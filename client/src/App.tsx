@@ -12,6 +12,7 @@ import WebResources from "@/pages/WebResources";
 import Legislation from "@/pages/Legislation";
 import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 function Router() {
   return (
@@ -34,10 +35,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <HelmetProvider>
-        <TooltipProvider>
-          <Router />
-          <Toaster />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Router />
+            <Toaster />
+          </TooltipProvider>
+        </AuthProvider>
       </HelmetProvider>
     </QueryClientProvider>
   );

@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { getBitcoinMarketData, getBitcoinChart, getBitcoinPrice } from "./api/cryptocompare";
 import { getLatestNews } from "./api/newsapi";
 // Twitter imports removed - now using specific HodlMyBeer integration
+import { getLatestTweets, getTrendingHashtags, getPopularAccounts, getHodlMyBeerFollowing } from "./api/social";
 
 import { getRealTreasuryData } from "./api/realTreasury";
 import { getFedWatchData, getFinancialMarketData } from "./api/financial";
