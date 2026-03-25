@@ -1,8 +1,14 @@
 import { NewsItem } from "../../client/src/lib/types";
-import axios from "axios";
+import axios from 'axios';
 
 // Default categories for Bitcoin news
 const DEFAULT_CATEGORIES = ["News", "Mining", "ETF", "Markets", "Security", "Wallets"];
+
+// RSS feed sources
+const RSS_FEEDS = [
+  { url: 'https://news.bitcoin.com/feed/', source: 'Bitcoin.com', categories: ['News'] },
+  { url: 'https://cryptonews.com/feed/', source: 'CryptoNews', categories: ['News', 'Markets'] },
+];
 
 // Cache mechanism to avoid hitting rate limits
 let newsCache: {
@@ -34,7 +40,44 @@ function extractCategories(title: string, body: string): string[] {
   return categories;
 }
 
-// Get latest Bitcoin news using CryptoCompare API (public, no API key required)
+// Strip HTML tags from text
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
+}
+
+// Fetch news from a single RSS feed via rss2json
+async function fetchFromFeed(feed: { url: string; source: string; categories: string[] }): Promise<NewsItem[]> {
+  try {
+    const response = await axios.get(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`, {
+      timeout: 10000,
+    });
+
+    if (response.data?.status === 'ok' && response.data?.items) {
+      return response.data.items.map((item: any, index: number) => {
+        const description = stripHtml(item.description || '').substring(0, 200);
+        const categories = item.categories && item.categories.length > 0 
+          ? item.categories.map((c: string) => c.charAt(0).toUpperCase() + c.slice(1))
+          : feed.categories;
+
+        return {
+          id: item.guid || `feed-${feed.source}-${index}`,
+          title: stripHtml(item.title),
+          description: description + (description.length >= 200 ? '...' : ''),
+          url: item.link,
+          source: feed.source,
+          publishedAt: item.pubDate || new Date().toISOString(),
+          categories: extractCategories(item.title, description),
+          imageUrl: item.thumbnail || item.enclosure?.link || 'https://images.unsplash.com/photo-1621504450181-5d356f61d307?ixlib=rb-4.0.3',
+        };
+      });
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch from ${feed.source}:`, error);
+  }
+  return [];
+}
+
+// Get latest Bitcoin news using RSS feeds
 export async function getLatestNews(category?: string): Promise<NewsItem[]> {
   try {
     // Use cached data if available and valid
@@ -49,43 +92,34 @@ export async function getLatestNews(category?: string): Promise<NewsItem[]> {
       return items;
     }
     
-    // Fetch fresh data from CryptoCompare News API (no auth required)
-    const url = "https://min-api.cryptocompare.com/data/v2/news/?categories=BTC,Bitcoin&excludeCategories=Sponsored";
-    const response = await axios.get(url);
+    // Fetch from all RSS feeds in parallel
+    const allNews = await Promise.all(RSS_FEEDS.map(feed => fetchFromFeed(feed)));
     
-    if (response.status !== 200) {
-      throw new Error(`Failed to fetch news: ${response.statusText}`);
-    }
+    // Flatten and sort by date (newest first)
+    let items: NewsItem[] = allNews
+      .flat()
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
     
-    // Transform API response to match our NewsItem interface
-    const items: NewsItem[] = response.data.Data.map((item: any, index: number) => {
-      const categories = extractCategories(item.title, item.body);
-      
-      return {
-        id: item.id || String(index + 1),
-        title: item.title,
-        description: item.body.substring(0, 200) + "...",
-        url: item.url,
-        source: item.source,
-        publishedAt: new Date(item.published_on * 1000).toISOString(),
-        categories: categories,
-        imageUrl: item.imageurl || "https://images.unsplash.com/photo-1621504450181-5d356f61d307?ixlib=rb-4.0.3"
-      };
+    // Deduplicate by URL
+    const seenUrls = new Set<string>();
+    items = items.filter(item => {
+      if (seenUrls.has(item.url)) return false;
+      seenUrls.add(item.url);
+      return true;
     });
     
     // Update cache
     newsCache = {
       timestamp: Date.now(),
-      data: items
+      data: items,
     };
     
     // Filter by category if provided
-    let result = items;
     if (category) {
-      result = items.filter(item => item.categories.includes(category));
+      items = items.filter(item => item.categories.includes(category));
     }
     
-    return result;
+    return items;
   } catch (error) {
     console.error("Error fetching news:", error);
     
