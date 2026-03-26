@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -33,15 +33,23 @@ interface GameData {
 interface DollarDilemmaGameProps {
   gameData: GameData;
   onBack: () => void;
+  onComplete?: () => void;
 }
 
-export function DollarDilemmaGame({ gameData, onBack }: DollarDilemmaGameProps) {
+export function DollarDilemmaGame({ gameData, onBack, onComplete }: DollarDilemmaGameProps) {
   const [currentLevel, setCurrentLevel] = useState(0);
   const [insightScore, setInsightScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
+
+  // Fire onComplete when game is finished
+  useEffect(() => {
+    if (gameCompleted && onComplete) {
+      onComplete();
+    }
+  }, [gameCompleted, onComplete]);
 
   const level = gameData.levels[currentLevel];
   const totalLevels = gameData.levels.length;

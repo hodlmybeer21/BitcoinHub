@@ -33,12 +33,15 @@ interface TreasureHuntGameProps {
   onBack: () => void;
 }
 
-export function TreasureHuntGame({ gameData, onBack }: TreasureHuntGameProps) {
+export function TreasureHuntGame({ gameData, onBack, onComplete }: TreasureHuntGameProps) {
   const [currentLevel, setCurrentLevel] = useState(0);
   const [totalCoins, setTotalCoins] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  useEffect(() => {
+    if (gameCompleted && onComplete) onComplete();
+  }, [gameCompleted, onComplete]);
   const [levelCompleted, setLevelCompleted] = useState<boolean[]>([]);
 
   useEffect(() => {

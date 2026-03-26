@@ -33,12 +33,15 @@ interface EscapeRoomGameProps {
   onBack: () => void;
 }
 
-export function EscapeRoomGame({ gameData, onBack }: EscapeRoomGameProps) {
+export function EscapeRoomGame({ gameData, onBack, onComplete }: EscapeRoomGameProps) {
   const [currentLevel, setCurrentLevel] = useState(0);
   const [totalKeys, setTotalKeys] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  useEffect(() => {
+    if (gameCompleted && onComplete) onComplete();
+  }, [gameCompleted, onComplete]);
   const [levelCompleted, setLevelCompleted] = useState<boolean[]>([]);
 
   useEffect(() => {

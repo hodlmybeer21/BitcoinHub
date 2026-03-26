@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -33,14 +33,18 @@ interface GameData {
 interface PolicySimulatorGameProps {
   gameData: GameData;
   onBack: () => void;
+  onComplete?: () => void;
 }
 
-export function PolicySimulatorGame({ gameData, onBack }: PolicySimulatorGameProps) {
+export function PolicySimulatorGame({ gameData, onBack, onComplete }: PolicySimulatorGameProps) {
   const [currentLevel, setCurrentLevel] = useState(0);
   const [insightScore, setInsightScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  useEffect(() => {
+    if (gameCompleted && onComplete) onComplete();
+  }, [gameCompleted, onComplete]);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [totalDebt, setTotalDebt] = useState(0.26); // Starting 1945 debt in trillions
   const [inflationImpact, setInflationImpact] = useState(0); // Cumulative inflation impact

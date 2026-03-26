@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -41,6 +41,9 @@ export function BitcoinTimeMachine({ gameData, onBack }: BitcoinTimeMachineProps
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  useEffect(() => {
+    if (gameCompleted && onComplete) onComplete();
+  }, [gameCompleted, onComplete]);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
 
   const level = gameData.levels[currentLevel];
