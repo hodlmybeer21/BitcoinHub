@@ -1,10 +1,33 @@
 import { useState, useEffect } from "react";
 import { LearningPaths } from "@/components/LearningPaths";
-import { GraduationCap, Trophy, Clock, TrendingUp, ChevronRight } from "lucide-react";
+import { UserStatsCard } from "@/components/UserStatsCard";
+import { GraduationCap, Trophy, Clock, TrendingUp } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+
+// Game difficulty mapping (matches the game types in the learning paths)
+const GAME_DIFFICULTY: Record<string, 'beginner' | 'intermediate' | 'advanced'> = {
+  // Beginner games
+  'bitcoin-time-machine': 'beginner',
+  'dollar-dilemma': 'beginner',
+  // Intermediate games
+  'bitcoin-boom-game': 'intermediate',
+  'boomer-policy-simulator': 'intermediate',
+  'millennial-escape-game': 'intermediate',
+  'bitcoin-treasure-hunt': 'intermediate',
+  'crypto-escape-room': 'intermediate',
+  'bitcoin-quest-game': 'intermediate',
+  'triffin-dilemma-quiz': 'intermediate',
+  'bretton-woods-collapse-quiz': 'intermediate',
+  // Advanced games
+  'great-inflation-quiz': 'advanced',
+  'historical-echoes-quiz': 'advanced',
+  'fourth-turning-quiz': 'advanced',
+};
 
 export default function Learn() {
   const [completedGames, setCompletedGames] = useState<string[]>([]);
   const [totalGames, setTotalGames] = useState(13);
+  const { isAuthenticated } = useAuth();
 
   // Load completed games from localStorage on mount
   useEffect(() => {
@@ -19,6 +42,45 @@ export default function Learn() {
 
   const completedCount = completedGames.length;
   const progressPercent = totalGames > 0 ? Math.round((completedCount / totalGames) * 100) : 0;
+
+  // Award XP when a game is completed
+  const awardXP = async (gameId: string) => {
+    if (!isAuthenticated) return;
+    
+    const gameType = GAME_DIFFICULTY[gameId] || 'beginner';
+    
+    try {
+      const response = await fetch('/api/user-stats/xp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ gameId, gameType }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('XP awarded:', data);
+        
+        // If there are new achievements, could show a notification here
+        if (data.newAchievements?.length > 0) {
+          console.log('New achievements unlocked:', data.newAchievements);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to award XP:', error);
+    }
+  };
+
+  // Update streak when user is active (on page load)
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetch('/api/user-stats/streak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      }).catch(console.error);
+    }
+  }, [isAuthenticated]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -65,6 +127,13 @@ export default function Learn() {
               )}
             </div>
           </div>
+
+          {/* User Stats Card - Gamification */}
+          {isAuthenticated && (
+            <div className="mt-4">
+              <UserStatsCard />
+            </div>
+          )}
         </div>
       </header>
 
@@ -88,6 +157,11 @@ export default function Learn() {
         <LearningPaths 
           completedGames={completedGames}
           onGameComplete={(gameId: string) => {
+            // Award XP if user is authenticated
+            if (isAuthenticated) {
+              awardXP(gameId);
+            }
+            
             if (!completedGames.includes(gameId)) {
               const updated = [...completedGames, gameId];
               setCompletedGames(updated);

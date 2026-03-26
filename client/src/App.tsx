@@ -12,6 +12,7 @@ import NewsFeed from "@/pages/NewsFeed";
 import WebResources from "@/pages/WebResources";
 import Legislation from "@/pages/Legislation";
 import Admin from "@/pages/Admin";
+import DCASimulator from "@/pages/DCASimulator";
 import Newsletter from "@/pages/Newsletter";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
@@ -29,6 +30,7 @@ function Router() {
         <Route path="/web-resources" component={WebResources} />
         <Route path="/legislation" component={Legislation} />
         <Route path="/admin" component={Admin} />
+        <Route path="/dca-simulator" component={DCASimulator} />
         <Route path="/newsletter" component={Newsletter} />
         <Route path="/privacy" component={Privacy} />
         <Route path="/terms" component={Terms} />
