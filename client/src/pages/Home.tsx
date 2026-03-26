@@ -197,6 +197,14 @@ const featuredTools = [
     link: 'https://tracker.goodbotai.tech',
     cta: 'Open Tracker',
     external: true
+  },
+  {
+    icon: TrendingUp,
+    title: 'DCA Simulator',
+    description: 'Simulate dollar-cost averaging strategies and see how regular investing compounds over time.',
+    link: '/dca-simulator',
+    cta: 'Coming Soon',
+    comingSoon: true
   }
 ];
 
@@ -639,25 +647,38 @@ const Home = () => {
           >
             {featuredTools.map((tool) => (
               <motion.div key={tool.title} variants={fadeInUp}>
-                <Card className="bg-card border-muted/20 p-6 h-full hover:shadow-lg hover:border-primary/30 transition-all group">
+                <Card className={`bg-card border-muted/20 p-6 h-full transition-all group ${tool.comingSoon ? '' : 'hover:shadow-lg hover:border-primary/30'}`}>
                   <CardHeader className="p-0 mb-4">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                      <tool.icon className="w-6 h-6 text-primary" />
+                    <div className="flex items-start justify-between">
+                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                        <tool.icon className="w-6 h-6 text-primary" />
+                      </div>
+                      {tool.comingSoon && (
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                          Coming Soon
+                        </Badge>
+                      )}
                     </div>
                     <CardTitle className="text-xl">{tool.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground mb-4">{tool.description}</p>
-                    <Link href={tool.link}>
-                      <Button variant="outline" className="w-full group">
-                        {tool.cta}
-                        {tool.external ? (
-                          <ExternalLink className="ml-2 w-4 h-4" />
-                        ) : (
-                          <ArrowRight className="ml-2 w-4 h-4" />
-                        )}
+                    {tool.comingSoon ? (
+                      <Button variant="outline" className="w-full group opacity-50 cursor-not-allowed" disabled>
+                        Coming Soon
                       </Button>
-                    </Link>
+                    ) : (
+                      <Link href={tool.link} {...(tool.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+                        <Button variant="outline" className="w-full group">
+                          {tool.cta}
+                          {tool.external ? (
+                            <ExternalLink className="ml-2 w-4 h-4" />
+                          ) : (
+                            <ArrowRight className="ml-2 w-4 h-4" />
+                          )}
+                        </Button>
+                      </Link>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>

@@ -16,6 +16,7 @@ import { getWorldBankEconomicData, getSpecificIndicator, getIndicatorTimeSeries 
 import { getCachedWhaleAlerts } from "./api/whale-alerts";
 import { getCachedOptionsFlow } from "./api/options-flow";
 import { getLiquidityData } from "./api/liquidity";
+import dcaSimulatorRouter from "./api/dca-simulator";
 import { z } from "zod";
 import { insertForumPostSchema, insertPortfolioEntrySchema, insertUserSchema, loginSchema, registerSchema } from "../shared/schema";
 import { hashPassword, verifyPassword, generateToken, getTokenExpiry, sendVerificationEmail, sendPasswordResetEmail } from "./auth";
@@ -502,6 +503,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch liquidity data" });
     }
   });
+
+  // DCA Simulator
+  app.use(dcaSimulatorRouter);
 
   // News
   app.get(`${apiPrefix}/news`, async (req, res) => {
@@ -3263,6 +3267,276 @@ All this data is updated live in the dashboard above. Try asking about specific 
         message: "Failed to fetch multi-timeframe predictions",
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  });
+
+  // ============================================
+  // GAMIFICATION SYSTEM - User Stats (In-Memory)
+  // ============================================
+  
+  // In-memory store for user stats
+  const userStatsMap = new Map<string, UserStats>();
+  
+  interface UserStats {
+    userId: string;
+    xp: number;
+    level: number;
+    satsEarned: number;
+    streak: number;
+    lastActivityDate: string;
+    achievements: string[];
+    gamesCompleted: number;
+    totalPlayTime: number;
+  }
+  
+  // XP configuration
+  const XP_PER_GAME = {
+    beginner: 100,
+    intermediate: 200,
+    advanced: 300,
+  };
+  
+  const MAX_STREAK_BONUS = 500;
+  const STREAK_BONUS_PER_DAY = 50;
+  
+  // Calculate level from XP
+  const calculateLevel = (xp: number): number => {
+    return Math.max(1, Math.floor(Math.sqrt(xp / 100)));
+  };
+  
+  // Calculate XP needed for next level
+  const xpForLevel = (level: number): number => {
+    return level * level * 100;
+  };
+  
+  // Get or create user stats
+  const getUserStats = (userId: string): UserStats => {
+    if (!userStatsMap.has(userId)) {
+      userStatsMap.set(userId, {
+        userId,
+        xp: 0,
+        level: 1,
+        satsEarned: 0,
+        streak: 0,
+        lastActivityDate: "",
+        achievements: [],
+        gamesCompleted: 0,
+        totalPlayTime: 0,
+      });
+    }
+    return userStatsMap.get(userId)!;
+  };
+  
+  // Check and award achievements
+  const checkAchievements = (stats: UserStats): string[] => {
+    const newAchievements: string[] = [];
+    const today = new Date().toISOString().split('T')[0];
+    
+    // First game achievement
+    if (stats.gamesCompleted >= 1 && !stats.achievements.includes('first_game')) {
+      stats.achievements.push('first_game');
+      stats.xp += 100; // Bonus XP
+      newAchievements.push('first_game');
+    }
+    
+    // Streak achievements
+    if (stats.streak >= 3 && !stats.achievements.includes('streak_3')) {
+      stats.achievements.push('streak_3');
+      newAchievements.push('streak_3');
+    }
+    if (stats.streak >= 7 && !stats.achievements.includes('streak_7')) {
+      stats.achievements.push('streak_7');
+      newAchievements.push('streak_7');
+    }
+    if (stats.streak >= 30 && !stats.achievements.includes('streak_30')) {
+      stats.achievements.push('streak_30');
+      newAchievements.push('streak_30');
+    }
+    
+    // Level 5 achievement
+    if (stats.level >= 5 && !stats.achievements.includes('level_5')) {
+      stats.achievements.push('level_5');
+      stats.xp += 200; // Bonus XP
+      newAchievements.push('level_5');
+    }
+    
+    // 100K sats achievement
+    if (stats.satsEarned >= 100000 && !stats.achievements.includes('sats_100k')) {
+      stats.achievements.push('sats_100k');
+      newAchievements.push('sats_100k');
+    }
+    
+    // Recalculate level after XP gains
+    stats.level = calculateLevel(stats.xp);
+    
+    return newAchievements;
+  };
+  
+  // GET /api/user-stats - Get current user stats
+  app.get(`${apiPrefix}/user-stats`, requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId?.toString();
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const stats = getUserStats(userId);
+      const xpForNextLevel = xpForLevel(stats.level + 1);
+      const xpForCurrentLevel = xpForLevel(stats.level);
+      const xpProgress = stats.xp - xpForCurrentLevel;
+      const xpNeeded = xpForNextLevel - xpForCurrentLevel;
+      
+      res.json({
+        ...stats,
+        xpProgress,
+        xpNeeded,
+        xpForNextLevel,
+      });
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ message: "Failed to fetch user stats" });
+    }
+  });
+  
+  // POST /api/user-stats/xp - Add XP after game completion
+  app.post(`${apiPrefix}/user-stats/xp`, requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId?.toString();
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const { gameId, gameType } = req.body;
+      
+      if (!gameId || !gameType) {
+        return res.status(400).json({ message: "gameId and gameType are required" });
+      }
+      
+      const stats = getUserStats(userId);
+      const xpGained = XP_PER_GAME[gameType as keyof typeof XP_PER_GAME] || XP_PER_GAME.beginner;
+      
+      // Add XP
+      stats.xp += xpGained;
+      
+      // Add sats (1 sat per XP for simplicity)
+      stats.satsEarned += xpGained;
+      
+      // Increment games completed
+      stats.gamesCompleted += 1;
+      
+      // Update level
+      stats.level = calculateLevel(stats.xp);
+      
+      // Update last activity
+      stats.lastActivityDate = new Date().toISOString();
+      
+      // Check for new achievements
+      const newAchievements = checkAchievements(stats);
+      
+      // Save back to map
+      userStatsMap.set(userId, stats);
+      
+      res.json({
+        success: true,
+        xpGained,
+        totalXp: stats.xp,
+        level: stats.level,
+        satsEarned: stats.satsEarned,
+        newAchievements,
+        gamesCompleted: stats.gamesCompleted,
+      });
+    } catch (error) {
+      console.error("Error adding XP:", error);
+      res.status(500).json({ message: "Failed to add XP" });
+    }
+  });
+  
+  // POST /api/user-stats/streak - Check and update daily streak
+  app.post(`${apiPrefix}/user-stats/streak`, requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId?.toString();
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const stats = getUserStats(userId);
+      const today = new Date().toISOString().split('T')[0];
+      const lastActivity = stats.lastActivityDate.split('T')[0];
+      
+      // Calculate days since last activity
+      const lastDate = new Date(lastActivity);
+      const todayDate = new Date(today);
+      const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      let streakBonus = 0;
+      
+      if (lastActivity === today) {
+        // Already updated today, no change
+      } else if (diffDays === 1) {
+        // Consecutive day - increase streak
+        stats.streak += 1;
+        streakBonus = Math.min(stats.streak * STREAK_BONUS_PER_DAY, MAX_STREAK_BONUS);
+        stats.xp += streakBonus;
+        stats.level = calculateLevel(stats.xp);
+      } else if (diffDays > 1) {
+        // Streak broken - reset to 1
+        stats.streak = 1;
+        streakBonus = STREAK_BONUS_PER_DAY;
+        stats.xp += streakBonus;
+        stats.level = calculateLevel(stats.xp);
+      } else {
+        // First activity
+        stats.streak = 1;
+        streakBonus = STREAK_BONUS_PER_DAY;
+        stats.xp += streakBonus;
+        stats.level = calculateLevel(stats.xp);
+      }
+      
+      // Update last activity date
+      stats.lastActivityDate = new Date().toISOString();
+      
+      // Check for new achievements
+      const newAchievements = checkAchievements(stats);
+      
+      // Save back to map
+      userStatsMap.set(userId, stats);
+      
+      res.json({
+        success: true,
+        streak: stats.streak,
+        streakBonus,
+        totalXp: stats.xp,
+        level: stats.level,
+        newAchievements,
+      });
+    } catch (error) {
+      console.error("Error updating streak:", error);
+      res.status(500).json({ message: "Failed to update streak" });
+    }
+  });
+  
+  // GET /api/leaderboard - Top 10 users by XP
+  app.get(`${apiPrefix}/leaderboard`, async (req, res) => {
+    try {
+      // Get all stats and sort by XP
+      const allStats = Array.from(userStatsMap.values())
+        .sort((a, b) => b.xp - a.xp)
+        .slice(0, 10)
+        .map((stats, index) => ({
+          rank: index + 1,
+          userId: stats.userId,
+          xp: stats.xp,
+          level: stats.level,
+          satsEarned: stats.satsEarned,
+          streak: stats.streak,
+          achievementsCount: stats.achievements.length,
+        }));
+      
+      res.json(allStats);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ message: "Failed to fetch leaderboard" });
     }
   });
 

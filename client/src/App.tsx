@@ -12,6 +12,9 @@ import NewsFeed from "@/pages/NewsFeed";
 import WebResources from "@/pages/WebResources";
 import Legislation from "@/pages/Legislation";
 import Admin from "@/pages/Admin";
+import Newsletter from "@/pages/Newsletter";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -26,6 +29,9 @@ function Router() {
         <Route path="/web-resources" component={WebResources} />
         <Route path="/legislation" component={Legislation} />
         <Route path="/admin" component={Admin} />
+        <Route path="/newsletter" component={Newsletter} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/terms" component={Terms} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
