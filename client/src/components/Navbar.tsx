@@ -88,43 +88,44 @@ const Navbar = () => {
                 <span className="text-xl font-bold text-foreground">BitcoinHub</span>
               </div>
             </Link>
-            <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-6">
               <Link href="/">
-                <span className={`${isActiveLink('/') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 font-medium cursor-pointer`}>
+                <span className={`${isActiveLink('/') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 text-sm font-medium cursor-pointer`}>
                   Learn
                 </span>
               </Link>
               <Link href="/analytics">
-                <span className={`${isActiveLink('/analytics') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 font-medium cursor-pointer`}>
+                <span className={`${isActiveLink('/analytics') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 text-sm font-medium cursor-pointer`}>
                   Analytics
                 </span>
               </Link>
               <Link href="/news">
-                <span className={`${isActiveLink('/news') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 font-medium cursor-pointer`}>
+                <span className={`${isActiveLink('/news') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 text-sm font-medium cursor-pointer`}>
                   News
                 </span>
               </Link>
               <Link href="/web-resources">
-                <span className={`${isActiveLink('/web-resources') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 font-medium cursor-pointer`}>
+                <span className={`${isActiveLink('/web-resources') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 text-sm font-medium cursor-pointer`}>
                   Web Resources
                 </span>
               </Link>
               <Link href="/legislation">
-                <span className={`${isActiveLink('/legislation') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 font-medium cursor-pointer`}>
+                <span className={`${isActiveLink('/legislation') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-1 pt-1 text-sm font-medium cursor-pointer`}>
                   Legislation
                 </span>
               </Link>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="relative">
+                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center">
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary text-[10px] text-primary-foreground font-bold">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
                     </span>
                   )}
                 </Button>

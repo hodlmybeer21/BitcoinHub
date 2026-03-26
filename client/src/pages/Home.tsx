@@ -51,10 +51,36 @@ const staggerContainer = {
   }
 };
 
+// Clean Bitcoin icon — scales perfectly at any size
 const BitcoinIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
-  <svg viewBox="0 0 32 32" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg">
     <circle cx="16" cy="16" r="16" fill="#F7931A"/>
-    <path d="M22.5 14.2c.3-2-1.2-3.1-3.3-3.8l.7-2.7-1.7-.4-.7 2.6c-.4-.1-.9-.2-1.4-.3l.7-2.7-1.7-.4-.7 2.7c-.4-.1-.7-.2-1-.2l-2.3-.6-.4 1.8s1.2.3 1.2.3c.7.2.8.6.8 1l-.8 3.2c0 0 .1 0 .2.1h-.2l-1.2 4.7c-.1.2-.3.5-.8.4 0 0-1.2-.3-1.2-.3l-.8 1.9 2.2.5c.4.1.8.2 1.2.3l-.7 2.8 1.7.4.7-2.7c.5.1.9.2 1.4.3l-.7 2.7 1.7.4.7-2.8c3 .6 5.2.3 6.1-2.4.8-2.1 0-3.4-1.6-4.2 1.1-.3 2-1 2.2-2.5zm-4 5.5c-.6 2.1-4.2 1-5.4.7l1 3.9c1.2.3 4.8.9 5.3-.6.4-1.3-.3-2.6-1.9-3zm.6-5.5c-.5 1.9-3.7.9-4.7.7l.9-3.6c1.1.3 4.4.8 4.8 1.1.4.4.3 1.6-.6 1.8h-.4z" fill="white"/>
+    <circle cx="16" cy="16" r="12" fill="none" stroke="white" strokeWidth="1.5"/>
+    <text x="16" y="21" textAnchor="middle" fontSize="14" fontWeight="bold" fill="white" fontFamily="serif">₿</text>
+  </svg>
+);
+
+// Hero logo — bold, clean, guaranteed to render perfectly
+const HeroBitcoinLogo = ({ className = "w-48 h-48" }: { className?: string }) => (
+  <svg viewBox="0 0 120 120" className={className} xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="btcGradHero" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#F7931A"/>
+        <stop offset="100%" stopColor="#E67500"/>
+      </linearGradient>
+      <filter id="heroGlow">
+        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    {/* Outer ring */}
+    <circle cx="60" cy="60" r="56" fill="none" stroke="url(#btcGradHero)" strokeWidth="3"/>
+    {/* Main circle with glow */}
+    <circle cx="60" cy="60" r="50" fill="url(#btcGradHero)" filter="url(#heroGlow)"/>
+    {/* Inner ring detail */}
+    <circle cx="60" cy="60" r="38" fill="none" stroke="white" strokeWidth="2" opacity="0.3"/>
+    {/* The ₿ symbol — large, bold, perfectly centered */}
+    <text x="60" y="80" textAnchor="middle" fontSize="52" fontWeight="bold" fill="white" fontFamily="Georgia, serif">₿</text>
   </svg>
 );
 
@@ -330,7 +356,7 @@ const Home = () => {
                   }}
                   className="w-full h-full"
                 >
-                  <BitcoinIcon className="w-full h-full drop-shadow-2xl" />
+                  <HeroBitcoinLogo className="w-full h-full drop-shadow-2xl" />
                 </motion.div>
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl -z-10" />
               </div>
