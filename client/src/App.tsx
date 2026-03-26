@@ -5,6 +5,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
+import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
 import Learn from "@/pages/Learn";
 import NewsFeed from "@/pages/NewsFeed";
@@ -18,7 +19,7 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Learn} />
+        <Route path="/" component={Home} />
         <Route path="/learn" component={Learn} />
         <Route path="/analytics" component={Dashboard} />
         <Route path="/news" component={NewsFeed} />
