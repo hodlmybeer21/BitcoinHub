@@ -3540,6 +3540,70 @@ All this data is updated live in the dashboard above. Try asking about specific 
     }
   });
 
+  // Newsletter subscription via Resend
+  app.post(`${apiPrefix}/newsletter`, async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Invalid email address" });
+      }
+
+      const RESEND_API_KEY = process.env.RESEND_API_KEY;
+      const AUDIENCE_ID = process.env.RESEND_AUDIENCE_ID || "0c6cd10b-ff19-4ffd-a899-af6dcdeb9cd4";
+
+      if (!RESEND_API_KEY) {
+        console.error("RESEND_API_KEY not configured");
+        return res.status(500).json({ 
+          message: "Newsletter service not configured. Please contact the administrator." 
+        });
+      }
+
+      // Add subscriber to Resend audience
+      const response = await fetch(`https://api.resend.com/audiences/${AUDIENCE_ID}/contacts`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase().trim(),
+          unsubscribed: false,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle already subscribed case gracefully
+        if (data.name === 'validation_error' && data.message?.includes('already exists')) {
+          return res.status(200).json({ 
+            message: "You're already subscribed!",
+            alreadySubscribed: true 
+          });
+        }
+        console.error("Resend API error:", data);
+        return res.status(500).json({ 
+          message: "Failed to subscribe. Please try again later." 
+        });
+      }
+
+      res.status(201).json({ 
+        message: "Successfully subscribed! Check your email to confirm.",
+        id: data.id 
+      });
+    } catch (error) {
+      console.error("Newsletter subscription error:", error);
+      res.status(500).json({ message: "Failed to subscribe. Please try again later." });
+    }
+  });
+
   // Last updated timestamp
   app.get(`${apiPrefix}/last-updated`, (req, res) => {
     res.json(new Date().toISOString());

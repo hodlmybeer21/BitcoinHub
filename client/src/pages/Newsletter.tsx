@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
-import { Mail, ArrowRight, CheckCircle2, Sparkles, TrendingUp, BookOpen } from 'lucide-react';
+import { Mail, ArrowRight, CheckCircle2, Sparkles, TrendingUp, BookOpen, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,13 +11,35 @@ import { Input } from '@/components/ui/input';
 const Newsletter = () => {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      // TODO: Integrate with newsletter service (Mailchimp, ConvertKit, etc.)
+    if (!email) return;
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Subscription failed');
+      }
+      
       setSubscribed(true);
       setEmail('');
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,20 +105,34 @@ const Newsletter = () => {
                     type="email"
                     placeholder="Enter your email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     required
+                    disabled={loading}
                     className="flex-1 bg-background/50 border-muted/20 focus:border-primary text-base h-12"
                   />
                   <Button 
                     type="submit" 
+                    disabled={loading}
                     className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-12 px-6"
                   >
-                    Subscribe
-                    <ArrowRight className="ml-2 w-5 h-5" />
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 w-5 h-5 animate-spin" />
+                        Subscribing...
+                      </>
+                    ) : (
+                      <>
+                        Subscribe
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                      </>
+                    )}
                   </Button>
                 </form>
+                {error && (
+                  <p className="text-sm text-red-500 text-center mt-3">{error}</p>
+                )}
                 <p className="text-xs text-muted-foreground text-center mt-4">
-                  TODO: Newsletter integration pending. Form UI complete.
+                  Free forever. Unsubscribe anytime.
                 </p>
               </>
             )}
