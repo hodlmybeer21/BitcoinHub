@@ -36,6 +36,19 @@ interface PolicySimulatorGameProps {
   onComplete?: () => void;
 }
 
+
+function shareToX(score: number, total: number, gameName: string) {
+  const pct = Math.round((score / total) * 100);
+  const text = encodeURIComponent(
+    `I just completed "${gameName}" on @BitcoinHub 🦇⚡\n\n` +
+    `Score: ${score}/${total} (${pct}%)\n\n` +
+    `Learning Bitcoin through interactive challenges.\n\n` +
+    `👉 Try it free: hub.goodbotai.tech\n\n` +
+    `#Bitcoin #SoundMoney`
+  );
+  window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
+}
+
 export function PolicySimulatorGame({ gameData, onBack, onComplete }: PolicySimulatorGameProps) {
   const [currentLevel, setCurrentLevel] = useState(0);
   const [insightScore, setInsightScore] = useState(0);
@@ -153,6 +166,15 @@ export function PolicySimulatorGame({ gameData, onBack, onComplete }: PolicySimu
                   {awarenessLevel}
                 </Badge>
               </div>
+      <button
+        onClick={() => shareToX(score, totalQuestions * 10,  + GAME_DISPLAY + )}
+        className="mt-4 w-full py-3 rounded-xl bg-[#1DA1F2] hover:bg-[#1a9bd9] text-white font-bold text-sm transition-all flex items-center justify-center gap-2"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+        Share Your Score on X
+      </button>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                 <Card className="bg-red-50 dark:bg-gray-800 border-red-300 dark:border-red-600">

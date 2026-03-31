@@ -36,6 +36,19 @@ interface FourthTurningGameProps {
   onComplete?: () => void;
 }
 
+
+function shareToX(score: number, total: number, gameName: string) {
+  const pct = Math.round((score / total) * 100);
+  const text = encodeURIComponent(
+    `I just completed "${gameName}" on @BitcoinHub 🦇⚡\n\n` +
+    `Score: ${score}/${total} (${pct}%)\n\n` +
+    `Learning Bitcoin through interactive challenges.\n\n` +
+    `👉 Try it free: hub.goodbotai.tech\n\n` +
+    `#Bitcoin #SoundMoney`
+  );
+  window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
+}
+
 export function FourthTurningGame({ gameData, onBack, onComplete }: FourthTurningGameProps) {
   const [currentLevel, setCurrentLevel] = useState(0);
   const [cycleScore, setCycleScore] = useState(0);
@@ -130,6 +143,15 @@ export function FourthTurningGame({ gameData, onBack, onComplete }: FourthTurnin
                   {scoreLevel.icon} {scoreLevel.title}
                 </Badge>
               </div>
+      <button
+        onClick={() => shareToX(score, totalQuestions * 10,  + GAME_DISPLAY + )}
+        className="mt-4 w-full py-3 rounded-xl bg-[#1DA1F2] hover:bg-[#1a9bd9] text-white font-bold text-sm transition-all flex items-center justify-center gap-2"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+        Share Your Score on X
+      </button>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Understanding Level</p>
                 <div className="text-2xl font-bold">

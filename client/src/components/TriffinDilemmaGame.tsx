@@ -1,368 +1,352 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Trophy, Target, TrendingDown, AlertCircle, CheckCircle, XCircle, DollarSign } from "lucide-react";
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import { TrendingUp, RotateCcw } from 'lucide-react';
 
-interface GameLevel {
+interface Level {
   id: number;
   title: string;
   story: string;
-  data: {
-    title: string;
-    stats: Array<{
-      label: string;
-      value: string;
-      note: string;
-    }>;
-  };
-  quiz: {
-    question: string;
-    options: string[];
-    correct: number;
-    explanation: string;
-    points: number;
-  };
+  data: { title: string; stats: { label: string; value: string; note: string }[] };
+  quiz: { question: string; options: string[]; correct: number; explanation: string; points: number };
 }
 
-interface GameData {
-  levels: GameLevel[];
-}
-
-interface TriffinDilemmaGameProps {
-  gameData: GameData;
-  onBack: () => void;
-  onComplete?: () => void;
-}
-
-export function TriffinDilemmaGame({ gameData, onBack, onComplete }: TriffinDilemmaGameProps) {
-  const [currentLevel, setCurrentLevel] = useState(0);
-  const [economicScore, setEconomicScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [gameCompleted, setGameCompleted] = useState(false);
-  useEffect(() => {
-    if (gameCompleted && onComplete) onComplete();
-  }, [gameCompleted, onComplete]);
-  const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
-
-  const level = gameData.levels[currentLevel];
-  const totalLevels = gameData.levels.length;
-  const progressPercentage = ((currentLevel + 1) / totalLevels) * 100;
-  const maxScore = totalLevels * 10;
-
-  const handleAnswerSelect = (answerIndex: number) => {
-    if (showResult) return;
-    setSelectedAnswer(answerIndex);
-  };
-
-  const handleSubmitAnswer = () => {
-    if (selectedAnswer === null) return;
-
-    const isCorrect = selectedAnswer === level.quiz.correct;
-    setShowResult(true);
-    
-    if (isCorrect && !answeredQuestions.has(currentLevel)) {
-      setEconomicScore(prev => prev + level.quiz.points);
-      setAnsweredQuestions(prev => new Set(prev).add(currentLevel));
+const LEVELS: Level[] = [
+  {
+    id: 1,
+    title: "Britain's Imperial Burden",
+    story: "Think back to the 1920s when Britain clung to the gold standard post-WWI, running deficits to maintain the pound's global role, leading to gold outflows and the 1931 sterling crisis that deepened the Great Depression. Just as families in the 1930s saw savings evaporate from currency devaluation, modern Americans face a dollar weakened by deficits needed to supply global demand for U.S. assets.",
+    data: {
+      title: "September 2025 Economic Reality",
+      stats: [
+        { label: "U.S. Gross National Debt", value: "$37.45T", note: "About 133% of GDP" },
+        { label: "Dollar Index (DXY) YTD", value: "-10.2%", note: "Down to around 96.6" },
+        { label: "Consumer Sentiment", value: "55.4", note: "Lowest since May 2025" }
+      ]
+    },
+    quiz: {
+      question: "What is the core conflict in Triffin's Dilemma that mirrors Britain's 1920s struggle?",
+      options: [
+        "A) The U.S. should hoard gold to strengthen the dollar",
+        "B) Supplying dollars globally via deficits eventually erodes the currency's stability",
+        "C) Foreign countries should stop demanding U.S. dollars for trade",
+        "D) The Federal Reserve can print unlimited dollars without consequences"
+      ],
+      correct: 1,
+      explanation: "Triffin's Dilemma exposed the Bretton Woods conflict: The U.S. had to export dollars through deficits to support global trade, but this created excess claims on finite gold, devaluing the dollar. In 2025's fiat version, $37.45 trillion in debt supplies Treasuries to foreigners, but it devalues the dollar (down 10.2% YTD), fueling 2.9% inflation that hits fixed-income retirees hardest.",
+      points: 10
     }
-  };
-
-  const handleNextLevel = () => {
-    if (currentLevel < totalLevels - 1) {
-      setCurrentLevel(currentLevel + 1);
-      setSelectedAnswer(null);
-      setShowResult(false);
-    } else {
-      setGameCompleted(true);
+  },
+  {
+    id: 2,
+    title: "The Gold Drain Crisis",
+    story: "Recall the late 1960s: U.S. gold reserves plummeted from 20,000 tons in 1950 to under 9,000 by 1971, drained by deficits from Vietnam War spending ($168 billion) and Great Society programs. This echoes the Roman Empire's debasement of silver coins to fund wars, leading to hyperinflation and collapse.",
+    data: {
+      title: "Current Debt Servicing Crisis",
+      stats: [
+        { label: "Annual Debt Servicing", value: "$1.1T+", note: "Exceeds Medicare spending" },
+        { label: "Current Inflation Rate", value: "2.9%", note: "Core inflation at 3.1%" },
+        { label: "Foreign Treasury Holdings", value: "$8T", note: "Demand requires U.S. supply" }
+      ]
+    },
+    quiz: {
+      question: "Why did the U.S. abandon the gold standard in 1971, and how does this relate to today's fiscal pressures?",
+      options: [
+        "A) The U.S. found new gold mines and no longer needed the standard",
+        "B) Deficits from wars and social spending led to foreign gold redemptions, depleting reserves",
+        "C) Europe banned U.S. dollars in international transactions",
+        "D) The Fed overprinted gold-backed notes by mistake"
+      ],
+      correct: 1,
+      explanation: "Persistent deficits flooded markets with dollars, prompting conversions (e.g., France's demands), much like Rome's coin clipping eroded trust. Nixon ended gold convertibility to avert crisis. Now, with debt at $37.45 trillion and servicing over $1.1 trillion yearly (more than Medicare), the 'New Triffin' relies on faith amid tariffs. This hits younger people hardest: shakier entitlements, $1.8 trillion student debt, and gig economy insecurity.",
+      points: 10
     }
-  };
-
-  const handlePreviousLevel = () => {
-    if (currentLevel > 0) {
-      setCurrentLevel(currentLevel - 1);
-      setSelectedAnswer(null);
-      setShowResult(false);
+  },
+  {
+    id: 3,
+    title: "Imperial Overstretch Pattern",
+    story: "Consider the British pound's fall in the 1800s: Imperial deficits from wars and global trade dominance led to gold drains, culminating in WWI-era devaluation, similar to Spain's 'price revolution' from colonial silver. Like a family overspending on credit for status, the U.S. borrows to maintain dollar hegemony, but it squeezes household budgets via higher prices for everything from housing to healthcare.",
+    data: {
+      title: "Generational Impact Analysis",
+      stats: [
+        { label: "Homeownership Age", value: "26 (1980) → 33 (2025)", note: "Rising barriers for young" },
+        { label: "Student Debt Burden", value: "$1.8T", note: "Crushing young adults" },
+        { label: "Real Wage Stagnation", value: "50+ years", note: "Since gold standard end" }
+      ]
+    },
+    quiz: {
+      question: "What historical pattern connects Britain's imperial decline to America's current reserve currency challenges?",
+      options: [
+        "A) Both relied on infinite commodity supplies without deficits",
+        "B) Global currency status requires deficits that erode confidence over time",
+        "C) Britain fixed its issues by adopting the dollar early",
+        "D) The U.S. avoided Britain's mistakes by eliminating deficits"
+      ],
+      correct: 1,
+      explanation: "Britain's pound, like the dollar, demanded deficits for empire/trade, but overreach inflated values away. Today, U.S. deficits meet insatiable demand for safe assets, but the dollar's 10.2% YTD drop from fiscal strains echoes those falls. Older generations enjoyed pound/dollar peaks; younger ones inherit wealth gaps, with homeownership ages rising from 26 in 1980 to 33 in 2025.",
+      points: 10
     }
-  };
-
-  const resetGame = () => {
-    setCurrentLevel(0);
-    setEconomicScore(0);
-    setSelectedAnswer(null);
-    setShowResult(false);
-    setGameCompleted(false);
-    setAnsweredQuestions(new Set());
-  };
-
-  const getScoreLevel = () => {
-    const scorePercentage = (economicScore / maxScore) * 100;
-    if (scorePercentage >= 80) return { title: "Economic Sage", color: "text-green-600", icon: "🏆" };
-    if (scorePercentage >= 60) return { title: "Strong Insight", color: "text-blue-600", icon: "💡" };
-    if (scorePercentage >= 40) return { title: "Learning", color: "text-orange-600", icon: "📚" };
-    return { title: "Novice", color: "text-slate-600", icon: "🎓" };
-  };
-
-  if (gameCompleted) {
-    const scoreLevel = getScoreLevel();
-    
-    return (
-      <div className="space-y-6">
-        <Card className="border-2 border-primary">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-4 bg-primary/10 rounded-full">
-                <Trophy className="h-12 w-12 text-primary" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl">Quiz Complete! 🎉</CardTitle>
-            <p className="text-muted-foreground">
-              You've navigated Triffin's Dilemma through economic history
-            </p>
-          </CardHeader>
-          <CardContent className="text-center space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Your Economic Insight Score</p>
-                <p className="text-4xl font-bold text-primary">{economicScore}/{maxScore}</p>
-                <Badge className={scoreLevel.color} variant="secondary">
-                  {scoreLevel.icon} {scoreLevel.title}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Understanding Level</p>
-                <div className="text-2xl font-bold">
-                  {economicScore === maxScore ? "Perfect! 🏆" : 
-                   economicScore >= 30 ? "Strong 💪" : "Keep Learning 📚"}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {economicScore >= 40 ? "You grasp the reserve currency dilemma" : "Review the historical parallels"}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">Key Insight: Triffin's Eternal Struggle</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                From Britain's gold standard to today's fiat dollar, reserve currencies face the same dilemma: 
-                provide global liquidity through deficits, but risk undermining confidence over time. 
-                Understanding this helps navigate economic uncertainty.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button onClick={resetGame} variant="outline" className="flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Play Again
-              </Button>
-              <Button onClick={onBack} className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Learning
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  },
+  {
+    id: 4,
+    title: "The Petrodollar Trap",
+    story: "Post-1971, the dollar became fiat, backed by oil deals (petrodollars) like OPEC's 1970s agreements, but abrupt deficit cuts could spike rates globally, reminiscent of the 1931 British gold abandonment that halted trade and worsened Depression unemployment. Like a business slashing costs and losing customers, cutting spending cold turkey might lower taxes short-term but crash markets.",
+    data: {
+      title: "Global Dependency Metrics",
+      stats: [
+        { label: "Foreign Treasury Holdings", value: "$8T", note: "Require ongoing U.S. deficit spending" },
+        { label: "Petrodollar Recycling", value: "~$600B/year", note: "Oil revenue reinvested in Treasuries" },
+        { label: "Rate Spike Risk", value: "5-8%", note: "If foreign demand drops suddenly" }
+      ]
+    },
+    quiz: {
+      question: "In September 2025, why is Triffin's Dilemma intensifying, and who suffers most from its effects?",
+      options: [
+        "A) Deficits are shrinking; only foreign investors feel the impact",
+        "B) Deficits and dollar devaluation intensify inequality — younger generations suffer most",
+        "C) Triffin's Dilemma only affects older, fixed-income retirees",
+        "D) The dilemma has been solved by modern monetary policy"
+      ],
+      correct: 1,
+      explanation: "Like petrodollars recycling oil wealth into Treasuries, foreign holdings ($8 trillion) demand U.S. supply, but stopping risks rate spikes and recessions, as in 1931. In 2025, with 2.9% inflation and policies like tariffs, the cycle persists without Bretton Woods' anchor. Younger generations suffer most: Deficits crowd out education/infrastructure investments, fueling job insecurity in automated economies.",
+      points: 10
+    }
   }
+];
 
+const TOTAL_POSSIBLE = LEVELS.reduce((sum, l) => sum + l.quiz.points, 0);
+
+function shareScore(score: number) {
+  const pct = Math.round((score / TOTAL_POSSIBLE) * 100);
+  const text = encodeURIComponent(`I just completed "Triffin's Dilemma" on @BitcoinHub 🏦⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nUnderstanding the impossible tradeoff at the heart of the dollar's reserve currency status.\n\n👉 Try it free: hub.goodbotai.tech\n\n#Bitcoin #TriffinsDilemma #Dollar #Macro`);
+  window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
+}
+
+function ProgressBar({ current, total }: { current: number; total: number }) {
+  const pct = Math.round((current / total) * 100);
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card className="border-l-4 border-l-primary">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <DollarSign className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-xl">Triffin's Dilemma Quiz</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  The Reserve Currency's Hidden Toll - September 2025
-                </p>
-              </div>
-            </div>
-            <Button onClick={onBack} variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Progress */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Progress</span>
-            <span className="text-sm text-muted-foreground">
-              Question {currentLevel + 1} of {totalLevels}
-            </span>
-          </div>
-          <Progress value={progressPercentage} className="h-2" />
-          
-          <div className="flex items-center justify-between mt-4">
-            <div className="flex items-center space-x-4">
-              <Button
-                onClick={handlePreviousLevel}
-                disabled={currentLevel === 0}
-                variant="outline"
-                size="sm"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Previous
-              </Button>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-muted-foreground">
-                Score: {economicScore}/{maxScore}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Level Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Story & Context */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{level.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <p className="text-muted-foreground leading-relaxed">
-                  {level.story}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Current Economic Data */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-orange-500" />
-              {level.data.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {level.data.stats.map((stat, index) => (
-                <div key={index} className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-sm">{stat.label}</p>
-                    <p className="text-xs text-muted-foreground">{stat.note}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-primary">{stat.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+    <div className="w-full mb-5">
+      <div className="flex justify-between text-xs text-slate-400/70 mb-1.5 font-medium">
+        <span>Level {current} of {total}</span><span>{pct}%</span>
       </div>
-
-      {/* Quiz Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Test Your Understanding</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="font-medium text-foreground leading-relaxed">
-              {level.quiz.question}
-            </p>
-
-            <div className="grid grid-cols-1 gap-3">
-              {level.quiz.options.map((option, index) => (
-                <Button
-                  key={index}
-                  variant={selectedAnswer === index ? "default" : "outline"}
-                  className={`justify-start text-left h-auto p-4 ${
-                    showResult
-                      ? index === level.quiz.correct
-                        ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
-                        : selectedAnswer === index
-                        ? "border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
-                        : "opacity-50"
-                      : ""
-                  }`}
-                  onClick={() => handleAnswerSelect(index)}
-                  disabled={showResult}
-                >
-                  <div className="flex items-start gap-3">
-                    {showResult && index === level.quiz.correct && (
-                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    )}
-                    {showResult && selectedAnswer === index && index !== level.quiz.correct && (
-                      <XCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-                    )}
-                    <span className="text-left leading-relaxed">{option}</span>
-                  </div>
-                </Button>
-              ))}
-            </div>
-
-            {!showResult ? (
-              <Button
-                onClick={handleSubmitAnswer}
-                disabled={selectedAnswer === null}
-                className="w-full"
-              >
-                Submit Answer
-              </Button>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="p-1">
-                      {selectedAnswer === level.quiz.correct ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <AlertCircle className="h-5 w-5 text-orange-500" />
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <p className="font-medium">
-                        {selectedAnswer === level.quiz.correct ? "Correct!" : "Not quite right"}
-                      </p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {level.quiz.explanation}
-                      </p>
-                      {selectedAnswer === level.quiz.correct && (
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <Trophy className="h-4 w-4" />
-                          +{level.quiz.points} points earned
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Button onClick={handleNextLevel} className="w-full">
-                  {currentLevel < totalLevels - 1 ? (
-                    <>
-                      Next Question
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  ) : (
-                    <>
-                      Complete Quiz
-                      <Trophy className="h-4 w-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-slate-500 to-gray-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
+
+function IntroScreen({ onStart }: { onStart: () => void }) {
+  const [m, setM] = useState(false);
+  useEffect(() => { setTimeout(() => setM(true), 80); }, []);
+  return (
+    <div className={`transition-all duration-500 ${m ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="text-center mb-7">
+        <div className="text-6xl mb-4">🏦⚡</div>
+        <h2 className="text-3xl font-black text-white mb-3">Triffin's Dilemma Quiz</h2>
+        <p className="text-gray-400 text-base leading-relaxed max-w-sm mx-auto">
+          The impossible tradeoff at the heart of the dollar's reserve currency status — and why it matters for every generation.
+        </p>
+      </div>
+      <div className="bg-gray-800/40 border border-gray-700/60 rounded-2xl p-5 mb-5">
+        <h3 className="text-white font-semibold mb-3 text-sm">What you'll discover:</h3>
+        <ul className="space-y-2.5">
+          {[
+            "Why the dollar's global role requires the U.S. to run persistent deficits",
+            "How this creates inflation that erodes everyone's purchasing power",
+            "The historical pattern from Britain to Rome to modern America",
+            "Why younger generations bear the greatest burden"
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-gray-300 text-sm">
+              <span className="text-slate-400 mt-0.5 shrink-0">✓</span>{item}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[{ v: "4", l: "Chapters" }, { v: "$37.45T", l: "U.S. Debt" }, { v: "-10.2%", l: "DXY YTD" }].map(({ v, l }) => (
+          <div key={l} className="text-center p-3 bg-gray-800/30 rounded-xl border border-gray-700/40">
+            <div className="text-lg font-black text-slate-400">{v}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{l}</div>
+          </div>
+        ))}
+      </div>
+      <button onClick={onStart} className="w-full py-4 rounded-2xl bg-gradient-to-r from-slate-600 to-gray-600 hover:from-slate-500 hover:to-gray-500 text-white font-black text-lg transition-all duration-200 shadow-lg shadow-slate-900/30 hover:scale-[1.02] active:scale-[0.98]">
+        Begin the Quiz →
+      </button>
+    </div>
+  );
+}
+
+function StoryScreen({ level, onComplete }: { level: Level; onComplete: () => void }) {
+  const [m, setM] = useState(false);
+  useEffect(() => { setTimeout(() => setM(true), 80); }, []);
+  return (
+    <div className={`transition-all duration-500 ${m ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="text-center mb-5">
+        <div className="inline-block px-3 py-1 rounded-full bg-slate-900/40 border border-slate-700/50 text-slate-400 text-xs font-bold tracking-wider mb-3">
+          CHAPTER {level.id} OF {LEVELS.length}
+        </div>
+        <h3 className="text-xl font-black text-white leading-tight">{level.title}</h3>
+      </div>
+      <div className="bg-gray-800/30 border border-gray-700/50 rounded-2xl p-5 mb-4">
+        <p className="text-gray-300 text-sm leading-relaxed">{level.story}</p>
+      </div>
+      <div className="bg-gray-900/60 border border-gray-700/40 rounded-2xl p-4 mb-5">
+        <div className="text-xs text-gray-500 uppercase tracking-wider mb-3 font-semibold">{level.data.title}</div>
+        <div className="space-y-3">
+          {level.data.stats.map((s, i) => (
+            <div key={i} className="flex justify-between items-baseline gap-3">
+              <span className="text-gray-400 text-xs shrink-0">{s.label}</span>
+              <div className="text-right">
+                <span className="text-slate-400 font-bold text-sm">{s.value}</span>
+                <span className="text-gray-600 text-xs ml-2">— {s.note}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <button onClick={onComplete} className="w-full py-3.5 rounded-xl bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white font-bold text-sm transition-all duration-150">
+        Continue to Question →
+      </button>
+    </div>
+  );
+}
+
+function QuizScreen({ level, selectedAnswer, answered, onSelect }: {
+  level: Level; selectedAnswer: number | null; answered: boolean; onSelect: (i: number) => void;
+}) {
+  const quiz = level.quiz;
+  const isCorrect = selectedAnswer === quiz.correct;
+  return (
+    <div>
+      <div className="mb-4">
+        <div className="text-xs text-gray-600 font-semibold mb-1.5">QUESTION</div>
+        <h4 className="text-white font-bold text-base leading-snug">{quiz.question}</h4>
+      </div>
+      <div className="space-y-2.5 mb-5">
+        {quiz.options.map((opt, i) => {
+          let cls = 'bg-gray-800/70 border-gray-700/70 text-gray-200 hover:border-slate-500/60 hover:bg-gray-800';
+          if (answered) {
+            if (i === quiz.correct) cls = 'bg-slate-800/70 border-slate-500 text-slate-200';
+            else if (i === selectedAnswer && !isCorrect) cls = 'bg-red-900/40 border-red-500/50 text-red-200';
+            else cls = 'bg-gray-800/30 border-gray-800/50 text-gray-600';
+          } else if (selectedAnswer === i) {
+            cls = 'bg-slate-800/50 border-slate-500/70 text-slate-200';
+          }
+          return (
+            <button key={i} onClick={() => !answered && onSelect(i)} disabled={answered}
+              className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all duration-150 text-sm font-medium ${cls}`}>
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      {answered && (
+        <div className={`p-4 rounded-2xl border mb-4 ${isCorrect ? 'bg-slate-900/40 border-slate-700/50' : 'bg-red-900/30 border-red-700/50'}`}>
+          <div className="flex items-start gap-2.5">
+            <span className="text-2xl shrink-0 mt-0.5">{isCorrect ? '✅' : '❌'}</span>
+            <p className={`text-sm leading-relaxed font-medium ${isCorrect ? 'text-slate-200' : 'text-red-200'}`}>{quiz.explanation}</p>
+          </div>
+          <div className="mt-2 pl-8">
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isCorrect ? 'bg-slate-700/50 text-slate-300' : 'bg-red-700/50 text-red-300'}`}>
+              {isCorrect ? `+${quiz.points} points` : '0 points'}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GameCompleteScreen({ score, onRestart }: { score: number; onRestart: () => void }) {
+  const [m, setM] = useState(false);
+  useEffect(() => { setTimeout(() => setM(true), 80); }, []);
+  const pct = Math.round((score / TOTAL_POSSIBLE) * 100);
+  const passed = score >= TOTAL_POSSIBLE * 0.6;
+  let badge = '📖', title = 'Keep Learning', message = "You've seen how the dollar's global role creates an inescapable dilemma. Understanding it is the first step.";
+  if (pct >= 80) { badge = '🏆'; title = 'Masterful!'; message = "You deeply understand Triffin's Dilemma and its generational consequences. You see the structural flaw at the heart of the dollar system."; }
+  else if (pct >= 60) { badge = '⚡'; title = 'Well Done!'; message = "You understand the core tension: supplying the world with dollars requires deficits that erode the dollar over time."; }
+  return (
+    <div className={`transition-all duration-500 ${m ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="text-center mb-6">
+        <div className="text-6xl mb-3">{badge}</div>
+        <h3 className="text-2xl font-black text-white mb-2">{title}</h3>
+        <p className="text-gray-400 text-sm leading-relaxed">{message}</p>
+      </div>
+      <div className="bg-gray-800/40 border border-gray-700/60 rounded-2xl p-6 mb-5 text-center">
+        <div className="text-4xl font-black text-slate-400 mb-1">{score}</div>
+        <div className="text-gray-500 text-sm mb-3">{TOTAL_POSSIBLE} points possible</div>
+        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-1000 ${passed ? 'bg-slate-500' : 'bg-gray-600'}`} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="mt-2 text-xs text-gray-500">{pct}% — {passed ? 'Passed!' : 'Keep studying!'}</div>
+      </div>
+      <button onClick={() => shareScore(score)} className="w-full py-4 rounded-2xl bg-[#1DA1F2] hover:bg-[#1a9bd9] active:bg-[#1589c4] text-white font-black text-base transition-all duration-150 flex items-center justify-center gap-2.5 mb-3 shadow-lg">
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Share Your Score on X
+      </button>
+      <button onClick={onRestart} className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-semibold text-sm transition-all duration-150">
+        Play Again
+      </button>
+    </div>
+  );
+}
+
+export function TriffinDilemmaGame() {
+  const [phase, setPhase] = useState<'intro' | 'story' | 'quiz' | 'gameComplete'>('intro');
+  const [currentLevel, setCurrentLevel] = useState(0);
+  const [score, setScore] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [answered, setAnswered] = useState(false);
+  const level = LEVELS[currentLevel];
+
+  const handleStart = useCallback(() => setPhase('story'), []);
+  const handleStoryComplete = useCallback(() => { setPhase('quiz'); setSelectedAnswer(null); setAnswered(false); }, []);
+  const handleSelect = useCallback((i: number) => {
+    if (answered) return;
+    setSelectedAnswer(i); setAnswered(true);
+    if (i === level.quiz.correct) setScore(s => s + level.quiz.points);
+  }, [answered, level]);
+  const handleContinue = useCallback(() => {
+    if (currentLevel + 1 >= LEVELS.length) setPhase('gameComplete');
+    else { setCurrentLevel(c => c + 1); setPhase('story'); setSelectedAnswer(null); setAnswered(false); }
+  }, [currentLevel]);
+  const handleRestart = useCallback(() => { setPhase('intro'); setCurrentLevel(0); setScore(0); setSelectedAnswer(null); setAnswered(false); }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white">
+      <div className="bg-gray-900/90 border-b border-gray-800 px-4 py-3 sticky top-0 z-20 backdrop-blur-sm">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🏦⚡</span>
+            <span className="font-black text-sm text-white tracking-tight">Triffin's Dilemma</span>
+          </div>
+          {phase !== 'intro' && (
+            <div className="flex items-center gap-3">
+              <div className="text-slate-400 font-black text-sm">{score} pts</div>
+              <div className="text-gray-600 text-xs">Lv {currentLevel + 1}/{LEVELS.length}</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="max-w-lg mx-auto px-4 py-6">
+        {phase !== 'intro' && phase !== 'gameComplete' && <ProgressBar current={currentLevel + 1} total={LEVELS.length} />}
+        {phase === 'intro' && <IntroScreen onStart={handleStart} />}
+        {phase === 'story' && <StoryScreen level={level} onComplete={handleStoryComplete} />}
+        {phase === 'quiz' && <>
+          <QuizScreen level={level} selectedAnswer={selectedAnswer} answered={answered} onSelect={handleSelect} />
+          {answered && (
+            <div className="mt-4">
+              <button onClick={handleContinue} className="w-full py-3.5 rounded-xl bg-green-600 hover:bg-green-500 active:bg-green-400 text-white font-bold text-sm transition-all duration-150">
+                {currentLevel + 1 >= LEVELS.length ? 'See Final Results →' : `Next: Chapter ${currentLevel + 2} →`}
+              </button>
+            </div>
+          )}
+        </>}
+        {phase === 'gameComplete' && <GameCompleteScreen score={score} onRestart={handleRestart} />}
+      </div>
+    </div>
+  );
+}
+
+export default TriffinDilemmaGame;

@@ -1,481 +1,351 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowRight, ArrowLeft, Trophy, Target, TrendingDown, AlertCircle,
-  CheckCircle, XCircle, Building2, Share2, Twitter, Copy, Check, Zap, BookOpen
-} from "lucide-react";
+'use client';
+import { useState, useEffect, useCallback } from 'react';
 
-interface GameLevel {
+interface Level {
   id: number;
   title: string;
   story: string;
-  data: {
-    title: string;
-    stats: Array<{ label: string; value: string; note: string }>;
-  };
-  quiz: {
-    question: string;
-    options: string[];
-    correct: number;
-    explanation: string;
-    points: number;
-  };
+  data: { title: string; stats: { label: string; value: string; note: string }[] };
+  quiz: { question: string; options: string[]; correct: number; explanation: string; points: number };
 }
 
-interface GameData {
-  levels: GameLevel[];
-}
-
-interface BrettonWoodsGameProps {
-  gameData: GameData;
-  onBack: () => void;
-  onComplete?: () => void;
-}
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.2 } },
-  exit: { opacity: 0 }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } }
-};
-
-const slideVariants = {
-  hidden: { opacity: 0, x: 30 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  exit: { opacity: 0, x: -30 }
-};
-
-export function BrettonWoodsGame({ gameData, onBack, onComplete }: BrettonWoodsGameProps) {
-  const [currentLevel, setCurrentLevel] = useState(0);
-  const [historyScore, setHistoryScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [gameCompleted, setGameCompleted] = useState(false);
-  const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (gameCompleted && onComplete) onComplete();
-  }, [gameCompleted, onComplete]);
-
-  const level = gameData.levels[currentLevel];
-  const totalLevels = gameData.levels.length;
-  const progressPercentage = ((currentLevel + 1) / totalLevels) * 100;
-  const maxScore = totalLevels * 10;
-
-  const getScoreLevel = () => {
-    const pct = (historyScore / maxScore) * 100;
-    if (pct >= 80) return { title: "History Buff Extraordinaire", color: "text-green-400", icon: "🏆", badge: "bg-green-500/20 border-green-500/50" };
-    if (pct >= 60) return { title: "Keen Observer", color: "text-blue-400", icon: "💡", badge: "bg-blue-500/20 border-blue-500/50" };
-    if (pct >= 40) return { title: "Learning", color: "text-yellow-400", icon: "📚", badge: "bg-yellow-500/20 border-yellow-500/50" };
-    return { title: "Keep Studying", color: "text-gray-400", icon: "🎓", badge: "bg-gray-500/20 border-gray-500/50" };
-  };
-
-  const handleAnswerSelect = (idx: number) => {
-    if (showResult) return;
-    setSelectedAnswer(idx);
-  };
-
-  const handleSubmitAnswer = () => {
-    if (selectedAnswer === null) return;
-    setShowResult(true);
-    if (selectedAnswer === level.quiz.correct && !answeredQuestions.has(currentLevel)) {
-      setHistoryScore(prev => prev + level.quiz.points);
-      setAnsweredQuestions(prev => new Set(prev).add(currentLevel));
+const LEVELS: Level[] = [
+  {
+    id: 1,
+    title: "The Fundamental Imbalance",
+    story: "The Bretton Woods system of fixed exchange rates was built on a contradiction: the U.S. promised to exchange dollars for gold at $35/oz, but also financed Vietnam and Great Society programs without raising taxes. This 'exorbitant privilege' — paying for global leadership with depreciating dollars — was unsustainable.",
+    data: {
+      title: "The 1971 Crisis",
+      stats: [
+        { label: "U.S. Gold Reserves 1950", value: "20,000 tons", note: "Full backing for dollar" },
+        { label: "U.S. Gold Reserves 1971", value: "<9,000 tons", note: "Depleted by deficits" },
+        { label: "Dollar's Official Value", value: "$35/oz gold", note: "Had to be abandoned" }
+      ]
+    },
+    quiz: {
+      question: "What caused the fundamental imbalance that led to Bretton Woods' eventual collapse?",
+      options: [
+        "A) Foreign countries refused to use dollars",
+        "B) The U.S. spent beyond its means while promising gold convertibility",
+        "C) Gold became too valuable to exchange",
+        "D) Trade surpluses drained U.S. reserves"
+      ],
+      correct: 1,
+      explanation: "Exactly right! The U.S. had the 'exorbitant privilege' of importing real wealth by paying in dollars, while running deficits that depleted gold. Like a family spending freely while claiming to back every dollar with savings — eventually the bluff gets called.",
+      points: 10
     }
-  };
-
-  const handleNextLevel = () => {
-    if (currentLevel < totalLevels - 1) {
-      setCurrentLevel(c => c + 1);
-      setSelectedAnswer(null);
-      setShowResult(false);
-    } else {
-      setGameCompleted(true);
+  },
+  {
+    id: 2,
+    title: "Tariffs and Capital Controls",
+    story: "In the late 1960s, the U.S. tried to restrict capital flows to preserve gold — imposing the 'interest equalization tax' and other controls. But global capital found ways around them, just as modern traders bypass today's tariffs. Freedom of capital movement always wins eventually.",
+    data: {
+      title: "Capital Flight Dynamics",
+      stats: [
+        { label: "Interest Equalization Tax 1965", value: "15%", note: "U.S. tax on foreign bond purchases" },
+        { label: "Result", value: "Capital flight", note: "Money escaped to avoid the tax" },
+        { label: "Modern Parallel", value: "Tariff circumvention", note: "$200B+ in tariff evasion" }
+      ]
+    },
+    quiz: {
+      question: "How did tariffs and capital controls affect the Bretton Woods system in the late 1960s?",
+      options: [
+        "A) They strengthened the dollar and prevented capital flight",
+        "B) They created distortions that accelerated capital flight and gold losses",
+        "C) They had no effect on the monetary system",
+        "D) They increased U.S. gold reserves"
+      ],
+      correct: 1,
+      explanation: "Right! Controls tried to stop what markets wanted to do anyway — move capital. Just like modern tariffs, they created black markets and arbitrage. Money finds a way around barriers, and when it does, the pressure builds until something breaks.",
+      points: 10
     }
-  };
-
-  const handlePreviousLevel = () => {
-    if (currentLevel > 0) {
-      setCurrentLevel(c => c - 1);
-      setSelectedAnswer(null);
-      setShowResult(false);
+  },
+  {
+    id: 3,
+    title: "The 1971 Collapse",
+    story: "On August 15, 1971, Nixon ended gold convertibility. The 'Nixon Shock' created the modern fiat system overnight. Double-digit inflation followed, gas lines appeared, and the post-war prosperity bargain broke down.",
+    data: {
+      title: "The Nixon Shock Aftermath",
+      stats: [
+        { label: "Inflation Post-1971", value: "7%+ annual", note: "Peaked at 13.5% in 1980" },
+        { label: "Dollar Devaluation", value: "-7% vs gold", note: "First devaluation in 1971" },
+        { label: "Gas Lines 1973", value: "Oil embargo", note: "System stress visible" }
+      ]
+    },
+    quiz: {
+      question: "What was a key outcome of Bretton Woods' collapse in the 1970s?",
+      options: [
+        "A) Global financial stability and low inflation",
+        "B) Double-digit inflation, oil crises, and the rise of fiat currencies",
+        "C) A return to the gold standard immediately",
+        "D) The dollar becoming stronger than ever"
+      ],
+      correct: 1,
+      explanation: "Correct! Without gold's discipline, governments could print freely. The 1970s showed what happens: inflation spirals, oil shocks, and economic instability. The lesson? Without a hard money anchor, fiscal discipline is nearly impossible.",
+      points: 10
     }
-  };
-
-  const resetGame = () => {
-    setCurrentLevel(0);
-    setHistoryScore(0);
-    setSelectedAnswer(null);
-    setShowResult(false);
-    setGameCompleted(false);
-    setAnsweredQuestions(new Set());
-  };
-
-  const shareText = `🏛️ Just finished the Bretton Woods Collapse Quiz — scored ${historyScore}/${maxScore}! Learned how monetary fractures echo through history. #Bitcoin #EconomicHistory`;
-  const handleShare = (platform: 'twitter' | 'copy') => {
-    if (platform === 'twitter') {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, '_blank');
-    } else {
-      navigator.clipboard.writeText(shareText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  },
+  {
+    id: 4,
+    title: "Modern Parallels — 2025 Warning Signs",
+    story: "Like the 1931 sterling crisis and 1971 dollar crisis, 2025 shows similar warning signs: $37.45T in debt, dollar down 10.2% YTD, 2.9% inflation, and consumer sentiment at 55.4. History doesn't repeat, but it rhymes.",
+    data: {
+      title: "2025 Economic Warning Signs",
+      stats: [
+        { label: "U.S. Debt", value: "$37.45T", note: "133% of GDP" },
+        { label: "Dollar Index YTD", value: "-10.2%", note: "Worst year since 2022" },
+        { label: "Consumer Sentiment", value: "55.4", note: "Near recession lows" }
+      ]
+    },
+    quiz: {
+      question: "How does fiscal indiscipline in Bretton Woods parallel today's economic challenges?",
+      options: [
+        "A) Today is completely different — no parallels exist",
+        "B) Running deficits while maintaining a reserve currency creates structural fragility that can suddenly unravel",
+        "C) Only gold-backed currencies face these issues",
+        "D) Deficits don't matter when you control the world reserve currency"
+      ],
+      correct: 1,
+      explanation: "Exactly! The dollar's reserve status lets the U.S. borrow cheaply, but debt compounds. Like Bretton Woods' end — where deficits depleted gold until the system broke — today debt servicing costs ($1.1T+/year) crowd out investment. The difference: no gold to run out of, just faith in the dollar.",
+      points: 10
     }
-  };
-
-  // ─── COMPLETION SCREEN ──────────────────────────────────────
-  if (gameCompleted) {
-    const sl = getScoreLevel();
-
-    return (
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        className="space-y-6"
-      >
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Learning Paths
-          </Button>
-        </div>
-
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, type: "spring" }}>
-          <Card className="bg-gradient-to-br from-slate-950 via-gray-900 to-amber-950 border-amber-500/40 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-radial from-amber-500/5 to-transparent" />
-
-            <CardHeader className="text-center relative z-10">
-              <motion.div
-                className="mx-auto mb-4"
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              >
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 p-1 mx-auto">
-                  <div className="w-full h-full rounded-full bg-gray-900 flex items-center justify-center">
-                    <Building2 className="h-12 w-12 text-amber-400" />
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-                <CardTitle className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
-                  Quiz Complete!
-                </CardTitle>
-              </motion.div>
-              <motion.p className="text-gray-400 mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-                You've explored the Bretton Woods collapse and its modern echoes
-              </motion.p>
-            </CardHeader>
-
-            <CardContent className="space-y-6 relative z-10">
-              {/* Score row */}
-              <motion.div className="flex flex-wrap justify-center gap-4" variants={containerVariants} initial="hidden" animate="visible">
-                <motion.div variants={itemVariants}>
-                  <Badge className="text-lg px-6 py-3 bg-amber-500/20 border-amber-500/50 text-amber-300">
-                    <Trophy className="mr-2 h-5 w-5 text-yellow-400" />
-                    {historyScore}/{maxScore}
-                  </Badge>
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                  <Badge className={`text-lg px-6 py-3 ${sl.badge} ${sl.color}`}>
-                    {sl.icon} {sl.title}
-                  </Badge>
-                </motion.div>
-              </motion.div>
-
-              {/* Understanding level */}
-              <motion.div
-                className="bg-gray-800/60 backdrop-blur rounded-2xl p-5 border border-gray-700"
-                variants={itemVariants}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-amber-300 flex items-center gap-2">
-                    <BookOpen className="h-5 w-5" />
-                    Understanding Level
-                  </h3>
-                  <span className="text-2xl font-bold text-amber-400">
-                    {historyScore === maxScore ? "🏆" : historyScore >= 30 ? "💪" : "📚"}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                  {historyScore >= 40
-                    ? "You understand monetary system fractures and can recognize how fiscal overreach creates imbalances that echo across generations."
-                    : "Review the historical parallels to better understand how Bretton Woods' collapse connects to today's unanchored fiat system."}
-                </p>
-              </motion.div>
-
-              {/* Key insight */}
-              <motion.div
-                className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-xl p-4 border border-amber-500/30"
-                variants={itemVariants}
-              >
-                <h4 className="font-semibold text-amber-400 mb-2 flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Key Insight: Monetary System Fractures
-                </h4>
-                <p className="text-sm text-gray-300 leading-relaxed">
-                  The Bretton Woods collapse highlights how fiscal overreach and protectionism breed imbalances,
-                  as seen in empires past. Understanding these patterns helps recognize similar risks in today's
-                  unanchored fiat system.
-                </p>
-              </motion.div>
-
-              {/* Social sharing */}
-              <motion.div className="flex flex-col sm:flex-row items-center justify-center gap-3" variants={itemVariants}>
-                <span className="text-sm text-gray-400">Share your result:</span>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => handleShare('twitter')} className="bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white">
-                    <Twitter className="h-4 w-4 mr-1" />
-                    Tweet
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleShare('copy')} className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
-                    {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-                    {copied ? "Copied!" : "Copy"}
-                  </Button>
-                </div>
-              </motion.div>
-
-              {/* Actions */}
-              <motion.div className="flex flex-col sm:flex-row justify-center gap-3" variants={itemVariants}>
-                <Button onClick={resetGame} variant="outline" className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
-                  <Target className="mr-2 h-4 w-4" />
-                  Play Again
-                </Button>
-                <Button onClick={onBack} className="bg-amber-600 hover:bg-amber-700 text-white">
-                  Back to Learning
-                </Button>
-              </motion.div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </motion.div>
-    );
   }
+];
 
-  // ─── GAME SCREEN ──────────────────────────────────────────────
+const TOTAL_POSSIBLE = LEVELS.reduce((sum, l) => sum + l.quiz.points, 0);
+
+function shareScore(score: number) {
+  const pct = Math.round((score / TOTAL_POSSIBLE) * 100);
+  const text = encodeURIComponent(`I just studied the Bretton Woods Collapse on @BitcoinHub 🏦⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nUnderstanding how 1971 broke the monetary system — and why 2025 looks familiar.\n\n👉 Try it free: hub.goodbotai.tech\n\n#Bitcoin #BrettonWoods #Macro #EconomicHistory`);
+  window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
+}
+
+function ProgressBar({ current, total }: { current: number; total: number }) {
+  const pct = Math.round((current / total) * 100);
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <motion.div
-        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <Button variant="outline" onClick={onBack} className="text-sm">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className="border-amber-500/50 bg-amber-500/10 text-amber-400">
-            <Trophy className="mr-1.5 h-3.5 w-3.5 text-yellow-400" />
-            {historyScore}/{maxScore}
-          </Badge>
-          <Badge className="border-gray-700 bg-gray-800 text-gray-400">
-            Q {currentLevel + 1}/{totalLevels}
-          </Badge>
-        </div>
-      </motion.div>
-
-      {/* Progress bar */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
-        <div className="flex items-center gap-3">
-          <Progress value={progressPercentage} className="h-2 bg-gray-800 flex-1" />
-          <span className="text-xs text-gray-500 font-medium">{Math.round(progressPercentage)}%</span>
-        </div>
-      </motion.div>
-
-      <AnimatePresence mode="wait">
-        <motion.div key={currentLevel} variants={slideVariants} initial="hidden" animate="visible" exit="exit">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Story card */}
-            <motion.div variants={itemVariants}>
-              <Card className="h-full bg-gray-900/80 border-gray-700 backdrop-blur overflow-hidden">
-                <div className="bg-gradient-to-r from-amber-900/30 to-orange-900/20 px-5 py-3 border-b border-amber-500/20">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-                      <Building2 className="h-5 w-5 text-amber-400" />
-                    </div>
-                    <div>
-                      <span className="text-xs text-amber-400 uppercase tracking-wider">Era {currentLevel + 1}</span>
-                      <p className="font-semibold text-white text-sm">{level.title}</p>
-                    </div>
-                  </div>
-                </div>
-                <CardContent className="p-5">
-                  <p className="text-gray-300 leading-relaxed text-sm">{level.story}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Data + Quiz card */}
-            <motion.div variants={itemVariants} className="space-y-5">
-              {/* Stats */}
-              <Card className="bg-gray-900/80 border-orange-500/30 backdrop-blur">
-                <CardContent className="p-5">
-                  <h4 className="font-semibold text-orange-400 mb-3 flex items-center gap-2 text-sm">
-                    <TrendingDown className="h-4 w-4" />
-                    {level.data.title}
-                  </h4>
-                  <div className="space-y-3">
-                    {level.data.stats.map((stat, index) => (
-                      <motion.div
-                        key={index}
-                        className="flex justify-between items-center bg-white/[0.03] rounded-lg px-4 py-3 border border-gray-800 hover:border-orange-500/30 transition-colors"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                      >
-                        <div>
-                          <p className="font-medium text-sm text-gray-300">{stat.label}</p>
-                          <p className="text-xs text-gray-500">{stat.note}</p>
-                        </div>
-                        <p className="font-bold text-orange-400">{stat.value}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Quiz */}
-              <Card className="bg-gray-900/80 border-amber-500/30 backdrop-blur">
-                <CardContent className="p-5 space-y-4">
-                  <h4 className="font-semibold text-amber-400 flex items-center gap-2 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    {level.quiz.question}
-                  </h4>
-
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {level.quiz.options.map((option, index) => (
-                      <motion.button
-                        key={index}
-                        onClick={() => handleAnswerSelect(index)}
-                        disabled={showResult}
-                        className={`p-3.5 rounded-xl border-2 text-left text-sm transition-all ${
-                          selectedAnswer === index
-                            ? showResult
-                              ? index === level.quiz.correct
-                                ? 'border-green-500/60 bg-green-500/15 text-green-300'
-                                : 'border-red-500/60 bg-red-500/15 text-red-300'
-                              : 'border-amber-500/60 bg-amber-500/10 text-amber-200'
-                            : showResult && index === level.quiz.correct
-                            ? 'border-green-500/60 bg-green-500/15 text-green-300'
-                            : 'border-gray-700 hover:border-amber-500/40 hover:bg-amber-500/5 text-gray-300'
-                        }`}
-                        whileHover={!showResult ? { x: 4 } : {}}
-                        whileTap={!showResult ? { scale: 0.99 } : {}}
-                      >
-                        <div className="flex items-start gap-2.5">
-                          {showResult && (
-                            <span className="flex-shrink-0 mt-0.5">
-                              {index === level.quiz.correct ? (
-                                <CheckCircle className="h-4 w-4 text-green-400" />
-                              ) : selectedAnswer === index ? (
-                                <XCircle className="h-4 w-4 text-red-400" />
-                              ) : (
-                                <div className="h-4 w-4" />
-                              )}
-                            </span>
-                          )}
-                          <span className="flex-1 leading-relaxed">{option}</span>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-
-                  <AnimatePresence>
-                    {showResult && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="bg-gray-800/80 rounded-xl p-4 border border-gray-700">
-                          <div className="flex items-start gap-3">
-                            <span className="flex-shrink-0 mt-0.5">
-                              {selectedAnswer === level.quiz.correct ? (
-                                <CheckCircle className="h-5 w-5 text-green-400" />
-                              ) : (
-                                <AlertCircle className="h-5 w-5 text-orange-400" />
-                              )}
-                            </span>
-                            <div>
-                              <p className="font-medium text-gray-200">
-                                {selectedAnswer === level.quiz.correct ? "Correct!" : "Not quite right"}
-                              </p>
-                              <p className="text-sm text-gray-400 mt-1 leading-relaxed">{level.quiz.explanation}</p>
-                              {selectedAnswer === level.quiz.correct && (
-                                <div className="flex items-center gap-1.5 mt-2 text-sm text-green-400">
-                                  <Trophy className="h-4 w-4" />
-                                  +{level.quiz.points} points earned
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Navigation */}
-                  <div className="flex justify-between pt-1">
-                    <Button
-                      variant="outline"
-                      onClick={handlePreviousLevel}
-                      disabled={currentLevel === 0}
-                      size="sm"
-                      className="border-gray-700 text-gray-400 hover:bg-gray-800"
-                    >
-                      <ArrowLeft className="mr-1.5 h-4 w-4" />
-                      Previous
-                    </Button>
-
-                    {!showResult ? (
-                      <Button
-                        onClick={handleSubmitAnswer}
-                        disabled={selectedAnswer === null}
-                        size="sm"
-                        className="bg-amber-600 hover:bg-amber-700 text-white"
-                      >
-                        Submit
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={handleNextLevel}
-                        size="sm"
-                        className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white"
-                      >
-                        {currentLevel < totalLevels - 1 ? (
-                          <>
-                            Next
-                            <ArrowRight className="ml-1.5 h-4 w-4" />
-                          </>
-                        ) : (
-                          <>
-                            Complete
-                            <Trophy className="ml-1.5 h-4 w-4" />
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+    <div className="w-full mb-5">
+      <div className="flex justify-between text-xs text-amber-400/70 mb-1.5 font-medium">
+        <span>Level {current} of {total}</span><span>{pct}%</span>
+      </div>
+      <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
+
+function IntroScreen({ onStart }: { onStart: () => void }) {
+  const [m, setM] = useState(false);
+  useEffect(() => { setTimeout(() => setM(true), 80); }, []);
+  return (
+    <div className={`transition-all duration-500 ${m ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="text-center mb-7">
+        <div className="text-6xl mb-4">🏦💎</div>
+        <h2 className="text-3xl font-black text-white mb-3">Bretton Woods Collapse</h2>
+        <p className="text-gray-400 text-base leading-relaxed max-w-sm mx-auto">
+          How the post-WWII monetary order collapsed in 1971 — and why 2025 looks eerily similar.
+        </p>
+      </div>
+      <div className="bg-gray-800/40 border border-gray-700/60 rounded-2xl p-5 mb-5">
+        <h3 className="text-white font-semibold mb-3 text-sm">What you'll learn:</h3>
+        <ul className="space-y-2.5">
+          {[
+            "Why Bretton Woods' fixed rates were doomed from the start",
+            "How capital controls always fail eventually",
+            "The Nixon Shock and its aftermath: stagflation",
+            "Why 2025's debt and deficits rhyme with 1971"
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-gray-300 text-sm">
+              <span className="text-amber-400 mt-0.5 shrink-0">✓</span>{item}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[{ v: "4", l: "Chapters" }, { v: "1971", l: "System Broke" }, { v: "13.5%", l: "Peak Inflation" }].map(({ v, l }) => (
+          <div key={l} className="text-center p-3 bg-gray-800/30 rounded-xl border border-gray-700/40">
+            <div className="text-lg font-black text-amber-400">{v}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{l}</div>
+          </div>
+        ))}
+      </div>
+      <button onClick={onStart} className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-700 to-orange-700 hover:from-amber-600 hover:to-orange-600 text-white font-black text-lg transition-all duration-200 shadow-lg shadow-amber-900/30 hover:scale-[1.02] active:scale-[0.98]">
+        Begin the Lesson →
+      </button>
+    </div>
+  );
+}
+
+function StoryScreen({ level, onComplete }: { level: Level; onComplete: () => void }) {
+  const [m, setM] = useState(false);
+  useEffect(() => { setTimeout(() => setM(true), 80); }, []);
+  return (
+    <div className={`transition-all duration-500 ${m ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="text-center mb-5">
+        <div className="inline-block px-3 py-1 rounded-full bg-amber-900/30 border border-amber-700/50 text-amber-400 text-xs font-bold tracking-wider mb-3">
+          CHAPTER {level.id} OF {LEVELS.length}
+        </div>
+        <h3 className="text-xl font-black text-white leading-tight">{level.title}</h3>
+      </div>
+      <div className="bg-gray-800/30 border border-gray-700/50 rounded-2xl p-5 mb-4">
+        <p className="text-gray-300 text-sm leading-relaxed">{level.story}</p>
+      </div>
+      <div className="bg-gray-900/60 border border-gray-700/40 rounded-2xl p-4 mb-5">
+        <div className="text-xs text-gray-500 uppercase tracking-wider mb-3 font-semibold">{level.data.title}</div>
+        <div className="space-y-3">
+          {level.data.stats.map((s, i) => (
+            <div key={i} className="flex justify-between items-baseline gap-3">
+              <span className="text-gray-400 text-xs shrink-0">{s.label}</span>
+              <div className="text-right">
+                <span className="text-amber-400 font-bold text-sm">{s.value}</span>
+                <span className="text-gray-600 text-xs ml-2">— {s.note}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <button onClick={onComplete} className="w-full py-3.5 rounded-xl bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white font-bold text-sm transition-all duration-150">
+        Continue to Question →
+      </button>
+    </div>
+  );
+}
+
+function QuizScreen({ level, selectedAnswer, answered, onSelect }: {
+  level: Level; selectedAnswer: number | null; answered: boolean; onSelect: (i: number) => void;
+}) {
+  const quiz = level.quiz;
+  const isCorrect = selectedAnswer === quiz.correct;
+  return (
+    <div>
+      <div className="mb-4">
+        <div className="text-xs text-gray-600 font-semibold mb-1.5">QUESTION</div>
+        <h4 className="text-white font-bold text-base leading-snug">{quiz.question}</h4>
+      </div>
+      <div className="space-y-2.5 mb-5">
+        {quiz.options.map((opt, i) => {
+          let cls = 'bg-gray-800/70 border-gray-700/70 text-gray-200 hover:border-amber-500/60 hover:bg-gray-800';
+          if (answered) {
+            if (i === quiz.correct) cls = 'bg-amber-900/50 border-amber-500 text-amber-200';
+            else if (i === selectedAnswer && !isCorrect) cls = 'bg-red-900/40 border-red-500/50 text-red-200';
+            else cls = 'bg-gray-800/30 border-gray-800/50 text-gray-600';
+          } else if (selectedAnswer === i) {
+            cls = 'bg-amber-900/40 border-amber-500/70 text-amber-200';
+          }
+          return (
+            <button key={i} onClick={() => !answered && onSelect(i)} disabled={answered}
+              className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all duration-150 text-sm font-medium ${cls}`}>
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      {answered && (
+        <div className={`p-4 rounded-2xl border mb-4 ${isCorrect ? 'bg-amber-900/30 border-amber-700/50' : 'bg-red-900/30 border-red-700/50'}`}>
+          <div className="flex items-start gap-2.5">
+            <span className="text-2xl shrink-0 mt-0.5">{isCorrect ? '✅' : '❌'}</span>
+            <p className={`text-sm leading-relaxed font-medium ${isCorrect ? 'text-amber-200' : 'text-red-200'}`}>{quiz.explanation}</p>
+          </div>
+          <div className="mt-2 pl-8">
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isCorrect ? 'bg-amber-700/50 text-amber-300' : 'bg-red-700/50 text-red-300'}`}>
+              {isCorrect ? `+${quiz.points} points` : '0 points'}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GameCompleteScreen({ score, onRestart }: { score: number; onRestart: () => void }) {
+  const [m, setM] = useState(false);
+  useEffect(() => { setTimeout(() => setM(true), 80); }, []);
+  const pct = Math.round((score / TOTAL_POSSIBLE) * 100);
+  const passed = score >= TOTAL_POSSIBLE * 0.6;
+  let badge = '🏦', title = 'Keep Studying', message = "You've seen how Bretton Woods collapsed. History offers lessons for today.";
+  if (pct >= 80) { badge = '🏆'; title = 'Monetary Historian!'; message = "You deeply understand the Bretton Woods system, its collapse, and modern parallels. You see the structural flaws in today's fiat system."; }
+  else if (pct >= 60) { badge = '💡'; title = 'Well Done!'; message = "You grasp the key lesson: deficits without a hard money anchor eventually break the system."; }
+  return (
+    <div className={`transition-all duration-500 ${m ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="text-center mb-6">
+        <div className="text-6xl mb-3">{badge}</div>
+        <h3 className="text-2xl font-black text-white mb-2">{title}</h3>
+        <p className="text-gray-400 text-sm leading-relaxed">{message}</p>
+      </div>
+      <div className="bg-gray-800/40 border border-gray-700/60 rounded-2xl p-6 mb-5 text-center">
+        <div className="text-4xl font-black text-amber-400 mb-1">{score}</div>
+        <div className="text-gray-500 text-sm mb-3">{TOTAL_POSSIBLE} points possible</div>
+        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-1000 ${passed ? 'bg-amber-500' : 'bg-yellow-500'}`} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="mt-2 text-xs text-gray-500">{pct}% — {passed ? 'Passed!' : 'Keep studying!'}</div>
+      </div>
+      <button onClick={() => shareScore(score)} className="w-full py-4 rounded-2xl bg-[#1DA1F2] hover:bg-[#1a9bd9] active:bg-[#1589c4] text-white font-black text-base transition-all duration-150 flex items-center justify-center gap-2.5 mb-3 shadow-lg">
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Share Your Score on X
+      </button>
+      <button onClick={onRestart} className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-semibold text-sm transition-all duration-150">
+        Play Again
+      </button>
+    </div>
+  );
+}
+
+export function BrettonWoodsGame() {
+  const [phase, setPhase] = useState<'intro' | 'story' | 'quiz' | 'gameComplete'>('intro');
+  const [currentLevel, setCurrentLevel] = useState(0);
+  const [score, setScore] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [answered, setAnswered] = useState(false);
+  const level = LEVELS[currentLevel];
+
+  const handleStart = useCallback(() => setPhase('story'), []);
+  const handleStoryComplete = useCallback(() => { setPhase('quiz'); setSelectedAnswer(null); setAnswered(false); }, []);
+  const handleSelect = useCallback((i: number) => {
+    if (answered) return;
+    setSelectedAnswer(i); setAnswered(true);
+    if (i === level.quiz.correct) setScore(s => s + level.quiz.points);
+  }, [answered, level]);
+  const handleContinue = useCallback(() => {
+    if (currentLevel + 1 >= LEVELS.length) setPhase('gameComplete');
+    else { setCurrentLevel(c => c + 1); setPhase('story'); setSelectedAnswer(null); setAnswered(false); }
+  }, [currentLevel]);
+  const handleRestart = useCallback(() => { setPhase('intro'); setCurrentLevel(0); setScore(0); setSelectedAnswer(null); setAnswered(false); }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white">
+      <div className="bg-gray-900/90 border-b border-gray-800 px-4 py-3 sticky top-0 z-20 backdrop-blur-sm">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🏦💎</span>
+            <span className="font-black text-sm text-white tracking-tight">Bretton Woods Collapse</span>
+          </div>
+          {phase !== 'intro' && (
+            <div className="flex items-center gap-3">
+              <div className="text-amber-400 font-black text-sm">{score} pts</div>
+              <div className="text-gray-600 text-xs">Lv {currentLevel + 1}/{LEVELS.length}</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="max-w-lg mx-auto px-4 py-6">
+        {phase !== 'intro' && phase !== 'gameComplete' && <ProgressBar current={currentLevel + 1} total={LEVELS.length} />}
+        {phase === 'intro' && <IntroScreen onStart={handleStart} />}
+        {phase === 'story' && <StoryScreen level={level} onComplete={handleStoryComplete} />}
+        {phase === 'quiz' && <>
+          <QuizScreen level={level} selectedAnswer={selectedAnswer} answered={answered} onSelect={handleSelect} />
+          {answered && (
+            <div className="mt-4">
+              <button onClick={handleContinue} className="w-full py-3.5 rounded-xl bg-green-600 hover:bg-green-500 active:bg-green-400 text-white font-bold text-sm transition-all duration-150">
+                {currentLevel + 1 >= LEVELS.length ? 'See Final Results →' : `Next: Chapter ${currentLevel + 2} →`}
+              </button>
+            </div>
+          )}
+        </>}
+        {phase === 'gameComplete' && <GameCompleteScreen score={score} onRestart={handleRestart} />}
+      </div>
+    </div>
+  );
+}
+
+export default BrettonWoodsGame;
