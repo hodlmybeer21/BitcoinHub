@@ -832,11 +832,7 @@ async function handleNews(_: VercelRequest, res: VercelResponse) {
 }
 
 async function handleTwitter(_: VercelRequest, res: VercelResponse) {
-  const tweets = {
-    tweets: [],
-    lastUpdated: new Date().toISOString()
-  };
-  ok(res, tweets);
+  ok(res, []);
 }
 
 // ─── Learning Paths ────────────────────────────────────────────────────────────

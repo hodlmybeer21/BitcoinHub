@@ -248,15 +248,17 @@ const NewsFeed = () => {
   
   // News data
   const { 
-    data: newsItems, 
+    data: rawNewsData, 
     isLoading: isLoadingNews, 
     refetch: refetchNews 
   } = useQuery({
     queryKey: ["/api/news", refreshTrigger],
     refetchOnWindowFocus: false,
     refetchInterval: 60000, // Refresh every minute
-    select: (data: any) => data?.news || [],
   });
+
+  // Unwrap the {news: [...]} wrapper
+  const newsItems = rawNewsData?.news || [];
   
   // Remove Twitter data queries since we're removing those sections
   
