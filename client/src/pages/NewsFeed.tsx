@@ -349,7 +349,7 @@ const NewsFeed = () => {
         <div className="space-y-6">
           
           {/* HodlMyBeer Twitter Feed */}
-          <TwitterFeed />
+          {/* <TwitterFeed /> */}
           
           {/* Upcoming Events */}
           <Card>
