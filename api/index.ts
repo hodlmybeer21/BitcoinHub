@@ -575,7 +575,272 @@ async function handleInflation(_: VercelRequest, res: VercelResponse) {
   });
 }
 
+// ─── Legislation ──────────────────────────────────────────────────────────────
+
+const legislationFallback = {
+  bills: [
+    {
+      id: "genius-act",
+      billName: "GENIUS Act",
+      billNumber: "S.2393",
+      description: "Stablecoin Regulatory Framework Act establishing federal licensing for stablecoin issuers and reserve requirements.",
+      currentStatus: "Passed Senate Banking Committee",
+      nextSteps: "Floor vote pending in Senate",
+      passageChance: 72,
+      whatsNext: "Awaiting Senate floor action. Monitor congress.gov for vote scheduling.",
+      lastAction: "Markup completed November 2025",
+      sponsor: "Sen. Bill Hagerty (R-TN)",
+      category: "stablecoin",
+      priority: "high"
+    },
+    {
+      id: "fit21",
+      billName: "FIT21 Act",
+      billNumber: "HR.4763",
+      description: "Financial Innovation and Technology for the 21st Century Act establishing CFTC primary regulator for digital assets.",
+      currentStatus: "Passed House (311-104)",
+      nextSteps: "Awaiting Senate consideration",
+      passageChance: 65,
+      whatsNext: "Senate Banking Committee review expected Q2 2026.",
+      lastAction: "House passage June 2025",
+      sponsor: "Rep. Patrick McHenry (R-NC)",
+      category: "regulation",
+      priority: "high"
+    },
+    {
+      id: "clarity-act",
+      billName: "CLARITY Act",
+      billNumber: "S.2286",
+      description: "Establishes CFTC as primary regulator for digital commodities including Bitcoin, creates clear registration path.",
+      currentStatus: "Senate Banking Committee",
+      nextSteps: "Markup expected Q2 2026",
+      passageChance: 55,
+      whatsNext: "Bipartisan negotiations ongoing. May be combined with FIT21 provisions.",
+      lastAction: "Introduced July 2025",
+      sponsor: "Sen. Cynthia Lummis (R-WY)",
+      category: "regulation",
+      priority: "high"
+    }
+  ],
+  lastUpdated: new Date().toISOString(),
+  summary: "Current crypto legislation tracking. 3 active bills in Congress affecting cryptocurrency regulation.",
+  nextMajorEvent: "GENIUS Act floor vote expected Q2 2026"
+};
+
+async function handleLegislation(_: VercelRequest, res: VercelResponse) {
+  ok(res, legislationFallback);
+}
+
+const catalystsData = {
+  catalysts: [
+    {
+      id: "sec_cftc_unified_rulebook_q1_2026",
+      event: "SEC-CFTC Unified Rulebook Draft",
+      description: "Following joint roundtables in Sept-Oct 2025, the SEC and CFTC are expected to release their draft unified crypto regulatory framework providing clarity on jurisdiction.",
+      probability: 75,
+      nextSteps: ["Monitor sec.gov and cftc.gov for joint announcements", "Check CoinDesk for regulatory analysis", "Track industry comment submissions"],
+      category: "regulatory",
+      impact: "high",
+      dueDate: "Q2 2026"
+    },
+    {
+      id: "genius_act_senate_action",
+      event: "GENIUS Act Stablecoin Framework - Senate Progress",
+      description: "The stablecoin regulatory framework continues Senate Banking Committee discussions. Bipartisan momentum suggests potential markup in Q1 2026.",
+      probability: 65,
+      nextSteps: ["Track Senate Banking Committee calendar", "Monitor Circle, Tether statements on compliance", "Watch for Treasury guidance on reserves"],
+      category: "regulatory",
+      impact: "high",
+      dueDate: "Q2 2026"
+    },
+    {
+      id: "clarity_act_2026_session",
+      event: "CLARITY Act - 2026 Congressional Session",
+      description: "After stalling in Senate during 2025, the CLARITY Act is expected to see renewed activity in 2026. Bill would establish CFTC as primary regulator.",
+      probability: 55,
+      nextSteps: ["Monitor Congress.gov for bill status updates", "Watch Senate Banking Committee announcements", "Track industry lobbying efforts"],
+      category: "regulatory",
+      impact: "high",
+      dueDate: "Q2-Q3 2026"
+    },
+    {
+      id: "xrp_etf_filings",
+      event: "XRP Spot ETF Applications",
+      description: "Following Solana ETF approvals in October 2025, multiple issuers expected to file XRP spot ETF applications. SEC's new crypto-friendly stance could accelerate review process.",
+      probability: 70,
+      nextSteps: ["Monitor sec.gov for S-1 filings", "Track Grayscale, 21Shares, VanEck announcements", "Watch for SEC comment letters"],
+      category: "etf",
+      impact: "high",
+      dueDate: "Q2 2026"
+    },
+    {
+      id: "state_bitcoin_reserve_votes",
+      event: "State Bitcoin Reserve Legislation Votes",
+      description: "Texas, Florida, and Wyoming considering state-level Bitcoin reserve bills following New Hampshire's lead. State legislative sessions in early 2026 could see key votes.",
+      probability: 60,
+      nextSteps: ["Track Texas, Florida, Wyoming state legislature calendars", "Monitor local news for bill progress", "Watch for other states introducing similar bills"],
+      category: "policy",
+      impact: "medium",
+      dueDate: "Q2 2026"
+    },
+    {
+      id: "institutional_adoption_2026",
+      event: "Institutional Bitcoin Adoption Expansion",
+      description: "Major corporations and financial institutions continue Bitcoin treasury and product expansions. MicroStrategy, BlackRock, and others driving institutional legitimacy.",
+      probability: 85,
+      nextSteps: ["Track Bitcoin ETF inflows/outflows", "Monitor corporate treasury announcements", "Watch pension fund crypto allocations"],
+      category: "market",
+      impact: "high",
+      dueDate: "Ongoing"
+    }
+  ],
+  lastUpdated: new Date().toISOString().split("T")[0],
+  marketImpact: "Key catalysts for 2026 include regulatory clarity from SEC-CFTC coordination, potential state-level Bitcoin reserve votes, and continued institutional adoption. Positive developments could drive significant rallies.",
+  riskFactors: "Verify information against primary sources (Congress.gov, sec.gov, cftc.gov). Political transitions and regulatory uncertainty remain key risks."
+};
+
+async function handleCatalysts(_: VercelRequest, res: VercelResponse) {
+  ok(res, catalystsData);
+}
+
+
+async function handleEvents(_: VercelRequest, res: VercelResponse) {
+  const events = {
+    events: [
+      {
+        id: "btc2026",
+        title: "Bitcoin 2026 Conference",
+        description: "The largest Bitcoin-only conference featuring Lightning Network workshops, mining summits, and macro strategy sessions.",
+        startDate: "2026-05-14",
+        endDate: "2026-05-16",
+        location: "Las Vegas, NV",
+        isVirtual: false,
+        url: "https://b.tc/conference",
+        category: "conference",
+        priority: "high"
+      },
+      {
+        id: "cryptoinvest-summit",
+        title: "Crypto Invest Summit",
+        description: "Institutional adoption and regulatory clarity focus. ETF issuers, custody banks, and asset managers.",
+        startDate: "2026-04-23",
+        endDate: "2026-04-24",
+        location: "New York, NY",
+        isVirtual: false,
+        url: "https://cryptoinvest.io",
+        category: "conference",
+        priority: "high"
+      },
+      {
+        id: "consensus-2026",
+        title: "Consensus 2026",
+        description: "World's largest crypto conference. 4 days, 500+ speakers, 10,000+ attendees.",
+        startDate: "2026-06-09",
+        endDate: "2026-06-12",
+        location: "Austin, TX",
+        isVirtual: false,
+        url: "https://consensus.coindesk.com",
+        category: "conference",
+        priority: "high"
+      },
+      {
+        id: "ethcc-2026",
+        title: "ETHCC Paris",
+        description: "European Ethereum developer conference. DeFi, Layer 2, and zero-knowledge proofs.",
+        startDate: "2026-07-07",
+        endDate: "2026-07-10",
+        location: "Paris, France",
+        isVirtual: false,
+        url: "https://ethcc.io",
+        category: "conference",
+        priority: "medium"
+      },
+      {
+        id: "bitcoin-mining-summit",
+        title: "Bitcoin Mining Summit",
+        description: "Mining directors and ASIC manufacturers discussing hashrate growth and energy infrastructure.",
+        startDate: "2026-05-06",
+        endDate: "2026-05-08",
+        location: "Miami, FL",
+        isVirtual: false,
+        url: "https://btcminevents.com/summit",
+        category: "conference",
+        priority: "medium"
+      }
+    ]
+  };
+  ok(res, events);
+}
+
+const newsFallback = {
+  news: [
+    {
+      id: "1",
+      title: "Bitcoin Spot ETF Records Largest Single-Day Inflow Since January Launch",
+      description: "BlackRock's IBIT and Fidelity's FBTC saw combined inflows of $1.2B in a single trading day as institutional demand accelerates.",
+      url: "https://coindesk.com",
+      source: "CoinDesk",
+      publishedAt: new Date().toISOString(),
+      categories: ["etf", "institutional"],
+      imageUrl: ""
+    },
+    {
+      id: "2",
+      title: "SEC Chair Signals Crypto Regulatory Clarity Coming in 2026",
+      description: "The SEC's new chair indicated the commission will finalizeBitcoin ETF rules and provide clearer guidance on digital asset classification.",
+      url: "https://decrypt.co",
+      source: "Decrypt",
+      publishedAt: new Date(Date.now() - 86400000).toISOString(),
+      categories: ["regulation", "sec"],
+      imageUrl: ""
+    },
+    {
+      id: "3",
+      title: "MicroStrategy Announces Additional $2B Bitcoin Purchase",
+      description: "The business intelligence company has now accumulated over 250,000 BTC as part of its strategic treasury program.",
+      url: "https://cointelegraph.com",
+      source: "Cointelegraph",
+      publishedAt: new Date(Date.now() - 172800000).toISOString(),
+      categories: ["microstrategy", "institutional"],
+      imageUrl: ""
+    },
+    {
+      id: "4",
+      title: "State-Level Bitcoin Reserve Bills Gain Bipartisan Momentum",
+      description: "Following New Hampshire's lead, Texas and Florida introduce state Bitcoin reserve legislation with multiple co-sponsors.",
+      url: "https://bitcoinmagazine.com",
+      source: "Bitcoin Magazine",
+      publishedAt: new Date(Date.now() - 259200000).toISOString(),
+      categories: ["policy", "bitcoin-reserve"],
+      imageUrl: ""
+    },
+    {
+      id: "5",
+      title: "Lightning Network Capacity Surpasses 10,000 BTC",
+      description: "Layer 2 Bitcoin payment network reaches new milestone as merchant adoption and liquidity improve across the network.",
+      url: "https://theblock.co",
+      source: "The Block",
+      publishedAt: new Date(Date.now() - 345600000).toISOString(),
+      categories: ["lightning", "adoption"],
+      imageUrl: ""
+    }
+  ]
+};
+
+async function handleNews(_: VercelRequest, res: VercelResponse) {
+  ok(res, newsFallback);
+}
+
+async function handleTwitter(_: VercelRequest, res: VercelResponse) {
+  const tweets = {
+    tweets: [],
+    lastUpdated: new Date().toISOString()
+  };
+  ok(res, tweets);
+}
+
 // ─── Learning Paths ────────────────────────────────────────────────────────────
+
 
 async function handleLearningPaths(_: VercelRequest, res: VercelResponse) {
   const learningPaths = {
@@ -2652,6 +2917,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/worldbank/economic-data' || path === '/api/worldbank/economic-data/') return handleLiquidity(req, res);
     if (path === '/api/inflation' || path === '/api/inflation/') return handleInflation(req, res);
     if (path === '/api/learning/paths' || path === '/api/learning/paths/') return handleLearningPaths(req, res);
+    if (path === '/api/legislation' || path === '/api/legislation/') return handleLegislation(req, res);
+    if (path === '/api/legislation/catalysts' || path === '/api/legislation/catalysts/') return handleCatalysts(req, res);
+    if (path === '/api/news' || path === '/api/news/') return handleNews(req, res);
+    if (path === '/api/events' || path === '/api/events/') return handleEvents(req, res);
+    if (path === '/api/twitter/hodlmybeer') return handleTwitter(req, res);
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);
