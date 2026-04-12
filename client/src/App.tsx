@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
+import TradingCockpit from "@/components/TradingCockpit";
 import Learn from "@/pages/Learn";
 import NewsFeed from "@/pages/NewsFeed";
 import WebResources from "@/pages/WebResources";

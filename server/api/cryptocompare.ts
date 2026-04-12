@@ -81,10 +81,11 @@ export async function getBitcoinPrice(): Promise<BitcoinPrice> {
       return cacheData.bitcoinPrice;
     }
     
-    // Last resort fallback
+    // Last resort fallback - BTC should never hit this if APIs are working
+    // Updated to reflect BTC in $90k+ range (April 2025)
     return {
-      usd: 41285.34,
-      usd_24h_change: 2.14,
+      usd: 92000.00,
+      usd_24h_change: 0.00,
       last_updated_at: Date.now() / 1000
     };
   }
@@ -126,7 +127,7 @@ export async function getBitcoinMarketData(): Promise<BitcoinMarketData> {
       total_volume: { usd: btcData.VOLUME24HOURTO },
       price_change_percentage_24h: btcData.CHANGEPCT24HOUR,
       circulating_supply: btcData.SUPPLY,
-      ath: { usd: 69000 }, // Historical ATH (hardcoded as it's not in the API response)
+      ath: { usd: 110000 }, // Updated ATH reflecting BTC surpassing $100k (April 2025)
       high_24h: { usd: btcData.HIGH24HOUR },
       low_24h: { usd: btcData.LOW24HOUR }
     };
@@ -144,16 +145,17 @@ export async function getBitcoinMarketData(): Promise<BitcoinMarketData> {
       return cacheData.marketData;
     }
     
-    // Last resort fallback
+    // Last resort fallback - BTC should never hit this if APIs are working
+    // Updated to reflect BTC in $90k+ range (April 2025)
     return {
-      current_price: { usd: 41285.34 },
-      market_cap: { usd: 815200000000 },
-      total_volume: { usd: 28900000000 },
-      price_change_percentage_24h: 2.14,
-      circulating_supply: 19400000,
-      ath: { usd: 69044 },
-      high_24h: { usd: 42100.75 },
-      low_24h: { usd: 40950.25 }
+      current_price: { usd: 92000.00 },
+      market_cap: { usd: 1800000000000 },
+      total_volume: { usd: 95000000000 },
+      price_change_percentage_24h: 0.00,
+      circulating_supply: 19800000,
+      ath: { usd: 110000 }, // Updated ATH reflecting BTC surpassing $100k
+      high_24h: { usd: 95000.00 },
+      low_24h: { usd: 90000.00 }
     };
   }
 }
@@ -257,7 +259,8 @@ export async function getBitcoinChart(timeframe: string): Promise<ProcessedChart
     
     // Base price and variation parameters for synthetic data
     // Get current price from cached market data if available
-    const basePrice = cacheData.marketData?.current_price?.usd || 41285.34;
+    // Updated to reflect BTC in $90k+ range (April 2025)
+    const basePrice = cacheData.marketData?.current_price?.usd || 92000.00;
     const hourlyVolatility = 0.005; // 0.5% per hour
     const dailyTrend = 0.01; // 1% daily trend (up)
     

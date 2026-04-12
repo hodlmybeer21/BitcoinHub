@@ -72,8 +72,9 @@ export async function getBitcoinDominance(): Promise<{
     
     // Fallback with realistic current market data
     const fallbackData = {
-      dominance: 63.5, // Realistic current Bitcoin dominance
-      totalMarketCap: 3600000000000, // ~$3.6T total crypto market cap
+      // Updated fallbacks for April 2025 - BTC ~$93k range
+      dominance: 60.8, // Current Bitcoin dominance
+      totalMarketCap: 3300000000000, // ~$3.3T total crypto market cap
       lastUpdated: new Date().toISOString(),
       source: 'CoinGecko Global (Fallback)'
     };
@@ -114,11 +115,11 @@ export async function getGlobalCryptoMetrics(): Promise<{
       const globalData = response.data.data;
       
       return {
-        totalMarketCap: globalData.total_market_cap?.usd || 3600000000000,
-        total24hVolume: globalData.total_volume?.usd || 180000000000,
-        btcDominance: globalData.market_cap_percentage?.btc || 63.5,
-        ethDominance: globalData.market_cap_percentage?.eth || 12.8,
-        activeCryptocurrencies: globalData.active_cryptocurrencies || 2800,
+        totalMarketCap: globalData.total_market_cap?.usd || 3300000000000,
+        total24hVolume: globalData.total_volume?.usd || 190000000000,
+        btcDominance: globalData.market_cap_percentage?.btc || 60.8,
+        ethDominance: globalData.market_cap_percentage?.eth || 13.2,
+        activeCryptocurrencies: globalData.active_cryptocurrencies || 3200,
         lastUpdated: new Date().toISOString(),
         source: 'CoinGecko Global'
       };
@@ -131,11 +132,12 @@ export async function getGlobalCryptoMetrics(): Promise<{
     
     // Fallback with realistic data
     return {
-      totalMarketCap: 3600000000000,
-      total24hVolume: 180000000000,
-      btcDominance: 63.5,
-      ethDominance: 12.8,
-      activeCryptocurrencies: 2800,
+      // Updated fallbacks for April 2025 - BTC ~$93k range
+      totalMarketCap: 3300000000000,
+      total24hVolume: 190000000000,
+      btcDominance: 60.8,
+      ethDominance: 13.2,
+      activeCryptocurrencies: 3200,
       lastUpdated: new Date().toISOString(),
       source: 'CoinGecko Global (Fallback)'
     };

@@ -144,7 +144,7 @@ export function GreatInflationGame({ gameData, onBack, onComplete }: GreatInflat
                 </Badge>
               </div>
       <button
-        onClick={() => shareToX(score, totalQuestions * 10,  + GAME_DISPLAY + )}
+        onClick={() => shareToX(score, totalQuestions * 10, GAME_DISPLAY)}
         className="mt-4 w-full py-3 rounded-xl bg-[#1DA1F2] hover:bg-[#1a9bd9] text-white font-bold text-sm transition-all flex items-center justify-center gap-2"
       >
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">

@@ -135,15 +135,16 @@ export async function getBitcoinMarketData(): Promise<BitcoinMarketData> {
     }
     
     // Last resort fallback with updated realistic values
+    // BTC has surpassed $100k - update to reflect current market
     return {
-      current_price: { usd: 117000 },
-      market_cap: { usd: 2300000000000 },
-      total_volume: { usd: 77000000000 }, // Updated to match current market (77B+)
-      price_change_percentage_24h: 2.14,
+      current_price: { usd: 92000 },
+      market_cap: { usd: 1800000000000 },
+      total_volume: { usd: 95000000000 }, // Updated to match current market (95B+)
+      price_change_percentage_24h: 0.00,
       circulating_supply: 19800000,
-      ath: { usd: 73800 },
-      high_24h: { usd: 118000 },
-      low_24h: { usd: 40950.25 }
+      ath: { usd: 110000 }, // BTC surpassed $100k
+      high_24h: { usd: 95000 },
+      low_24h: { usd: 90000 }
     };
   }
 }
@@ -292,8 +293,8 @@ export async function getBitcoinChart(timeframe: string): Promise<ProcessedChart
     let intervalMs = 60000; // Default time step in milliseconds (1 minute)
     
     // Base price and variation parameters for synthetic data
-    // Get current price from cached market data if available
-    const basePrice = cacheData.marketData?.current_price?.usd || 41285.34;
+    // Updated to reflect BTC in $90k+ range (April 2025)
+    const basePrice = cacheData.marketData?.current_price?.usd || 92000;
     const hourlyVolatility = 0.005; // 0.5% per hour
     const dailyTrend = 0.01; // 1% daily trend (up)
     
