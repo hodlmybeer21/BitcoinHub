@@ -255,6 +255,7 @@ const NewsFeed = () => {
     queryKey: ["/api/news", refreshTrigger],
     refetchOnWindowFocus: false,
     refetchInterval: 60000, // Refresh every minute
+    select: (data: any) => data?.news || [],
   });
   
   // Remove Twitter data queries since we're removing those sections
