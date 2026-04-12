@@ -783,3 +783,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     err(res, 500, e.message || 'Internal error');
   }
 }
+
+// Force redeploy marker: $(date)
