@@ -27,10 +27,13 @@ interface CryptoEvent {
 
 // Upcoming Events Component
 const UpcomingEvents = () => {
-  const { data: events = [], isLoading: eventsLoading } = useQuery({
+  const { data: rawEvents, isLoading: eventsLoading } = useQuery({
     queryKey: ['/api/events'],
     refetchInterval: 24 * 60 * 60 * 1000, // Refresh daily
+    select: (data: any) => data?.events || [],
   });
+
+  const events = (rawEvents as CryptoEvent[]) || [];
 
   const getDaysUntilEvent = (eventDate: string): string => {
     const now = new Date();
