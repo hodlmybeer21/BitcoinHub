@@ -873,114 +873,412 @@ function GlobalMetricsStrip({ data }: { data?: GlobalMetrics }) {
 
   // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-  export default function Dashboard() {
-    const [lastUpdate, setLastUpdate] = useState(() => new Date());
+  
+// ─── Row 2, Col 1: Fed Watch Panel ───────────────────────────────────────────
 
-    useEffect(() => {
-      const t = setInterval(() => setLastUpdate(new Date()), 60000);
-      return () => clearInterval(t);
-    }, []);
-
-    const btc = useQuery<BTC>({ queryKey: ["/api/bitcoin/market-data"], refetchInterval: 60000 });
-    const fear = useQuery<FearGreed>({ queryKey: ["/api/web-resources/fear-greed"], refetchInterval: 300000 });
-    const whales = useQuery<WhaleAlerts>({ queryKey: ["/api/whale-alerts"], refetchInterval: 60000 });
-    const macro = useQuery<Macro>({ queryKey: ["/api/financial/markets"], refetchInterval: 60000 });
-    const network = useQuery<NetworkStats>({ queryKey: ["/api/bitcoin/network-stats"], refetchInterval: 60000 });
-    const global = useQuery<GlobalMetrics>({ queryKey: ["/api/crypto/global-metrics"], refetchInterval: 60000 });
-    const liq = useQuery<Liquidity>({ queryKey: ["/api/liquidity"], refetchInterval: 60000 });
-    const funding = useQuery<FundingRates>({ queryKey: ["/api/funding-rates"], refetchInterval: 60000 });
-    const options = useQuery<OptionsFlow>({ queryKey: ["/api/options-flow"], refetchInterval: 60000 });
-    const treasury = useQuery<Treasury>({ queryKey: ["/api/financial/treasury"], refetchInterval: 60000 });
-    const inflation = useQuery<Inflation>({ queryKey: ["/api/inflation"], refetchInterval: 300000 });
-
-    const isLoading = btc.isLoading;
-
-    if (isLoading) {
-      return (
-        <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-3xl font-black font-mono text-amber-400 mb-2">Loading...</div>
-            <p className="text-white/40 text-sm">Fetching live Bitcoin data</p>
+function FedWatchPanel() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["/api/financial/fedwatch"],
+    queryFn: async () => { const r = await fetch("/api/financial/fedwatch"); return r.json(); },
+    refetchInterval: 300000,
+  });
+  if (isLoading || !data) return <Panel title="Fed Watch Tool"><Skeleton className="h-32 w-full" /></Panel>;
+  const mo = data.futureOutlook?.oneMonth;
+  return (
+    <Panel title="Fed Watch Tool" badge={[{ text: "Next: " + (data.nextMeeting || "—"), color: "bg-blue-500/20 text-blue-400" }]}>
+      <div className="mb-3">
+        <p className="text-[9px] text-white/[0.3] uppercase mb-0.5">Current Target Rate</p>
+        <p className="text-2xl font-mono font-black text-white">{data.currentRate || "—"} <span className="text-sm text-white/[0.4]">bps</span></p>
+      </div>
+      {data.probabilities && data.probabilities.length > 0 && (
+        <div className="mb-3">
+          <p className="text-[9px] text-white/[0.3] uppercase mb-2">Meeting Probabilities</p>
+          <div className="space-y-1.5">{data.probabilities.map((p: any, i: number) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[10px] text-white/[0.5] w-14 font-mono">{p.rate}</span>
+              <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: p.probability + "%", background: i === 0 ? "rgb(59,130,246)" : "rgb(96,165,250)" }} />
+              </div>
+              <span className="text-[10px] font-mono font-semibold text-white w-10 text-right">{p.probability}%</span>
+            </div>
+          ))}</div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white/[0.04] rounded-lg p-2">
+          <p className="text-[9px] text-white/[0.3] uppercase mb-1">1W Outlook</p>
+          <div className="space-y-0.5">
+            <div className="flex justify-between"><span className="text-[10px] text-white/[0.5]">No Change</span><span className="text-[10px] font-mono font-semibold text-white">{(data.futureOutlook?.oneWeek?.noChange ?? 0) + "%"}</span></div>
+            <div className="flex justify-between"><span className="text-green-400 text-[10px]">Cut</span><span className="text-green-400 text-[10px] font-mono">{(data.futureOutlook?.oneWeek?.cut ?? 0) + "%"}</span></div>
           </div>
         </div>
-      );
-    }
-
-    const m = btc.data;
-
-    return (
-      <div className="min-h-screen bg-[#0a0a0f] text-white">
-        <div className="max-w-[1600px] mx-auto px-4 pt-6 pb-2">
-
-          {/* ── Scoreboard ── */}
-          <Scoreboard data={m} lastUpdate={lastUpdate} onRefresh={() => window.location.reload()} />
-
-          {/* ── Signal Bar ── */}
-          <SignalBar market={m} fear={fear.data} whales={whales.data} macro={macro.data} funding={funding.data} />
-
-          {/* ── Chart ── */}
-          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 mb-4">
-            <BTCChart />
-          </div>
-
-          {/* ── Main Grid ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-
-            {/* Left column: Fear&Greed + Macro tiles + Whale */}
-            <div className="space-y-4">
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <FearGreedGauge data={fear.data} />
-              </div>
-
-              {/* Macro tiles 2x2 */}
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <p className="text-[9px] text-white/[0.3] tracking-widest uppercase font-semibold mb-3">Macro Drivers</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {macro.data?.spx && <MacroTile label="S&P 500" value={macro.data.spx.value} change={macro.data.spx.change} />}
-                  {macro.data?.dxy && <MacroTile label="DXY Index" value={macro.data.dxy.value} change={macro.data.dxy.change} inverse />}
-                  {macro.data?.gold && <MacroTile label="Gold" value={macro.data.gold.value} change={macro.data.gold.change} />}
-                  {macro.data?.vix && <MacroTile label="VIX" value={macro.data.vix.value} change={macro.data.vix.change} inverse />}
-                </div>
-              </div>
-
-              {/* Whale Pulse */}
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <WhalePulse data={whales.data} />
-              </div>
-            </div>
-
-            {/* Middle column: Funding + Options + OnChain */}
-            <div className="space-y-4">
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <FundingCard data={funding.data} />
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <OptionsCard data={options.data} />
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <OnChainCard data={network.data} />
-              </div>
-            </div>
-
-            {/* Right column: Global + Treasury + Liquidity */}
-            <div className="space-y-4">
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <GlobalMetricsStrip data={global.data} />
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <TreasuryCard treasury={treasury.data} inflation={inflation.data} />
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
-                <LiquidityCard data={liq.data} />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Footer ── */}
-          <div className="mt-4 text-center text-[9px] text-white/[0.15] py-3 border-t border-white/[0.05]">
-            BITCOINHUB TERMINAL · DATA: COINGECKO · BLOCKCHAIN.INFO · YAHOO FINANCE · FRED · ALTERNATIVE.ME · DERIBIT · NOT FINANCIAL ADVICE
+        <div className="bg-white/[0.04] rounded-lg p-2">
+          <p className="text-[9px] text-white/[0.3] uppercase mb-1">1M Outlook</p>
+          <div className="space-y-0.5">
+            <div className="flex justify-between"><span className="text-[10px] text-white/[0.5]">No Change</span><span className="text-[10px] font-mono font-semibold text-white">{(mo?.noChange ?? 0) + "%"}</span></div>
+            <div className="flex justify-between"><span className="text-green-400 text-[10px]">Cut</span><span className="text-green-400 text-[10px] font-mono">{(mo?.cut ?? 0) + "%"}</span></div>
+            <div className="flex justify-between"><span className="text-red-400 text-[10px]">Hike</span><span className="text-red-400 text-[10px] font-mono">{(mo?.hike ?? 0) + "%"}</span></div>
           </div>
         </div>
       </div>
-    );
-  }
+      <p className="text-[8px] text-white/[0.2] mt-2">Fed rate changes impact Bitcoin through liquidity and risk appetite.</p>
+    </Panel>
+  );
+}
+
+// ─── Row 2, Col 2: Global Markets Panel ───────────────────────────────────────
+
+function GlobalMarketsPanel() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["/api/financial/markets"],
+    queryFn: async () => { const r = await fetch("/api/financial/markets"); return r.json(); },
+    refetchInterval: 60000,
+  });
+  const tiles = [
+    { l: "DXY Index", k: "dxy" },
+    { l: "Gold", k: "gold" },
+    { l: "S&P 500", k: "spx" },
+    { l: "VIX", k: "vix" },
+  ];
+  return (
+    <Panel title="Global Markets">
+      {isLoading || !data ? <Skeleton className="h-24 w-full" /> : (
+        <div className="space-y-2.5">{tiles.map((t: any) => {
+          const item = (data as any)[t.k];
+          if (!item) return null;
+          const ip = item.change >= 0;
+          return (
+            <div key={t.k} className="flex items-center justify-between">
+              <span className="text-[10px] text-white/[0.5]">{t.l}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-semibold text-white">
+                  {t.k === "gold" ? "$" + item.value.toLocaleString() : item.value.toFixed(item.value > 100 ? 0 : 2)}
+                </span>
+                <span className={"text-[10px] font-mono font-semibold " + (ip ? "text-green-400" : "text-red-400")}>
+                  {(ip ? "▲" : "▼") + Math.abs(item.change).toFixed(2) + "%"}
+                </span>
+              </div>
+            </div>
+          );
+        })}</div>
+      )}
+    </Panel>
+  );
+}
+
+// ─── Row 2, Col 3: Treasury & Inflation Panel ─────────────────────────────────
+
+function TreasuryInflationPanel() {
+  const fiscal = useQuery({ queryKey: ["/api/financial/treasury-fiscal"], refetchInterval: 300000 });
+  const infl = useQuery({ queryKey: ["/api/financial/inflation"], refetchInterval: 300000 });
+  const sects = (infl.data as any)?.sectors || [];
+  const td = (fiscal.data as any)?.debtToPenny?.totalDebt ?? 38.4e12;
+  const d2g = (fiscal.data as any)?.debtStatistics?.debtToGDP ?? 142.2;
+  return (
+    <Panel title="US Treasury &amp; Inflation">
+      <div className="space-y-3">
+        <div className="border-b border-white/[0.06] pb-2">
+          <p className="text-[10px] text-red-400 font-mono font-bold">
+            {fmtDebt(td)}<span className="text-white/[0.3] text-[9px] ml-1">Total US Debt</span>
+          </p>
+          <div className="grid grid-cols-3 gap-1 mt-1">
+            <div><p className="text-[8px] text-white/[0.25]">Public Debt</p><p className="text-[10px] font-mono text-white/70">{fmtDebt((fiscal.data as any)?.debtToPenny?.publicDebt ?? 28.5e12)}</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Intragov</p><p className="text-[10px] font-mono text-white/70">{fmtDebt((fiscal.data as any)?.debtToPenny?.intergovernmentalHoldings ?? 9.6e12)}</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Debt/GDP</p><p className="text-[10px] font-mono text-orange-400">{d2g}%</p></div>
+          </div>
+          <div className="grid grid-cols-2 gap-1 mt-1">
+            <div><p className="text-[8px] text-white/[0.25]">Per Citizen</p><p className="text-[10px] font-mono text-white/70">${((fiscal.data as any)?.debtStatistics?.debtPerCitizen || 114627).toLocaleString()}</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Per Taxpayer</p><p className="text-[10px] font-mono text-white/70">${((fiscal.data as any)?.debtStatistics?.debtPerTaxpayer || 240000).toLocaleString()}</p></div>
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[9px] text-white/[0.3] uppercase">CPI YoY</p>
+            <span className={"text-[11px] font-mono font-bold " + (((infl.data as any)?.overall?.rate ?? 3.2) > 3 ? "text-red-400" : "text-green-400")}>
+              {((infl.data as any)?.overall?.rate ?? 3.2).toFixed(2)}%
+            </span>
+          </div>
+          <div className="space-y-1">{sects.slice(0, 5).map((s: any, i: number) => (
+            <div key={i} className="flex items-center justify-between">
+              <span className="text-[9px] text-white/[0.45]">{s.name}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono font-semibold text-white/70">{s.rate.toFixed(1)}%</span>
+                <span className={"text-[9px] font-mono " + (s.change >= 0 ? "text-red-400" : "text-green-400")}>
+                  {(s.change >= 0 ? "+" : "") + s.change.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          ))}</div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+// ─── Row 2, Col 4: Treasury + Liquidity Panel ─────────────────────────────────
+
+function TreasuryLiqPanel() {
+  const treasury = useQuery({ queryKey: ["/api/financial/treasury"], refetchInterval: 60000 });
+  const liq = useQuery({ queryKey: ["/api/liquidity"], refetchInterval: 60000 });
+  const y = (treasury.data as any)?.yield ?? 0;
+  const chg = (treasury.data as any)?.change ?? 0;
+  const low = (treasury.data as any)?.keyLevels?.low52Week ?? 3.15;
+  const high = (treasury.data as any)?.keyLevels?.high52Week ?? 5.02;
+  const yPos = ((y - low) / (high - low || 1)) * 100;
+  const sig = (liq.data as any)?.summary?.overallSignal || "neutral";
+  const lm = [
+    { l: "M2", v: (liq.data as any)?.indicators?.m2?.value ?? 0, c: (liq.data as any)?.indicators?.m2?.change ?? null },
+    { l: "RRP", v: (liq.data as any)?.indicators?.rrp?.value ?? 0, c: null },
+    { l: "TGA", v: (liq.data as any)?.indicators?.tga?.value ?? 0, c: null },
+    { l: "Fed BS", v: (liq.data as any)?.indicators?.fedBalance?.value ?? 0, c: null },
+  ];
+  return (
+    <Panel title="Treasury &amp; Liquidity">
+      <div className="space-y-3">
+        <div className="border-b border-white/[0.06] pb-2">
+          <div className="flex items-end justify-between mb-1">
+            <div>
+              <p className="text-[9px] text-white/[0.3] uppercase">10Y Treasury</p>
+              <p className="text-xl font-mono font-black text-white">{y.toFixed(3)}%</p>
+            </div>
+            <span className={"text-[11px] font-mono font-semibold " + (chg >= 0 ? "text-green-400" : "text-red-400")}>{fmtBps(chg)}</span>
+          </div>
+          <div className="relative h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+            <div className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-amber-400 rounded-full" style={{ left: Math.min(Math.max(yPos, 2), 98) + "%", transform: "translateX(-50%)" }} />
+          </div>
+          <div className="flex justify-between text-[8px] text-white/[0.25] font-mono mt-0.5">
+            <span>{low.toFixed(2)}%</span><span className="text-amber-400/50">52W Range</span><span>{high.toFixed(2)}%</span>
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[9px] text-white/[0.3] uppercase">FRED Liquidity</p>
+            <span className={"text-[9px] px-1.5 py-0.5 rounded font-bold " + (sig === "expansionary" ? "bg-green-500/20 text-green-400" : sig === "contractionary" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400")}>
+              {sig === "expansionary" ? "↑ Expanding" : sig === "contractionary" ? "↓ Contracting" : "→ Neutral"}
+            </span>
+          </div>
+          <div className="space-y-1">{lm.map(({ l, v, c }: any) => (
+            <div key={l} className="flex items-center justify-between">
+              <span className="text-[9px] text-white/[0.35]">{l}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-semibold text-white/70">{v > 0 ? fmtM(v) : "—"}</span>
+                {c !== null && (
+                  <span className={"text-[9px] font-mono " + (c >= 0 ? "text-green-400" : "text-red-400")}>
+                    {(c >= 0 ? "+" : "") + c.toFixed(1) + "%"}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}</div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+// ─── Row 3, Col 1: Fed Holdings Panel ────────────────────────────────────────
+
+function FedHoldingsPanel() {
+  const liq = useQuery({ queryKey: ["/api/liquidity"], refetchInterval: 60000 });
+  const nl = (liq.data as any)?.derivedMetrics?.netLiq ?? 5.94e12;
+  const mm = (liq.data as any)?.derivedMetrics?.m2M0 ?? 4.21;
+  const rf = (liq.data as any)?.derivedMetrics?.rsvFed ?? 46.6;
+  const fh = [
+    { l: "Fed MBS", v: 2.0e12, c: -8.1 },
+    { l: "Fed Treasuries", v: 4.41e12, c: 4.5 },
+  ];
+  const dm = [
+    { l: "Net Liq", v: (nl / 1e12).toFixed(2) + "T", n: "<$3T warning" },
+    { l: "M2/M0", v: mm.toFixed(2) + "x", n: ">4.5x warning" },
+    { l: "Rsv/Fed", v: rf.toFixed(1) + "%", n: ">30% safe" },
+  ];
+  return (
+    <Panel title="Fed Holdings">
+      <div className="space-y-3">
+        <div className="space-y-1.5">{fh.map(({ l, v, c }: any) => (
+          <div key={l} className="bg-white/[0.04] rounded-lg p-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/[0.5]">{l}</span>
+              <span className="text-[11px] font-mono font-semibold text-white">{fmtM(v)}</span>
+            </div>
+            <div className="flex items-center justify-between mt-0.5">
+              <span className="text-[8px] text-white/[0.25]">YoY</span>
+              <span className={"text-[9px] font-mono " + (c >= 0 ? "text-green-400" : "text-red-400")}>
+                {(c >= 0 ? "+" : "") + c.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        ))}</div>
+        <div className="border-t border-white/[0.06] pt-2">
+          <p className="text-[9px] text-white/[0.3] uppercase mb-1.5">Derived Metrics</p>
+          <div className="space-y-1">{dm.map(({ l, v, n }: any) => (
+            <div key={l} className="flex items-center justify-between">
+              <span className="text-[9px] text-white/[0.35]">{l}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-mono font-semibold text-cyan-400">{v}</span>
+                <span className="text-[8px] text-white/[0.2]">{n}</span>
+              </div>
+            </div>
+          ))}</div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+// ─── Row 3, Col 2: AI Analysis + Predictions Panel ────────────────────────────
+
+function AIAnalysisPanel() {
+  const ai = useQuery({ queryKey: ["/api/ai/analysis"], refetchInterval: 60000 });
+  const pred = useQuery({ queryKey: ["/api/ai/multi-timeframe-predictions"], refetchInterval: 300000 });
+  const a = ai.data as any;
+  const p = pred.data as any;
+  const preds = p?.predictions;
+  const frames = [
+    { k: "1M", d: preds?.oneMonth },
+    { k: "3M", d: preds?.threeMonth },
+    { k: "6M", d: preds?.sixMonth },
+    { k: "1Y", d: preds?.oneYear },
+  ];
+  return (
+    <Panel title="AI Analysis" badge={[{ text: (p?.overallSentiment || "NEUTRAL").toUpperCase(), color: p?.overallSentiment === "bullish" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400" }]}>
+      <div className="space-y-3">
+        {a && (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white/[0.04] rounded-lg p-2 text-center"><p className="text-[8px] text-white/[0.3] uppercase">RSI(14)</p><p className="text-[13px] font-mono font-black text-white">{a.rsi?.toFixed(1) ?? "—"}</p></div>
+            <div className="bg-white/[0.04] rounded-lg p-2 text-center"><p className="text-[8px] text-white/[0.3] uppercase">MACD</p><p className="text-[11px] font-mono font-semibold" style={{ color: a.movingAverages?.signal > 0 ? "rgb(34,197,94)" : "rgb(239,68,68)" }}>{a.movingAverages?.signal ? "CROSS" : "—"}</p></div>
+            <div className="bg-white/[0.04] rounded-lg p-2 text-center"><p className="text-[8px] text-white/[0.3] uppercase">MA200</p><p className="text-[11px] font-mono font-semibold text-white">{a.movingAverages?.ma200 ? formatCurrency(a.movingAverages.ma200) : "—"}</p></div>
+          </div>
+        )}
+        {preds && (
+          <div className="space-y-1.5">
+            {frames.map(({ k, d }: any) => {
+              if (!d) return null;
+              const ip = d.targetPrice > (p?.currentPrice || 0);
+              return (
+                <div key={k} className="flex items-center justify-between bg-white/[0.03] rounded-lg px-3 py-1.5">
+                  <span className="text-[10px] font-mono font-bold text-white/60 w-6">{k}</span>
+                  <span className="text-[11px] font-mono font-semibold text-white">{formatCurrency(d.targetPrice)}</span>
+                  <span className={"text-[10px] font-mono " + (ip ? "text-green-400" : "text-red-400")}>
+                    {(ip ? "▲" : "▼") + Math.abs(((d.targetPrice - (p?.currentPrice || 0)) / (p?.currentPrice || 1)) * 100).toFixed(1) + "%"}
+                  </span>
+                  <span className="text-[9px] text-white/[0.3]">{d.probability}% prob</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {(!a && !preds) && <Skeleton className="h-24 w-full" />}
+      </div>
+    </Panel>
+  );
+}
+
+// ─── Row 3, Col 3: Options Flow + Whales Panel ───────────────────────────────
+
+function OptionsFlowWhalesPanel() {
+  const opt = useQuery({ queryKey: ["/api/options-flow"], refetchInterval: 60000 });
+  const whales = useQuery({ queryKey: ["/api/whale-alerts"], refetchInterval: 60000 });
+  const o = opt.data as any;
+  const txs = (whales.data as any)?.transactions || [];
+  return (
+    <Panel title="Options &amp; Whales">
+      <div className="space-y-3">
+        {o?.btc && (
+          <div className="border-b border-white/[0.06] pb-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[9px] text-white/[0.3] uppercase">Deribit Options</p>
+              <span className={"text-[9px] px-1.5 py-0.5 rounded font-bold " + (o.btc.sentiment === "bullish" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>
+                {o.btc.sentiment?.toUpperCase() || "NEUTRAL"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white/[0.04] rounded-lg p-2"><p className="text-[8px] text-white/[0.25]">P/C Ratio</p><p className="text-[12px] font-mono font-semibold text-white">{o.btc.putCallRatio?.toFixed(2) ?? "—"}</p></div>
+              <div className="bg-white/[0.04] rounded-lg p-2"><p className="text-[8px] text-white/[0.25]">Open Interest</p><p className="text-[12px] font-mono font-semibold text-white">{fmtM(o.btc.totalOI ?? 0)}</p></div>
+              <div className="bg-white/[0.04] rounded-lg p-2"><p className="text-[8px] text-white/[0.25]">Net Delta</p><p className={"text-[12px] font-mono font-semibold " + ((o.btc.netDelta ?? 0) >= 0 ? "text-green-400" : "text-red-400")}>{(o.btc.netDelta ?? 0) >= 0 ? "+" : ""}{(o.btc.netDelta ?? 0).toFixed(2)}</p></div>
+              <div className="bg-white/[0.04] rounded-lg p-2"><p className="text-[8px] text-white/[0.25]">Volume</p><p className="text-[12px] font-mono font-semibold text-white">{fmtM(o.btc.totalVolume ?? 0)}</p></div>
+            </div>
+          </div>
+        )}
+        <div>
+          <p className="text-[9px] text-white/[0.3] uppercase mb-1.5">Whale Transactions</p>
+          {txs.length === 0 ? (
+            <p className="text-[10px] text-white/[0.3] text-center py-2">No recent whale alerts</p>
+          ) : (
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {txs.slice(0, 5).map((tx: any, i: number) => (
+                <div key={i} className="flex items-center justify-between text-[9px]">
+                  <span className={"font-mono font-semibold w-8 " + (tx.type === " inflow" ? "text-green-400" : "text-red-400")}>
+                    {tx.type === "inflow" ? "IN" : "OUT"}
+                  </span>
+                  <span className="font-mono text-white/70 flex-1 ml-1">{fmtM(tx.amountUSD)}</span>
+                  <span className="text-white/[0.3] font-mono">{Math.abs(tx.amount).toFixed(4)} BTC</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+
+export default function Dashboard() {
+  const [lastUpdate, setLastUpdate] = useState(() => new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setLastUpdate(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const { data: btcData, refetch: refetchBTC } = useQuery({
+    queryKey: ["/api/bitcoin"],
+    queryFn: async () => { const r = await fetch("/api/bitcoin"); return r.json(); },
+    refetchInterval: 60000,
+  });
+
+  const { data: fearData } = useQuery({
+    queryKey: ["/api/fear-greed"],
+    queryFn: async () => { const r = await fetch("/api/fear-greed"); return r.json(); },
+    refetchInterval: 300000,
+  });
+
+  const handleRefresh = () => { refetchBTC(); setLastUpdate(new Date()); };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white p-6 font-mono">
+      <div className="max-w-[1800px] mx-auto space-y-4">
+
+        {/* ─── Row 1: Bitcoin Hero Strip ─── */}
+        <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-5">
+          <Scoreboard data={btcData as BTC} lastUpdate={lastUpdate} onRefresh={handleRefresh} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+            <div className="lg:col-span-1">
+              <FearGreedGauge data={fearData as FearGreed} />
+            </div>
+            <div className="lg:col-span-2">
+              <BTCChart />
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Row 2: Macro Grid (4 columns) ─── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <FedWatchPanel />
+          <GlobalMarketsPanel />
+          <TreasuryInflationPanel />
+          <TreasuryLiqPanel />
+        </div>
+
+        {/* ─── Row 3: Analytics Grid (3 columns) ─── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FedHoldingsPanel />
+          <AIAnalysisPanel />
+          <OptionsFlowWhalesPanel />
+        </div>
+
+      </div>
+    </div>
+  );
+};
