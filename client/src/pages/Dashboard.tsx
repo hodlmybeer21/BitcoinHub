@@ -871,9 +871,24 @@ function GlobalMetricsStrip({ data }: { data?: GlobalMetrics }) {
     );
   }
 
+  // ─── Panel ──────────────────────────────────────────────────────────────────
+
+  function Panel({ title, children, badge }: { title: string; children: React.ReactNode; badge?: { text: string; color: string }[] }) {
+    return (
+      <div className="bg-[#12121a] border border-white/[0.07] rounded-lg p-3 h-full">
+        <div className="flex justify-between items-start mb-2">
+          <span className="text-[10px] font-bold text-white/[0.4] uppercase tracking-widest">{title}</span>
+          {badge && badge.map((b, i) => (
+            <span key={i} className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${b.color}`}>{b.text}</span>
+          ))}
+        </div>
+        {children}
+      </div>
+    );
+  }
+
   // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-  
 // ─── Row 2, Col 1: Fed Watch Panel ───────────────────────────────────────────
 
 function FedWatchPanel() {
