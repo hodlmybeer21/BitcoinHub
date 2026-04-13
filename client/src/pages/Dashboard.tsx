@@ -969,43 +969,50 @@ function GlobalMarketsPanel() {
 // ─── Row 2, Col 3: Treasury & Inflation Panel ─────────────────────────────────
 
 function TreasuryInflationPanel() {
-  const fiscal = useQuery({ queryKey: ["/api/financial/treasury-fiscal"], refetchInterval: 300000 });
-  const infl = useQuery({ queryKey: ["/api/financial/inflation"], refetchInterval: 300000 });
-  const sects = (infl.data as any)?.sectors || [];
-  const td = (fiscal.data as any)?.debtToPenny?.totalDebt ?? 38.4e12;
-  const d2g = (fiscal.data as any)?.debtStatistics?.debtToGDP ?? 142.2;
+  const infl = useQuery({ queryKey: ["/api/inflation"], refetchInterval: 300000 });
+  const inflData = infl.data as any;
+  const cpiRate = inflData?.cpi?.value ?? 3.2;
+  const cpiChange = inflData?.cpi?.change ?? 0;
+  const items = [
+    { n: "CPI YoY", v: inflData?.cpi?.value, c: inflData?.cpi?.change },
+    { n: "PPI YoY", v: inflData?.ppi?.value, c: inflData?.ppi?.change },
+    { n: "PCE YoY", v: inflData?.pce?.value, c: inflData?.pce?.change },
+    { n: "Core CPI", v: inflData?.core?.value, c: inflData?.core?.change },
+  ];
   return (
     <Panel title="US Treasury &amp; Inflation">
       <div className="space-y-3">
         <div className="border-b border-white/[0.06] pb-2">
           <p className="text-[10px] text-red-400 font-mono font-bold">
-            {fmtDebt(td)}<span className="text-white/[0.3] text-[9px] ml-1">Total US Debt</span>
+            $38.4T<span className="text-white/[0.3] text-[9px] ml-1">Total US Debt</span>
           </p>
           <div className="grid grid-cols-3 gap-1 mt-1">
-            <div><p className="text-[8px] text-white/[0.25]">Public Debt</p><p className="text-[10px] font-mono text-white/70">{fmtDebt((fiscal.data as any)?.debtToPenny?.publicDebt ?? 28.5e12)}</p></div>
-            <div><p className="text-[8px] text-white/[0.25]">Intragov</p><p className="text-[10px] font-mono text-white/70">{fmtDebt((fiscal.data as any)?.debtToPenny?.intergovernmentalHoldings ?? 9.6e12)}</p></div>
-            <div><p className="text-[8px] text-white/[0.25]">Debt/GDP</p><p className="text-[10px] font-mono text-orange-400">{d2g}%</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Public Debt</p><p className="text-[10px] font-mono text-white/70">$28.5T</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Intragov</p><p className="text-[10px] font-mono text-white/70">$9.6T</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Debt/GDP</p><p className="text-[10px] font-mono text-orange-400">142%</p></div>
           </div>
           <div className="grid grid-cols-2 gap-1 mt-1">
-            <div><p className="text-[8px] text-white/[0.25]">Per Citizen</p><p className="text-[10px] font-mono text-white/70">${((fiscal.data as any)?.debtStatistics?.debtPerCitizen || 114627).toLocaleString()}</p></div>
-            <div><p className="text-[8px] text-white/[0.25]">Per Taxpayer</p><p className="text-[10px] font-mono text-white/70">${((fiscal.data as any)?.debtStatistics?.debtPerTaxpayer || 240000).toLocaleString()}</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Per Citizen</p><p className="text-[10px] font-mono text-white/70">$114,627</p></div>
+            <div><p className="text-[8px] text-white/[0.25]">Per Taxpayer</p><p className="text-[10px] font-mono text-white/70">$240,000</p></div>
           </div>
         </div>
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[9px] text-white/[0.3] uppercase">CPI YoY</p>
-            <span className={"text-[11px] font-mono font-bold " + (((infl.data as any)?.overall?.rate ?? 3.2) > 3 ? "text-red-400" : "text-green-400")}>
-              {((infl.data as any)?.overall?.rate ?? 3.2).toFixed(2)}%
+            <p className="text-[9px] text-white/[0.3] uppercase">Inflation</p>
+            <span className={"text-[11px] font-mono font-bold " + (cpiRate > 3 ? "text-red-400" : "text-green-400")}>
+              {cpiRate.toFixed(2)}%
             </span>
           </div>
-          <div className="space-y-1">{sects.slice(0, 5).map((s: any, i: number) => (
+          <div className="space-y-1">{items.map(({ n, v, c }, i) => (
             <div key={i} className="flex items-center justify-between">
-              <span className="text-[9px] text-white/[0.45]">{s.name}</span>
+              <span className="text-[9px] text-white/[0.45]">{n}</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono font-semibold text-white/70">{s.rate.toFixed(1)}%</span>
-                <span className={"text-[9px] font-mono " + (s.change >= 0 ? "text-red-400" : "text-green-400")}>
-                  {(s.change >= 0 ? "+" : "") + s.change.toFixed(1)}%
-                </span>
+                <span className="text-[10px] font-mono font-semibold text-white/70">{v != null ? v.toFixed(1) + "%" : "—"}</span>
+                {c != null && (
+                  <span className={"text-[9px] font-mono " + (c >= 0 ? "text-red-400" : "text-green-400")}>
+                    {(c >= 0 ? "+" : "") + c.toFixed(1)}%
+                  </span>
+                )}
               </div>
             </div>
           ))}</div>
@@ -1233,14 +1240,14 @@ export default function Dashboard() {
   }, []);
 
   const { data: btcData, refetch: refetchBTC } = useQuery({
-    queryKey: ["/api/bitcoin"],
-    queryFn: async () => { const r = await fetch("/api/bitcoin"); return r.json(); },
+    queryKey: ["/api/bitcoin/market-data"],
+    queryFn: async () => { const r = await fetch("/api/bitcoin/market-data"); return r.json(); },
     refetchInterval: 60000,
   });
 
   const { data: fearData } = useQuery({
-    queryKey: ["/api/fear-greed"],
-    queryFn: async () => { const r = await fetch("/api/fear-greed"); return r.json(); },
+    queryKey: ["/api/web-resources/fear-greed"],
+    queryFn: async () => { const r = await fetch("/api/web-resources/fear-greed"); return r.json(); },
     refetchInterval: 300000,
   });
 
