@@ -1,0 +1,428 @@
+import { useQuery } from "@tanstack/react-query";
+import { formatCurrency, formatPercentage, formatNumber } from "@/lib/utils";
+import { ArrowUp, ArrowDown, RefreshCw, Activity, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BitcoinMarketData } from "@/lib/types";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1D'] as const;
+type Timeframe = typeof TIMEFRAMES[number];
+
+interface ChartPoint { timestamp: number; price: number; }
+interface FearGreedData { currentValue: number; classification: string; yesterday: number; lastWeek: number; }
+interface WhaleTransaction { hash: string; timestamp: number; amount: number; amountUSD: number; from: string; to: string; type: string; }
+interface WhaleAlertResponse { transactions: WhaleTransaction[]; }
+interface NetworkStats { hashRateEH: number; difficulty: number; avgBlockTime: number; }
+interface FundingRateData { symbol: string; fundingRatePercent: number; nextFundingTime: string; }
+interface LiquidityData {
+  indicators: { shortName: string; displayValue: string; yoyChangePercent: number; }[];
+  summary: { overallSignal: string; anomalyCount: number; signalReasons: string[]; stackSatsAlert: boolean; };
+  derivedMetrics: { id: string; displayValue: string; isAnomaly: boolean; alertMessage: string; }[];
+}
+interface FinancialMarketData { dxy: { value: number; change: number }; gold: { value: number; change: number }; spx: { value: number; change: number }; vix: { value: number; change: number }; }
+interface OptionsFlowResponse {
+  putCallRatio: number; totalCallOI: number; totalPutOI: number; avgImpliedVolatility: number;
+  marketSentiment: string; topContracts: { strike: number; type: string; openInterest: number; volume24h: number; impliedVolatility: number; }[];
+}
+interface GlobalMetrics { totalMarketCap: number; btcDominance: number; ethPrice: number; ethChange: number; defiTVL: number; }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const fmtCurr = (v: number, decimals = 2) => formatCurrency(v, 'USD', decimals);
+const fmtPct = (v: number) => formatPercentage(v);
+const fmtNumber = (v: number, decimals = 1) => formatNumber(v, decimals);
+const fmtRelTime = (dateString: string) => {
+  const diff = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (diff < 60) return 'Just now';
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
+const truncAddr = (addr: string) => addr === 'Unknown' ? 'Unknown' : addr.length <= 12 ? addr : `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+const priceColor = (v: number) => v >= 0 ? 'text-green-500' : 'text-red-500';
+const fgColor = (v: number) => { if (v <= 24) return 'text-red-500'; if (v <= 49) return 'text-orange-500'; if (v <= 74) return 'text-lime-500'; return 'text-green-500'; };
+const fgBgClass = (v: number) => { if (v <= 24) return 'bg-red-500/10 border-red-500/20'; if (v <= 49) return 'bg-orange-500/10 border-orange-500/20'; if (v <= 74) return 'bg-lime-500/10 border-lime-500/20'; return 'bg-green-500/10 border-green-500/20'; };
+const clamp = (min: number, val: number, max: number) => Math.max(min, Math.min(max, val));
+const fmtOI = (oi: number) => oi >= 1000 ? `${(oi / 1000).toFixed(1)}K` : oi.toFixed(0);
+
+// ─── Scoreboard ───────────────────────────────────────────────────────────────
+function Scoreboard({ marketData, fundingData, lastUpdate, onRefresh }: {
+  marketData: BitcoinMarketData | undefined; fundingData: FundingRateData[] | undefined; lastUpdate: Date; onRefresh: () => void;
+}) {
+  const price = marketData?.current_price?.usd || 0;
+  const change = marketData?.price_change_percentage_24h || 0;
+  const high24h = marketData?.high_24h?.usd || 0;
+  const low24h = marketData?.low_24h?.usd || 0;
+  const volume = marketData?.total_volume?.usd || 0;
+  const mcap = marketData?.market_cap?.usd || 0;
+  const range = high24h - low24h;
+  const posInRange = range > 0 ? ((price - low24h) / range) * 100 : 50;
+
+  return (
+    <div className="bg-card/80 backdrop-blur border-b border-muted/20 sticky top-0 z-50 px-4 py-3">
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-muted-foreground tracking-widest">BTC/USD</span>
+          <span className="text-xs text-muted-foreground/50">BITCOIN</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Updated {lastUpdate.toLocaleTimeString()}</span>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRefresh}><RefreshCw size={12} /></Button>
+        </div>
+      </div>
+      <div className="flex items-end justify-between flex-wrap gap-2">
+        <div className="flex items-baseline gap-3">
+          <span className="text-4xl sm:text-5xl font-mono font-bold tracking-tight">{price > 0 ? fmtCurr(price, 0) : '—'}</span>
+          <div className="flex items-center gap-1 mb-1">
+            {change >= 0 ? <ArrowUp size={18} className="text-green-500" /> : <ArrowDown size={18} className="text-red-500" />}
+            <span className={`text-xl font-mono font-semibold ${priceColor(change)}`}>{change !== 0 ? fmtPct(change) : '—'}</span>
+            <span className="text-xs text-muted-foreground mb-0.5">24h</span>
+          </div>
+        </div>
+        <div className="flex gap-4 text-xs">
+          <div className="text-right"><p className="text-muted-foreground">24h Vol</p><p className="font-mono font-medium">{volume > 0 ? `${fmtNumber(volume / 1e9, 1)}B` : '—'}</p></div>
+          <div className="text-right"><p className="text-muted-foreground">MCap</p><p className="font-mono font-medium">{mcap > 0 ? `${fmtNumber(mcap / 1e12, 2)}T` : '—'}</p></div>
+          {fundingData && fundingData.length > 0 && (
+            <div className="text-right">
+              <p className="text-muted-foreground">Funding</p>
+              <p className={`font-mono font-medium ${priceColor(-fundingData[0].fundingRatePercent)}`}>
+                {fundingData[0].fundingRatePercent >= 0 ? '+' : ''}{fundingData[0].fundingRatePercent.toFixed(4)}%
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+      {range > 0 && (
+        <div className="mt-2">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+            <span className="font-mono">{fmtCurr(low24h, 0)}</span>
+            <span className="text-muted-foreground">24h range</span>
+            <span className="font-mono">{fmtCurr(high24h, 0)}</span>
+          </div>
+          <div className="h-2 bg-muted/30 rounded-full overflow-hidden relative">
+            <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-red-500/20 via-yellow-500/10 to-green-500/20 rounded-full" />
+            <div className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white border-2 border-foreground shadow-sm" style={{ left: `clamp(0%, ${posInRange}%, 100%)` }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Signal Light ─────────────────────────────────────────────────────────────
+function SignalLight({ score, total, loading }: { score: number; total: number; loading: boolean }) {
+  const pct = total > 0 ? score / total : 0.5;
+  const label = pct >= 0.67 ? 'BUY CONDITIONS BUILDING' : pct >= 0.4 ? 'NEUTRAL — SIT TIGHT' : 'SELL CONDITIONS — CAUTION';
+  const emoji = pct >= 0.67 ? '🟢' : pct >= 0.4 ? '🟡' : '🔴';
+  const barColor = pct >= 0.67 ? 'bg-green-500' : pct >= 0.4 ? 'bg-yellow-500' : 'bg-red-500';
+
+  return (
+    <div className={`px-4 py-3 rounded-lg border flex items-center justify-between ${pct >= 0.67 ? 'bg-green-500/5 border-green-500/20' : pct >= 0.4 ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">{emoji}</span>
+        <div>
+          <p className={`text-sm font-bold tracking-wide ${pct >= 0.67 ? 'text-green-500' : pct >= 0.4 ? 'text-yellow-500' : 'text-red-500'}`}>{label}</p>
+          {loading ? <Skeleton className="h-3 w-32 mt-1" /> : <p className="text-xs text-muted-foreground mt-0.5">{score}/{total} signals bullish</p>}
+        </div>
+      </div>
+      <div className="w-32 h-2 bg-muted/30 rounded-full overflow-hidden">
+        <div className={`h-full ${barColor} transition-all rounded-full`} style={{ width: `${pct * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Price Chart ──────────────────────────────────────────────────────────────
+function PriceChart({ timeframe, onTimeframeChange, chartData, currentPrice }: {
+  timeframe: Timeframe; onTimeframeChange: (tf: Timeframe) => void; chartData: ChartPoint[] | undefined; currentPrice: number;
+}) {
+  const { prices, minPrice, maxPrice, p5, p95, points } = useMemo(() => {
+    if (!chartData || chartData.length === 0) return { prices: [], minPrice: 0, maxPrice: 0, p5: 0, p95: 0, points: '' };
+    const arr = chartData.map(d => d.price);
+    const min = Math.min(...arr);
+    const max = Math.max(...arr);
+    const range = max - min || 1;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const p5 = sorted[Math.floor(sorted.length * 0.05)];
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    const pts = chartData.map((d, i) => {
+      const x = (i / (chartData.length - 1)) * 100;
+      const y = 100 - ((d.price - min) / range) * 100;
+      return `${x},${y}`;
+    }).join(' ');
+    return { prices: arr, minPrice: min, maxPrice: max, p5, p95, points: pts };
+  }, [chartData]);
+
+  const svgH = 220;
+  const resY = prices.length ? 100 - ((p95 - minPrice) / (maxPrice - minPrice || 1)) * 100 : 50;
+  const supY = prices.length ? 100 - ((p5 - minPrice) / (maxPrice - minPrice || 1)) * 100 : 50;
+  const priceY = prices.length ? 100 - ((currentPrice - minPrice) / (maxPrice - minPrice || 1)) * 100 : 50;
+
+  return (
+    <div className="border border-muted/20 rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-muted/10">
+        <span className="text-xs font-semibold text-muted-foreground tracking-wider">BTC/USD CHART</span>
+        <div className="flex gap-1">
+          {TIMEFRAMES.map(tf => (
+            <Button key={tf} variant={timeframe === tf ? 'default' : 'ghost'} size="sm"
+              className={`h-6 px-2 text-xs font-mono ${timeframe === tf ? '' : 'text-muted-foreground'}`}
+              onClick={() => onTimeframeChange(tf)}>{tf}</Button>
+          ))}
+        </div>
+      </div>
+      <div className="relative" style={{ height: svgH }}>
+        {prices.length > 0 ? (
+          <>
+            <div className="absolute left-0 right-0 border-t border-dashed border-red-500/40 pointer-events-none" style={{ top: `${resY}%` }}>
+              <span className="absolute right-2 text-xs font-mono text-red-500/60 bg-background px-1" style={{ top: -10 }}>R: {fmtCurr(p95, 0)}</span>
+            </div>
+            <div className="absolute left-0 right-0 border-t border-dashed border-green-500/40 pointer-events-none" style={{ top: `${supY}%` }}>
+              <span className="absolute right-2 text-xs font-mono text-green-500/60 bg-background px-1" style={{ top: -10 }}>S: {fmtCurr(p5, 0)}</span>
+            </div>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full" style={{ position: 'absolute', top: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(142, 76%, 36%, 0.3)" />
+                  <stop offset="100%" stopColor="hsl(142, 76%, 36%, 0)" />
+                </linearGradient>
+              </defs>
+              <polygon fill="url(#chartGrad)" points={`0,100 ${points} 100,100`} />
+              <polyline fill="none" stroke="hsl(142, 76%, 36%)" strokeWidth="1.5" points={points} />
+              <circle cx="50" cy={priceY} r="2.5" fill="white" stroke="hsl(142, 76%, 36%)" strokeWidth="1" />
+            </svg>
+            <div className="absolute left-1 top-0 bottom-0 flex flex-col justify-between py-2 text-xs font-mono text-muted-foreground/60">
+              <span>{fmtCurr(maxPrice, 0)}</span>
+              <span>{fmtCurr((maxPrice + minPrice) / 2, 0)}</span>
+              <span>{fmtCurr(minPrice, 0)}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-full"><p className="text-sm text-muted-foreground">Loading chart...</p></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Fear & Greed Card ───────────────────────────────────────────────────────
+function FearGreedCard({ data }: { data: FearGreedData | undefined }) {
+  const value = data?.currentValue ?? 50;
+  const color = fgColor(value);
+  const bg = fgBgClass(value);
+
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">FEAR & GREED</CardTitle></CardHeader>
+      <CardContent>
+        <div className={`p-3 rounded-lg border ${bg} mb-3`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-3xl font-mono font-bold ${color}`}>{value}</span>
+            <span className={`text-sm font-medium ${color}`}>{data?.classification ?? '—'}</span>
+          </div>
+          <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
+            <div className={`h-full transition-all ${value > 50 ? 'bg-green-500' : value > 30 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${value}%` }} />
+          </div>
+          <div className="flex justify-between mt-1 text-xs text-muted-foreground"><span>Extreme Fear</span><span>Extreme Greed</span></div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="flex justify-between"><span className="text-muted-foreground">Yesterday</span><span className={`font-mono font-medium ${fgColor(data?.yesterday ?? 50)}`}>{data?.yesterday ?? '—'}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Last Week</span><span className={`font-mono font-medium ${fgColor(data?.lastWeek ?? 50)}`}>{data?.lastWeek ?? '—'}</span></div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Market Movers Card ───────────────────────────────────────────────────────
+function MarketMoversCard({ data }: { data: GlobalMetrics | undefined }) {
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">MARKET MOVERS</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">Total MCap</span><span className="text-sm font-mono font-medium">{data ? `${fmtNumber(data.totalMarketCap / 1e12, 1)}T` : <Skeleton className="h-4 w-16 inline-block" />}</span></div>
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">BTC Dominance</span><span className="text-sm font-mono font-medium">{data ? `${data.btcDominance.toFixed(1)}%` : <Skeleton className="h-4 w-12 inline-block" />}</span></div>
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">ETH Price</span><span className={`text-sm font-mono font-medium ${data ? priceColor(data.ethChange) : ''}`}>{data ? fmtCurr(data.ethPrice, 2) : <Skeleton className="h-4 w-16 inline-block" />}</span></div>
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">ETH 24h</span><span className={`text-sm font-mono font-medium ${data ? priceColor(data.ethChange) : ''}`}>{data ? fmtPct(data.ethChange) : <Skeleton className="h-4 w-12 inline-block" />}</span></div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Whale Pulse Card ─────────────────────────────────────────────────────────
+function WhalePulseCard({ data }: { data: WhaleAlertResponse | undefined }) {
+  const txs = data?.transactions?.slice(0, 3) ?? [];
+
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">WHALE PULSE</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        {!data ? [1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)
+          : txs.length === 0 ? <p className="text-xs text-muted-foreground text-center py-4">No large transactions</p>
+          : txs.map((tx, idx) => (
+            <div key={tx.hash + idx} className="flex items-center justify-between py-1 border-b border-muted/10 last:border-0">
+              <div className="flex items-center gap-2">
+                {tx.type === 'exchange_inflow' ? <ArrowDown size={12} className="text-red-500" /> : tx.type === 'exchange_outflow' ? <ArrowUp size={12} className="text-green-500" /> : <Activity size={12} className="text-blue-500" />}
+                <div>
+                  <p className={`text-xs font-mono font-medium ${tx.type === 'exchange_inflow' ? 'text-red-500' : tx.type === 'exchange_outflow' ? 'text-green-500' : 'text-blue-500'}`}>{tx.amount.toFixed(1)} BTC</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-[100px]">{truncAddr(tx.from)} → {truncAddr(tx.to)}</p>
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0 ml-2">
+                <p className="text-xs font-mono text-muted-foreground">{tx.amountUSD > 0 ? fmtCurr(tx.amountUSD, 0) : '—'}</p>
+                <p className="text-xs text-muted-foreground/60">{tx.timestamp ? fmtRelTime(new Date(tx.timestamp).toISOString()) : ''}</p>
+              </div>
+            </div>
+          ))
+        }
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── On-Chain Snap Card ───────────────────────────────────────────────────────
+function OnChainSnapCard({ data, marketData }: { data: NetworkStats | undefined; marketData: BitcoinMarketData | undefined }) {
+  const fmtHR = (eh: number) => eh >= 1000 ? `${(eh / 1000).toFixed(1)} ZE/s` : `${eh.toFixed(1)} EH/s`;
+  const fmtDiff = (d: number) => d >= 1e12 ? `${(d / 1e12).toFixed(2)}T` : d >= 1e9 ? `${(d / 1e9).toFixed(2)}B` : `${(d / 1e6).toFixed(2)}M`;
+
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">ON-CHAIN SNAP</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">Hash Rate</span><span className="text-sm font-mono font-medium">{data ? fmtHR(data.hashRateEH) : <Skeleton className="h-4 w-14 inline-block" />}</span></div>
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">Difficulty</span><span className="text-sm font-mono font-medium">{data ? fmtDiff(data.difficulty) : <Skeleton className="h-4 w-14 inline-block" />}</span></div>
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">Block Time</span><span className="text-sm font-mono font-medium">{data ? `${data.avgBlockTime.toFixed(1)}m` : <Skeleton className="h-4 w-10 inline-block" />}</span></div>
+        <div className="flex justify-between items-center"><span className="text-xs text-muted-foreground">24h Volume</span><span className="text-sm font-mono font-medium">{marketData ? `${fmtNumber((marketData.total_volume?.usd || 0) / 1e9, 1)}B` : <Skeleton className="h-4 w-12 inline-block" />}</span></div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Macro Correlation Card ───────────────────────────────────────────────────
+function MacroCorrCard({ data }: { data: FinancialMarketData | undefined }) {
+  if (!data) return <Card className="bg-card/50"><CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">MACRO CORRELATION</CardTitle></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>;
+
+  const items = [
+    { label: 'S&P 500', value: data.spx.value.toLocaleString(), change: data.spx.change, note: 'correlates with risk' },
+    { label: 'DXY Index', value: data.dxy.value.toFixed(2), change: data.dxy.change, note: 'inverse to BTC' },
+    { label: 'Gold', value: fmtCurr(data.gold.value, 0), change: data.gold.change, note: 'safe haven' },
+    { label: 'VIX Fear', value: data.vix.value.toFixed(2), change: data.vix.change, note: 'volatility' },
+  ];
+
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">MACRO CORRELATION</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        {items.map(item => (
+          <div key={item.label} className="flex items-center justify-between">
+            <div><span className="text-xs text-muted-foreground">{item.label}</span><p className="text-xs text-muted-foreground/50">{item.note}</p></div>
+            <div className="text-right">
+              <p className="text-sm font-mono font-medium">{item.value}</p>
+              <p className={`text-xs font-mono ${priceColor(item.change)}`}>{item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%</p>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Funding Card ─────────────────────────────────────────────────────────────
+function FundingCard({ data }: { data: FundingRateData[] | undefined }) {
+  const rate = data?.[0]?.fundingRatePercent ?? 0;
+  const isExtreme = rate > 0.01;
+  const color = rate > 0 ? 'text-red-500' : rate < 0 ? 'text-green-500' : 'text-yellow-500';
+
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">FUNDING RATES</CardTitle></CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <p className={`text-2xl font-mono font-bold ${color}`}>{data && data.length > 0 ? `${rate >= 0 ? '+' : ''}${rate.toFixed(4)}%` : '—'}</p>
+            <p className="text-xs text-muted-foreground">Per 8h period</p>
+          </div>
+          {isExtreme && <div className="flex items-center gap-1 text-xs text-orange-500"><AlertTriangle size={12} /><span>High funding</span></div>}
+        </div>
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between"><span className="text-muted-foreground">Next funding</span><span className="font-mono">{data?.[0]?.nextFundingTime ? new Date(data[0].nextFundingTime).toLocaleTimeString() : '—'}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Bias</span><span className={`font-mono font-medium ${rate > 0.005 ? 'text-red-500' : rate < -0.005 ? 'text-green-500' : 'text-yellow-500'}`}>{rate > 0.005 ? 'BEARISH' : rate < -0.005 ? 'BULLISH' : 'NEUTRAL'}</span></div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-muted/10 text-xs text-muted-foreground space-y-1">
+          <p>• Positive = longs pay shorts (bear pressure)</p>
+          <p>• Negative = shorts pay longs (bull pressure)</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Liquidity Card ───────────────────────────────────────────────────────────
+function LiquidityCard({ data }: { data: LiquidityData | undefined }) {
+  const coreIndicators = data?.indicators?.filter(i => ['M2', 'RRP', 'TGA', 'Fed BS', 'Reserves'].includes(i.shortName)).slice(0, 4) ?? [];
+  const netLiq = data?.derivedMetrics?.find(d => d.id === 'net_liquidity');
+  const stackSats = data?.summary?.stackSatsAlert;
+  const signal = data?.summary?.overallSignal ?? 'neutral';
+
+  const getSignalColor = (s: string) => s === 'bullish' ? 'text-green-500' : s === 'bearish' ? 'text-red-500' : 'text-yellow-500';
+  const getSignalBg = (s: string) => s === 'bullish' ? 'bg-green-500/10 border-green-500/20' : s === 'bearish' ? 'bg-red-500/10 border-red-500/20' : 'bg-yellow-500/10 border-yellow-500/20';
+
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">
+          LIQUIDITY
+          {stackSats && <span className="ml-2 text-xs font-normal text-orange-500 animate-pulse">⚠️ STACK SATS</span>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {coreIndicators.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {coreIndicators.map(ind => (
+              <div key={ind.shortName} className={`p-2 rounded border ${ind.yoyChangePercent > 5 ? 'bg-green-500/5 border-green-500/20' : ind.yoyChangePercent < -5 ? 'bg-red-500/5 border-red-500/20' : 'border-muted/20'}`}>
+                <p className="text-xs text-muted-foreground">{ind.shortName}</p>
+                <p className="text-sm font-mono font-bold">{ind.displayValue}</p>
+                <p className={`text-xs font-mono ${ind.yoyChangePercent > 0 ? 'text-green-500' : 'text-red-500'}`}>{ind.yoyChangePercent >= 0 ? '+' : ''}{ind.yoyChangePercent.toFixed(1)}% YoY</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Skeleton className="h-16 w-full mb-3" />
+        )}
+        {netLiq && (
+          <div className={`p-2 rounded border ${netLiq.isAnomaly ? 'bg-orange-500/10 border-orange-500/20' : 'border-muted/20'}`}>
+            <p className="text-xs text-muted-foreground">Net Liquidity</p>
+            <p className="text-sm font-mono font-bold">{netLiq.displayValue}</p>
+            {netLiq.alertMessage && <p className="text-xs text-orange-500">{netLiq.alertMessage}</p>}
+          </div>
+        )}
+        {data?.summary && (
+          <div className="mt-3 pt-3 border-t flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Macro Signal</span>
+            <div className="flex items-center gap-2">
+              {data.summary.anomalyCount > 0 && <span className="text-xs text-orange-500">{data.summary.anomalyCount}⚠️</span>}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded ${getSignalBg(signal)} ${getSignalColor(signal)}`}>{signal.toUpperCase()}</span>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Options Flow Card ───────────────────────────────────────────────────────
+function OptionsFlowCard({ data }: { data: OptionsFlowResponse | undefined }) {
+  if (!data) return <Card className="bg-card/50"><CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">OPTIONS FLOW</CardTitle></CardHeader><CardContent><Skeleton className="h-24 w-full" /></CardContent></Card>;
+
+  const sentimentColor = data.marketSentiment === 'bullish' ? 'text-green-500 bg-green-500/10' : data.marketSentiment === 'bearish' ? 'text-red-500 bg-red-500/10' : 'text-yellow-500 bg-yellow-500/10';
+
+  return (
+    <Card className="bg-card/50">
+      <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider">OPTIONS FLOW (DERIBIT)</CardTitle></CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="p-3 bg-card rounded-lg border">
+            <p className="text
