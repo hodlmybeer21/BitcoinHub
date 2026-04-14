@@ -9,7 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Premium components
@@ -137,7 +137,7 @@ function BTCChart({ timeframe }: { timeframe?: string }) {
 
 // ─── Dark container wrapper ────────────────────────────────────────────────────
 
-function DarkCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function DarkCard({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div className={`bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto ${className}`}>
       {children}
