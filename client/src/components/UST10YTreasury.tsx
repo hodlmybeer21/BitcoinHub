@@ -1,128 +1,73 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
 
 const UST10YTreasury = () => {
-  // Mock data based on the screenshot - in production this would come from CNBC/Treasury API
-  const [treasuryData, setTreasuryData] = useState({
-    yield: 4.348,
-    change: 0.055,
-    changePercent: 1.28,
-    lastUpdated: "2:30 PM EDT",
-    isPositive: true
+  const { data, isLoading, error } = useQuery<{
+    rate: number; yieldChange: number; trend: string; date: string;
+  }>({
+    queryKey: ['/api/financial/yields'],
+    refetchInterval: 5 * 60 * 1000,
   });
 
-  // Simulate real-time updates every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Small random fluctuations to simulate market movement
-      const baseYield = 4.348;
-      const randomChange = (Math.random() - 0.5) * 0.1; // ±0.05% range
-      const newYield = Number((baseYield + randomChange).toFixed(3));
-      const change = Number((newYield - baseYield).toFixed(3));
-      const changePercent = Number(((change / baseYield) * 100).toFixed(2));
-      
-      setTreasuryData({
-        yield: newYield,
-        change: change,
-        changePercent: Math.abs(changePercent),
-        lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + " EDT",
-        isPositive: change >= 0
-      });
-    }, 30000);
+  if (isLoading) {
+    return (
+      <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full">
+        <div className="animate-pulse space-y-2">
+          <div className="h-4 bg-white/[0.06] rounded w-1/2" />
+          <div className="h-14 bg-white/[0.04] rounded" />
+          <div className="h-8 bg-white/[0.04] rounded" />
+        </div>
+      </div>
+    );
+  }
 
-    return () => clearInterval(interval);
-  }, []);
+  if (error || !data) {
+    return (
+      <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-6 w-6 text-white/20 mx-auto mb-1" />
+          <p className="text-xs text-white/30">Yield data unavailable</p>
+        </div>
+      </div>
+    );
+  }
 
-  const formatYield = (value: number) => `${value.toFixed(3)}%`;
-  const formatChange = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(3)}`;
+  const pos = data.yieldChange >= 0;
 
   return (
-    <Card className="bg-card border">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-500" />
-            U.S. 10 Year Treasury
-          </h3>
-          <div className="text-xs text-muted-foreground">
-            US10Y:Tradeweb
-          </div>
-        </div>
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] font-black tracking-[0.2em] text-white/60 uppercase">10Y Treasury</span>
+        <span className="text-[9px] text-white/20">{data.date}</span>
+      </div>
 
-        {/* Main Yield Display */}
-        <div className="mb-4">
-          <div className="flex items-baseline gap-3 mb-2">
-            <h2 className="text-4xl font-mono font-bold text-foreground">
-              {formatYield(treasuryData.yield)}
-            </h2>
-            <div className="flex items-center gap-1">
-              {treasuryData.isPositive ? (
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              ) : (
-                <TrendingDown className="h-4 w-4 text-red-500" />
-              )}
-              <span className={`text-lg font-medium ${
-                treasuryData.isPositive ? 'text-green-500' : 'text-red-500'
-              }`}>
-                {formatChange(treasuryData.change)}
-              </span>
-            </div>
+      <div className="bg-white/[0.04] rounded-lg p-3 mb-3">
+        <p className="text-[9px] text-white/25 uppercase tracking-widest mb-1">Yield</p>
+        <div className="flex items-baseline gap-2">
+          <span className={`text-3xl font-mono font-black ${data.rate > 4.5 ? 'text-red-400' : data.rate > 4.0 ? 'text-yellow-400' : 'text-green-400'}`}>
+            {data.rate.toFixed(2)}%
+          </span>
+          <div className={`flex items-center gap-0.5 text-xs font-mono ${pos ? 'text-red-400' : 'text-green-400'}`}>
+            {pos ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+            {Math.abs(data.yieldChange).toFixed(3)}%
           </div>
-          <p className="text-sm text-muted-foreground">
-            Yield | {treasuryData.lastUpdated}
-          </p>
         </div>
+      </div>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-muted/20 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground mb-1">Daily Change</p>
-            <p className={`text-lg font-mono font-bold ${
-              treasuryData.isPositive ? 'text-green-500' : 'text-red-500'
-            }`}>
-              {formatChange(treasuryData.change)}
-            </p>
-          </div>
-          
-          <div className="bg-muted/20 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground mb-1">% Change</p>
-            <p className={`text-lg font-mono font-bold ${
-              treasuryData.isPositive ? 'text-green-500' : 'text-red-500'
-            }`}>
-              {treasuryData.isPositive ? '+' : '-'}{treasuryData.changePercent}%
-            </p>
-          </div>
+      {/* Real yield context */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-[10px]">
+          <span className="text-white/30">Real Yield (approx)</span>
+          <span className="text-white/60 font-mono">{(data.rate - 2.9).toFixed(2)}%</span>
         </div>
+        <div className="flex justify-between text-[10px]">
+          <span className="text-white/30">BTC context</span>
+          <span className="text-white/60 font-mono">{data.rate > 4.5 ? 'Headwind' : 'Tailwind'}</span>
+        </div>
+      </div>
 
-        {/* Key Levels */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium">Key Levels</h4>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="text-center p-2 bg-red-500/10 rounded">
-              <p className="text-xs text-muted-foreground">52W Low</p>
-              <p className="text-sm font-mono font-medium">3.650%</p>
-            </div>
-            <div className="text-center p-2 bg-muted/20 rounded">
-              <p className="text-xs text-muted-foreground">Current</p>
-              <p className="text-sm font-mono font-medium">{formatYield(treasuryData.yield)}</p>
-            </div>
-            <div className="text-center p-2 bg-green-500/10 rounded">
-              <p className="text-xs text-muted-foreground">52W High</p>
-              <p className="text-sm font-mono font-medium">4.750%</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Impact Note */}
-        <div className="mt-4 p-3 bg-blue-500/10 rounded-lg">
-          <p className="text-xs text-muted-foreground">
-            <TrendingUp className="h-3 w-3 inline mr-1" />
-            Higher Treasury yields often correlate with Bitcoin sell-offs as traditional assets become more attractive.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+      <p className="text-[8px] text-white/20 mt-auto pt-2 text-center">Yield &gt; 4.5% = risk-off pressure on BTC</p>
+    </div>
   );
 };
 

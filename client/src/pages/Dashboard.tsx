@@ -248,7 +248,7 @@ export default function Dashboard() {
         {/* ROW 2: AI Analysis — Primary Focus (full width)                  */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         <DarkCard className="mb-4">
-          <AIAnalysis marketData={marketData} />
+          <AIAnalysis marketData={marketData} isLoading={false} timeframe="1D" />
         </DarkCard>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
