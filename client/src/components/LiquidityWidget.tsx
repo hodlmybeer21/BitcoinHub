@@ -76,11 +76,15 @@ export default function LiquidityWidget() {
   };
 
   // Core liquidity indicators to show
-  const coreIndicators = data.indicators?.filter(
-    i => ['M2', 'M1', 'RRP', 'TGA', 'Fed BS', 'Reserves'].includes(i.shortName)
-  ).slice(0, 6) || [];
+  const indicatorArr = Array.isArray(data.indicators)
+    ? data.indicators
+    : Object.values(data.indicators || {});
+  const coreIndicators = indicatorArr
+    .filter((i: any) => ['M2', 'M1', 'RRP', 'TGA', 'Fed BS', 'Reserves'].includes(i.shortName))
+    .slice(0, 6);
 
-  const netLiq = data.derivedMetrics?.find(d => d.id === 'net_liquidity');
+  const dmArr = Array.isArray(data.derivedMetrics) ? data.derivedMetrics : Object.values(data.derivedMetrics || {});
+  const netLiq = dmArr.find((d: any) => d.id === 'net_liquidity');
   const stackSatsAlert = data.summary?.stackSatsAlert;
 
   return (
