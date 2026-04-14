@@ -38,7 +38,7 @@ async function handleAuthMe(_: VercelRequest, res: VercelResponse) {
 // ─── Notifications (stub) ──────────────────────────────────────────────────────
 
 async function handleNotifications(_: VercelRequest, res: VercelResponse) {
-  ok(res, { notifications: [], unread: 0 });
+  ok(res, []);
 }
 
 // ─── Bitcoin Market Data ───────────────────────────────────────────────────────
