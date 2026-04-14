@@ -28,6 +28,19 @@ async function handleHealth(_: VercelRequest, res: VercelResponse) {
   ok(res, { status: 'ok', ts: Date.now() });
 }
 
+// ─── Auth (stub — no DB-backed users on serverless) ───────────────────────────
+
+async function handleAuthMe(_: VercelRequest, res: VercelResponse) {
+  // Anonymous guest — no auth DB in serverless mode
+  ok(res, null);
+}
+
+// ─── Notifications (stub) ──────────────────────────────────────────────────────
+
+async function handleNotifications(_: VercelRequest, res: VercelResponse) {
+  ok(res, { notifications: [], unread: 0 });
+}
+
 // ─── Bitcoin Market Data ───────────────────────────────────────────────────────
 
 async function handleMarketData(_: VercelRequest, res: VercelResponse) {
@@ -3247,6 +3260,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (path === '/api/health' || path === '/api/health/') return handleHealth(req, res);
+    if (path === '/api/auth/me' || path === '/api/auth/me/') return handleAuthMe(req, res);
+    if (path === '/api/notifications' || path === '/api/notifications/') return handleNotifications(req, res);
     if (path === '/api/bitcoin/market-data' || path === '/api/bitcoin/market-data/') return handleMarketData(req, res);
     if (path.startsWith('/api/bitcoin/chart')) return handleChart(req, res);
     if (path === '/api/web-resources/fear-greed' || path === '/api/web-resources/fear-greed/') return handleFearGreed(req, res);
