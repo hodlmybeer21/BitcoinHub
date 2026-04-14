@@ -142,11 +142,11 @@ async function getFinancialMarketData() {
   let vix = { value: 0, change: 0 };
 
   try {
-    const [spxRes, dxyRes, goldRes, vixRes] = await Promise.all([
+    const [spxRes, goldRes, vixRes, dxyRes] = await Promise.all([
       apiFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=2d'),
-      apiFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EDXY?interval=1d&range=2d'),
       apiFetch('https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=2d'),
       apiFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=2d'),
+      apiFetch('https://open.er-api.com/v6/latest/USD'),
     ]);
 
     if (spxRes.ok) {
@@ -157,12 +157,22 @@ async function getFinancialMarketData() {
         spx = { value: closes[closes.length - 1], change: ((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2]) * 100 };
       }
     }
-    if (dxyRes.ok) {
-      const j = await dxyRes.json();
-      const p = j.chart?.result?.[0];
-      const closes = p?.indicators?.quote?.[0]?.close || [];
-      if (closes.length >= 2) {
-        dxy = { value: closes[closes.length - 1], change: ((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2]) * 100 };
+    // DXY from open.er-api.com — trade-weighted USD index via major currencies
+    if (dxyRes?.ok) {
+      const jr = await dxyRes.json();
+      const r = jr?.rates || {};
+      const eur = r.EUR || 1;        // USD per EUR
+      const jpy = r.JPY || 1;        // USD per JPY
+      const gbp = r.GBP || 1;        // USD per GBP
+      const cad = r.CAD || 1;        // USD per CAD
+      const chf = r.CHF || 1;        // USD per CHF
+      const aud = r.AUD || 1;        // USD per AUD
+      if (eur && jpy && gbp) {
+        const dxyValue = 50.14348112 /
+          (eur ** 0.576 * (1 / jpy) ** 0.136 * gbp ** 0.119 * cad ** 0.091 * chf ** 0.036 * aud ** 0.044);
+        if (!isNaN(dxyValue) && dxyValue > 50 && dxyValue < 200) {
+          dxy = { value: Math.round(dxyValue * 100) / 100, change: 0 };
+        }
       }
     }
     if (goldRes.ok) {
@@ -448,29 +458,33 @@ async function getLiquidityData() {
     }
   } catch (_) {}
 
-  // Derive liquidity signal
-  let overallSignal = 'neutral';
-  if (m2Growth > 10) overallSignal = 'expansionary';
-  else if (m2Growth < 2) overallSignal = 'contractionary';
+  // Derive liquidity signal — only show when real data is available
+  const hasRealData = m2 > 0 && fedBalance > 0;
+  let overallSignal = 'unavailable';
+  if (hasRealData) {
+    if (m2Growth > 10) overallSignal = 'expansionary';
+    else if (m2Growth < 2) overallSignal = 'contractionary';
+    else overallSignal = 'neutral';
+  }
 
   return {
     summary: {
-      overallSignal,
-      m2Growth: m2Growth.toFixed(1),
+      overallSignal: hasRealData ? overallSignal : 'unavailable',
+      m2Growth: hasRealData ? m2Growth.toFixed(1) : null,
       fedBalanceSheet: fedBalance,
       reverseRepo: rrp,
       tga,
       m2,
     },
     indicators: {
-      m2: { value: m2, label: 'M2 Money Supply', unit: 'USD Billions', change: m2Growth },
+      m2: { value: m2, label: 'M2 Money Supply', unit: 'USD Billions', change: hasRealData ? m2Growth : null },
       rrp: { value: rrp, label: 'Overnight RRP', unit: 'USD Billions', change: null },
       tga: { value: tga, label: 'Treasury Gen. Acct', unit: 'USD Billions', change: null },
       fedBalance: { value: fedBalance, label: 'Fed Balance Sheet', unit: 'USD Billions', change: null },
     },
     derivedMetrics: {
-      moneySupplyGrowth: m2Growth,
-      liquidityConditions: overallSignal,
+      moneySupplyGrowth: hasRealData ? m2Growth : null,
+      liquidityConditions: hasRealData ? overallSignal : 'unavailable',
     },
     bitcoinOverlay: m2 > 0 ? { m2ToBtcRatio: m2 / (await getBtcMcap()) } : null,
     anomalies: [],
