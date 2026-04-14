@@ -1,15 +1,13 @@
 /**
  * BitcoinHub Trading Terminal — Premium Macro Grid
  * Dark terminal aesthetic · Amber BTC accent · Dense data panels
- * Built with premium components: FedWatchTool, GlobalMarketIndicators,
- * TreasuryFiscalWidget, UST10YTreasury, LiquidityWidget, FearGreedWidget,
- * AIAnalysis, AITrendPrediction, OptionsFlowWidget, WhaleAlertsWidget
+ * Layout: BTC Hero → AI Analysis (focal) → Macro Grid → Context Grid
  */
 
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Premium components
@@ -22,7 +20,6 @@ import FearGreedWidget from "@/components/FearGreedWidget";
 import AIAnalysis from "@/components/AIAnalysis";
 import AITrendPrediction from "@/components/AITrendPrediction";
 import WhaleAlertsWidget from "@/components/WhaleAlertsWidget";
-
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,22 +44,13 @@ interface BitcoinMarketData {
   market_cap?: { usd: number };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── BTC Chart Component ──────────────────────────────────────────────────────
 
-function fmtM(val: number) {
-  if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
-  if (val >= 1e9) return `$${(val / 1e9).toFixed(1)}B`;
-  if (val >= 1e6) return `$${(val / 1e6).toFixed(1)}M`;
-  return `$${val.toFixed(0)}`;
-}
-
-// ─── BTC Chart (inline SVG) ───────────────────────────────────────────────────
-
-function BTCChart({ timeframe }: { timeframe?: string }) {
-  const [tf, setTf] = useState(timeframe || "1D");
+function BTCChart() {
+  const [tf, setTf] = useState("1D");
   const TFS = ["15m", "1h", "4h", "1D", "1W", "1M"] as const;
 
-  const { data, isLoading } = useQuery<ChartPoint[]>({
+  const { data: chartData, isLoading } = useQuery<ChartPoint[]>({
     queryKey: ["/api/bitcoin/chart", tf],
     queryFn: async () => {
       const r = await fetch(`/api/bitcoin/chart?timeframe=${tf}`);
@@ -71,18 +59,18 @@ function BTCChart({ timeframe }: { timeframe?: string }) {
     refetchInterval: 60000,
   });
 
-  const prices = data?.map(d => d.price) || [];
+  const prices = chartData?.map((d: ChartPoint) => d.price) || [];
   const lo = prices.length ? Math.min(...prices) : 0;
   const hi = prices.length ? Math.max(...prices) : 0;
   const latest = prices[prices.length - 1] || 0;
 
-  const W = 420, H = 130, P = 8;
+  const W = 920, H = 220, P = 10;
   const toX = (i: number) => P + (i / Math.max(prices.length - 1, 1)) * (W - P * 2);
   const toY = (p: number) => P + (1 - (p - lo) / (hi - lo || 1)) * (H - P * 2);
-  const pts = prices.map((p, i) => `${toX(i)},${toY(p)}`).join(" ");
+  const pts = prices.map((p: number, i: number) => `${toX(i)},${toY(p)}`).join(" ");
   const area = `${P},${H - P} ${pts} ${W - P},${H - P}`;
 
-  const sorted = [...prices].sort((a, b) => a - b);
+  const sorted = [...prices].sort((a: number, b: number) => a - b);
   const sup5 = sorted[Math.floor(sorted.length * 0.05)] || lo;
   const res95 = sorted[Math.floor(sorted.length * 0.95)] || hi;
   const supY = toY(sup5);
@@ -90,14 +78,14 @@ function BTCChart({ timeframe }: { timeframe?: string }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[9px] text-white/[0.3] tracking-widest uppercase font-semibold">BTC Chart</span>
-        <div className="flex gap-0.5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[9px] text-white/[0.3] tracking-widest uppercase font-semibold">Price Chart</span>
+        <div className="flex gap-1">
           {TFS.map(f => (
             <button
               key={f}
               onClick={() => setTf(f)}
-              className={`px-1.5 py-0.5 text-[9px] font-mono rounded transition-colors ${
+              className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded transition-colors ${
                 tf === f
                   ? "bg-amber-400/20 text-amber-400 border border-amber-400/30"
                   : "text-white/[0.35] hover:text-white/[0.6] border border-transparent"
@@ -115,104 +103,58 @@ function BTCChart({ timeframe }: { timeframe?: string }) {
         <div className="relative" style={{ height: H }}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-full">
             <defs>
-              <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="rgb(245,158,11)" stopOpacity="0.15" />
                 <stop offset="100%" stopColor="rgb(245,158,11)" stopOpacity="0" />
               </linearGradient>
             </defs>
-            <line x1={P} y1={supY} x2={W - P} y2={supY} stroke="rgb(34,197,94)" strokeWidth="0.75" strokeDasharray="3,3" opacity="0.5" />
-            <line x1={P} y1={resY} x2={W - P} y2={resY} stroke="rgb(239,68,68)" strokeWidth="0.75" strokeDasharray="3,3" opacity="0.5" />
-            <polygon points={area} fill="url(#cg)" />
-            <polyline points={pts} fill="none" stroke="rgb(245,158,11)" strokeWidth="1.25" strokeLinejoin="round" strokeLinecap="round" />
-            <circle cx={toX(prices.length - 1)} cy={toY(latest)} r="3" fill="rgb(245,158,11)" stroke="rgb(10,10,15)" strokeWidth="1.5" />
-            <text x={toX(prices.length - 1) - 4} y={toY(latest) - 6} textAnchor="end" fill="rgb(245,158,11)" fontSize="8" fontFamily="monospace" fontWeight="bold">
-              {formatCurrency(latest)}
-            </text>
+            <line x1={P} y1={supY} x2={W - P} y2={supY} stroke="rgb(34,197,94)" strokeWidth="1" strokeDasharray="4,4" opacity="0.6" />
+            <line x1={P} y1={resY} x2={W - P} y2={resY} stroke="rgb(239,68,68)" strokeWidth="1" strokeDasharray="4,4" opacity="0.6" />
+            <polygon points={area} fill="url(#chartFill)" />
+            <polyline points={pts} fill="none" stroke="rgb(245,158,11)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+            <circle cx={toX(prices.length - 1)} cy={toY(latest)} r="4" fill="rgb(245,158,11)" stroke="rgb(10,10,15)" strokeWidth="2" />
+            <text x={W - P} y={resY - 4} textAnchor="end" fill="rgb(239,68,68)" fontSize="9" fontFamily="monospace" opacity="0.8">{formatCurrency(res95)}</text>
+            <text x={W - P} y={supY + 12} textAnchor="end" fill="rgb(34,197,94)" fontSize="9" fontFamily="monospace" opacity="0.8">{formatCurrency(sup5)}</text>
+            <text x={toX(prices.length - 1) - 6} y={toY(latest) - 8} textAnchor="end" fill="rgb(245,158,11)" fontSize="10" fontFamily="monospace" fontWeight="bold">{formatCurrency(latest)}</text>
           </svg>
+        </div>
+      )}
+
+      {prices.length > 0 && (
+        <div className="flex justify-between mt-1 text-[9px] text-white/[0.3] font-mono">
+          <span>{formatCurrency(lo)}</span>
+          <span className="text-amber-400/60">{tf}</span>
+          <span>{formatCurrency(hi)}</span>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Dark container wrapper ────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────────
 
-function DarkCard({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto ${className}`}>
-      {children}
-    </div>
-  );
+function fmtM(n: number) {
+  if (!n) return "—";
+  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  return `$${n.toFixed(2)}`;
 }
 
-// ─── Options Flow Panel (inline — matches actual /api/options-flow shape) ────
-
-function OptionsFlowPanel() {
-  const { data, isLoading } = useQuery<{
-    btc: { putCallRatio: number; totalOI: number; totalVolume: number; netDelta: number; sentiment: string };
-    topStrikes: { symbol: string; strike: number; type: string; openInterest: number; iv: number }[];
-    lastUpdated: string;
-  }>({
-    queryKey: ['/api/options-flow'],
-    refetchInterval: 300000,
-  });
-
-  const btc = data?.btc;
-  const sentimentColor = btc?.sentiment === 'bullish' ? 'text-green-400' : btc?.sentiment === 'bearish' ? 'text-red-400' : 'text-yellow-400';
-
-  if (isLoading) return <Skeleton className="h-24 w-full bg-white/5" />;
-  if (!data) return <p className="text-xs text-white/40">Unable to load options data</p>;
-
-  return (
-    <>
-      <p className="text-[9px] text-white/[0.3] tracking-widest uppercase font-semibold">OPTIONS FLOW (DERIBIT)</p>
-      <div className="grid grid-cols-3 gap-2 mt-2">
-        <div>
-          <p className="text-[9px] text-white/[0.25] uppercase">P/C Ratio</p>
-          <p className="text-sm font-mono font-bold text-white">{btc?.putCallRatio?.toFixed(2) ?? '—'}</p>
-        </div>
-        <div>
-          <p className="text-[9px] text-white/[0.25] uppercase">Open Int</p>
-          <p className="text-sm font-mono font-bold text-white">{btc?.totalOI ? `$${(btc.totalOI / 1e9).toFixed(1)}B` : '—'}</p>
-        </div>
-        <div>
-          <p className="text-[9px] text-white/[0.25] uppercase">Sentiment</p>
-          <p className={`text-sm font-mono font-bold ${sentimentColor}`}>{btc?.sentiment ?? '—'}</p>
-        </div>
-      </div>
-      <div className="mt-2 space-y-1">
-        {(data.topStrikes ?? []).slice(0, 4).map((s, i) => (
-          <div key={i} className="flex justify-between items-center">
-            <span className={`text-[10px] font-mono ${s.type === 'call' ? 'text-green-400' : 'text-red-400'}`}>{s.symbol}</span>
-            <span className="text-[10px] font-mono text-white/50">{s.type === 'put' ? 'P' : 'C'} ${s.strike.toLocaleString()}</span>
-            <span className="text-[10px] font-mono text-white/40">{(s.openInterest / 1e6).toFixed(0)}M</span>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
+const DarkCard = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 ${className}`}>
+    {children}
+  </div>
+);
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  // BTC market data query (shared with AIAnalysis)
   const btc = useQuery<BTC>({
     queryKey: ["/api/bitcoin/market-data"],
     refetchInterval: 60000,
   });
 
-  // BTC chart query
-  const btcChart = useQuery<ChartPoint[]>({
-    queryKey: ["/api/bitcoin/chart", "1D"],
-    queryFn: async () => {
-      const r = await fetch("/api/bitcoin/chart?timeframe=1D");
-      return r.json();
-    },
-    refetchInterval: 60000,
-  });
-
-  // Build BitcoinMarketData for AIAnalysis from the same BTC query
   const marketData: BitcoinMarketData | null = btc.data ? {
     current_price: btc.data.current_price,
     price_change_percentage_24h: btc.data.price_change_percentage_24h,
@@ -247,7 +189,7 @@ export default function Dashboard() {
       <div className="max-w-[1800px] mx-auto px-4 pt-6 pb-4">
 
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* ROW 1: Bitcoin Hero — Full Width                                  */}
+        {/* ROW 1: Bitcoin Hero — Compact 3-Col                             */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 mb-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
@@ -267,7 +209,6 @@ export default function Dashboard() {
                   <span className="text-base font-mono font-bold">{formatPercentage(chg)}</span>
                 </div>
               </div>
-              {/* Day range bar */}
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-[10px] text-white/[0.35] font-mono">{formatCurrency(lo)}</span>
                 <div className="w-44 h-1 bg-white/[0.08] rounded-full overflow-hidden">
@@ -275,7 +216,6 @@ export default function Dashboard() {
                 </div>
                 <span className="text-[10px] text-white/[0.35] font-mono">{formatCurrency(hi)}</span>
               </div>
-              {/* Key stats row */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <p className="text-[9px] text-white/[0.25] uppercase tracking-widest">Volume 24h</p>
@@ -299,80 +239,62 @@ export default function Dashboard() {
 
             {/* Right: BTC chart */}
             <div>
-              <BTCChart timeframe="1D" />
+              <BTCChart />
             </div>
           </div>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* ROW 2: 4-Col Macro Grid                                           */}
+        {/* ROW 2: AI Analysis — Primary Focus (full width)                  */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <DarkCard className="mb-4">
+          <AIAnalysis marketData={marketData} />
+        </DarkCard>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ROW 3: 4-Col Macro Grid                                          */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
 
           {/* Col 1: FedWatchTool */}
-          <DarkCard>
-            <FedWatchTool />
-          </DarkCard>
-
-          {/* Col 2: GlobalMarketIndicators */}
-          <DarkCard>
-            <GlobalMarketIndicators />
-          </DarkCard>
-
-          {/* Col 3: TreasuryFiscalWidget + Inflation */}
           <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto">
-            <TreasuryFiscalWidget />
+            <FedWatchTool />
           </div>
 
-          {/* Col 4: UST10YTreasury + LiquidityWidget stacked */}
-          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto space-y-4">
-            <UST10YTreasury />
-            <div className="border-t border-white/[0.06]" />
+          {/* Col 2: GlobalMarketIndicators */}
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto">
+            <GlobalMarketIndicators />
+          </div>
+
+          {/* Col 3: LiquidityWidget */}
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto">
             <LiquidityWidget />
+          </div>
+
+          {/* Col 4: TreasuryFiscalWidget */}
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto">
+            <TreasuryFiscalWidget />
           </div>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* ROW 3: 3-Col Analytics Grid                                        */}
+        {/* ROW 4: 3-Col Context Grid                                        */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 
-          {/* Col 1: Fed Holdings + Derived Metrics (inline) */}
+          {/* Col 1: Whale Alerts */}
           <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto">
-            <p className="text-[9px] text-white/[0.3] tracking-widest uppercase font-semibold mb-3">Fed Holdings + Derived</p>
-            <div className="space-y-2">
-              {[
-                { label: "Fed MBS", value: "$2.00T" },
-                { label: "Fed Treasuries", value: "$4.41T" },
-                { label: "Total Fed BS", value: "$6.72T" },
-                { label: "Net Liquidity", value: "—" },
-                { label: "M2 / M0 Ratio", value: "—" },
-                { label: "Reserves / Fed", value: "—" },
-              ].map(item => (
-                <div key={item.label} className="flex justify-between items-center">
-                  <span className="text-[10px] text-white/[0.35]">{item.label}</span>
-                  <span className="text-xs font-mono font-semibold text-white">{item.value}</span>
-                </div>
-              ))}
-            </div>
+            <WhaleAlertsWidget />
           </div>
 
-          {/* Col 2: AIAnalysis + AITrendPrediction */}
-          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto space-y-4">
-            {/* AI Analysis section — pass BTC market data */}
-            <AIAnalysis marketData={marketData} isLoading={btc.isLoading} timeframe="1D" />
-            <div className="border-t border-white/[0.06]" />
-            {/* AI Trend Predictions */}
+          {/* Col 2: AI Trend Prediction */}
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto">
             <AITrendPrediction />
           </div>
 
-          {/* Col 3: Options Flow + Whale Alerts (inline, fixes API shape mismatch) */}
-          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto space-y-4">
-            {/* Options Flow — inline, matches actual API response shape */}
-            <OptionsFlowPanel />
-            <div className="border-t border-white/[0.06]" />
-            {/* Whale Alerts */}
-            <WhaleAlertsWidget />
+          {/* Col 3: UST 10Y Treasury */}
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 h-full overflow-auto">
+            <UST10YTreasury />
           </div>
         </div>
 
