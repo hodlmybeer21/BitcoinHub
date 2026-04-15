@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>The Sound Lab</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#FFF8F0;--card-bg:#fff;--text:#2d2a26;--text-light:#6b6560;--spring:cubic-bezier(0.34,1.56,0.64,1)}
+html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);touch-action:manipulation}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .25s ease;overflow:hidden}
+.screen.active{opacity:1;pointer-events:all}
+#menu{background:var(--bg);justify-content:flex-start;padding:44px 24px 28px}
+.menu-header{text-align:center;margin-bottom:32px}
+.menu-header h1{font-size:clamp(2rem,6vw,3.2rem);font-weight:800;color:#1a1714;letter-spacing:-1px}
+.menu-header p{font-size:1rem;color:var(--text-light);margin-top:6px}
+.menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:460px;margin:0 auto}
+.menu-card{background:var(--card-bg);border-radius:18px;padding:18px 8px 14px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.07);transition:transform .2s var(--spring),box-shadow .2s ease;border-bottom:4px solid transparent;-webkit-tap-highlight-color:transparent;user-select:none}
+.menu-card:active{transform:scale(.94);box-shadow:0 4px 18px rgba(0,0,0,.12)}
+.menu-card .icon{font-size:2.6rem;line-height:1}
+.menu-card .name{font-size:.9rem;font-weight:700}
+.menu-card .hint{font-size:.68rem;color:var(--text-light)}
+.menu-card.drum{border-bottom-color:#e74c3c}.menu-card.guitar{border-bottom-color:#e67e22}
+.menu-card.trumpet{border-bottom-color:#f1c40f}.menu-card.piano{border-bottom-color:#bdc3c7}
+.menu-card.bells{border-bottom-color:#d35400}.menu-card.violin{border-bottom-color:#8e44ad}
+.inst-header{width:100%;display:flex;align-items:center;justify-content:center;padding:16px 20px 8px;position:relative;flex-shrink:0}
+.inst-header h2{font-size:clamp(1.5rem,5vw,2.2rem);font-weight:800}
+.back-btn{position:absolute;left:16px;top:50%;transform:translateY(-50%);background:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:1.3rem;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;transition:transform .15s var(--spring);-webkit-tap-highlight-color:transparent}
+.back-btn:active{transform:translateY(-50%) scale(.86)}
+.inst-body{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 16px 20px;overflow:hidden;gap:10px}
+#drums{background:#141414}#drums .inst-header h2{color:#fff}
+.drum-layout{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;justify-content:center;padding:8px}
+.drum-col{display:flex;flex-direction:column;align-items:center;gap:3px}
+.drum{width:72px;height:72px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:rgba(255,255,255,.6);text-align:center;transition:transform .12s var(--spring);-webkit-tap-highlight-color:transparent;user-select:none;position:relative}
+.drum.hit{animation:drumHit .35s var(--spring) forwards}
+@keyframes drumHit{0%{transform:scale(1)}30%{transform:scale(.8)}70%{transform:scale(1.1)}100%{transform:scale(1)}}
+.drum-kick{width:108px;height:108px;background:radial-gradient(circle at 35% 35%,#e74c3c,#5a1a1a)}
+.drum-snare{background:radial-gradient(circle at 35% 35%,#ecf0f1,#7f8c8d)}
+.drum-tom1{background:radial-gradient(circle at 35% 35%,#3498db,#154360)}
+.drum-tom2{background:radial-gradient(circle at 35% 35%,#9b59b6,#4a235a)}
+.drum-bongo1{width:58px;height:58px;background:radial-gradient(circle at 35% 35%,#1abc9c,#0a5e50)}
+.drum-bongo2{width:52px;height:52px;background:radial-gradient(circle at 35% 35%,#f39c12,#7d5000)}
+.drum-hihat{width:86px;height:24px;border-radius:12px;background:linear-gradient(to right,#bdc3c7,#7f8c8d,#bdc3c7)}
+.hihat-row{display:flex;justify-content:center;margin-bottom:4px}
+.drum-label{font-size:.6rem;color:rgba(255,255,255,.4);text-align:center;line-height:1.2;margin-top:2px}
+#guitar{background:var(--bg)}
+.guitar-body{display:flex;gap:7px;align-items:stretch;height:280px;padding:10px}
+.guitar-string-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;-webkit-tap-highlight-color:transparent;flex:1}
+.guitar-string{border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.58rem;font-weight:800;color:rgba(255,255,255,.88);cursor:pointer;user-select:none;line-height:1.3;flex:1;min-height:0}
+.guitar-string.plucked{animation:strPluck .45s ease-out}
+@keyframes strPluck{0%{transform:translateX(0)}15%{transform:translateX(-8px)}30%{transform:translateX(7px)}45%{transform:translateX(-5px)}60%{transform:translateX(4px)}75%{transform:translateX(-2px)}100%{transform:translateX(0)}}
+.guitar-string-label{font-size:.6rem;color:var(--text-light);text-align:center;padding:4px 0 2px;white-space:nowrap}
+.g-E2{background:linear-gradient(to bottom,#6a2e2a,#8B4513)}.g-A2{background:linear-gradient(to bottom,#6a3830,#7a5040)}
+.g-D3{background:linear-gradient(to bottom,#3a5c3a,#4a7a4a)}.g-G3{background:linear-gradient(to bottom,#3a4a6c,#4a6090)}
+.g-B3{background:linear-gradient(to bottom,#6a4a2a,#8a6a40)}.g-E4{background:linear-gradient(to bottom,#7a5a1a,#9a8a2a)}
+#trumpet{background:#f9f3e3}
+.trumpet-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+.note-display{font-size:2rem;font-weight:800;color:#5a3a00;min-height:2.5rem;text-align:center}
+.trumpet-tube-wrap{position:relative;width:100%;max-width:380px}
+.trumpet-tube{height:16px;background:linear-gradient(to bottom,#f9c74f,#c8a000);border-radius:8px;position:relative}
+.trumpet-mouthpiece{position:absolute;left:-12px;top:-5px;width:20px;height:26px;background:linear-gradient(to right,#c8a000,#a08000);border-radius:3px 2px 2px 3px}
+.trumpet-bell{position:absolute;right:-8px;top:-26px;width:50px;height:68px;background:linear-gradient(to right,#f9c74f,#c8a000);border-radius:50% 50% 50% 50%/80% 80% 20% 20%}
+.trumpet-valves{display:flex;gap:12px}
+.valve-btn{width:52px;height:52px;border-radius:50%;background:linear-gradient(145deg,#f9c74f,#c8a000);border:3px solid #a07800;font-size:1.2rem;font-weight:800;color:#5a3a00;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 #7a5a00,0 6px 10px rgba(0,0,0,.18);transition:transform .1s,box-shadow .1s;-webkit-tap-highlight-color:transparent;user-select:none}
+.valve-btn.pressed{transform:translateY(4px);box-shadow:0 0 0 #7a5a00,0 2px 6px rgba(0,0,0,.12)}
+.valve-hint{font-size:.65rem;color:var(--text-light);text-align:center}
+#piano{background:#1a1a1a}#piano .inst-header h2{color:#fff}
+.piano-keys{display:flex;gap:4px}
+.piano-key{width:50px;height:190px;background:linear-gradient(to bottom,#fff,#f2f2f2);border-radius:0 0 7px 7px;border:2px solid #ccc;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:10px;cursor:pointer;transition:transform .07s,box-shadow .07s;box-shadow:0 4px 6px rgba(0,0,0,.28),inset 0 -3px 0 #ddd;-webkit-tap-highlight-color:transparent;user-select:none}
+.piano-key:active,.piano-key.pressed{transform:translateY(3px);box-shadow:0 1px 2px rgba(0,0,0,.25),inset 0 -1px 0 #ccc}
+.piano-key .key-label{font-size:.68rem;font-weight:700;color:#333}.piano-key .key-hz{font-size:.52rem;color:#888;margin-top:2px}
+#bells{background:#060612}
+.bells-area{position:relative;width:100%;max-width:440px;height:320px}
+.bell-item{position:absolute;cursor:pointer;transform-origin:top center;-webkit-tap-highlight-color:transparent;user-select:none}
+.bell-item.ringing{animation:bellRing .7s ease-out}
+@keyframes bellRing{0%{transform:rotate(0) scale(1)}15%{transform:rotate(-15deg) scale(1.08)}30%{transform:rotate(12deg) scale(1.05)}45%{transform:rotate(-9deg)}60%{transform:rotate(7deg)}75%{transform:rotate(-3deg)}100%{transform:rotate(0)}}
+.bell-string{width:2px;background:rgba(255,255,255,.2);margin:0 auto}
+.bell-clapper{width:9px;height:9px;background:#8B6914;border-radius:50%;margin:0 auto}
+.bell-label{font-size:.58rem;color:rgba(255,255,255,.45);text-align:center;margin-top:3px}
+#violin{background:#f5edd8}
+.violin-body{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;max-width:440px}
+.violin-strings-area{width:100%;height:180px;position:relative;background:linear-gradient(to bottom,#8B4513,#A0522D);border-radius:18px 18px 10px 10px;box-shadow:inset 0 -18px 36px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.18);overflow:hidden}
+.v-strings-layer{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-evenly;padding:20px 0}
+.v-string{height:3px;background:linear-gradient(to right,#e8d5a0,#f5e6b0,#e8d5a0);border-radius:2px;cursor:pointer;display:flex;align-items:center;-webkit-tap-highlight-color:transparent;user-select:none;position:relative}
+.v-string.plucked{animation:vPluck .45s ease-out}
+@keyframes vPluck{0%{transform:translateY(0)}20%{transform:translateY(-12px)}40%{transform:translateY(8px)}60%{transform:translateY(-5px)}80%{transform:translateY(3px)}100%{transform:translateY(0)}}
+.v-string-label{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.5);color:#fff;font-size:.58rem;font-weight:700;padding:2px 6px;border-radius:4px;pointer-events:none}
+.v-bow-wrap{width:100%;padding:0 10px}
+.v-bow{width:100%;height:40px;background:linear-gradient(to right,#2a1a0a,#7a5a2a 35%,#8a6a35 65%,#2a1a0a);border-radius:20px;cursor:grab;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.28);touch-action:none;user-select:none}
+.v-bow-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:rgba(255,255,255,.6);font-weight:600;pointer-events:none}
+.violin-status{font-size:1rem;font-weight:700;color:#5a3a1a;min-height:1.5rem;text-align:center}
+.inst-hint{font-size:.8rem;color:var(--text-light);text-align:center;margin-top:4px}
+</style>
+</head>
+<body>
+
+<!-- MENU -->
+<div id="menu" class="screen active">
+  <div class="menu-header"><h1>🎵 The Sound Lab</h1><p>Tap an instrument to play!</p></div>
+  <div class="menu-grid">
+    <div class="menu-card drum" onclick="showScreen('drums')"><div class="icon">🥁</div><div class="name">Drum Kit</div><div class="hint">Tap to beat!</div></div>
+    <div class="menu-card guitar" onclick="showScreen('guitar')"><div class="icon">🎸</div><div class="name">Guitar</div><div class="hint">Pluck strings</div></div>
+    <div class="menu-card trumpet" onclick="showScreen('trumpet')"><div class="icon">🎺</div><div class="name">Trumpet</div><div class="hint">Press valves</div></div>
+    <div class="menu-card piano" onclick="showScreen('piano')"><div class="icon">🎹</div><div class="name">Piano</div><div class="hint">Play keys</div></div>
+    <div class="menu-card bells" onclick="showScreen('bells')"><div class="icon">🔔</div><div class="name">Bells</div><div class="hint">Ring bells</div></div>
+    <div class="menu-card violin" onclick="showScreen('violin')"><div class="icon">🎻</div><div class="name">Violin</div><div class="hint">Pluck &amp; bow</div></div>
+  </div>
+</div>
+
+<!-- DRUM KIT -->
+<div id="drums" class="screen">
+  <div class="inst-header"><button class="back-btn" onclick="showScreen('menu')">&#8592;</button><h2>🥁 Drum Kit</h2></div>
+  <div class="inst-body">
+    <div class="hihat-row"><div class="drum drum-hihat" onclick="hitDrum(this,'hihat')"><span style="font-size:.5rem">HI-HAT</span></div></div>
+    <div class="drum-layout">
+      <div class="drum-col"><div class="drum drum-kick" onclick="hitDrum(this,'kick')"><span>KICK</span></div><div class="drum-label">Floor Tom</div></div>
+      <div class="drum-col"><div class="drum drum-snare" onclick="hitDrum(this,'snare')"><span>SNARE</span></div><div class="drum-label">Snare</div></div>
+      <div class="drum-col"><div class="drum drum-tom1" onclick="hitDrum(this,'tom1')"><span>TOM 1</span></div><div class="drum-label">Rack Tom</div></div>
+      <div class="drum-col"><div class="drum drum-tom2" onclick="hitDrum(this,'tom2')"><span>TOM 2</span></div><div class="drum-label">Rack Tom 2</div></div>
+      <div class="drum-col"><div class="drum drum-bongo1" onclick="hitDrum(this,'bongo1')"><span>BONGO</span></div><div class="drum-label">Bongo 1</div></div>
+      <div class="drum-col"><div class="drum drum-bongo2" onclick="hitDrum(this,'bongo2')"><span>BONGO</span></div><div class="drum-label">Bongo 2</div></div>
+    </div>
+    <div class="inst-hint" style="color:rgba(255,255,255,.4)">Tap each drum to hear its unique sound!</div>
+  </div>
+</div>
+
+<!-- GUITAR -->
+<div id="guitar" class="screen">
+  <div class="inst-header"><button class="back-btn" onclick="showScreen('menu')">&#8592;</button><h2>🎸 Guitar</h2></div>
+  <div class="inst-body">
+    <div class="guitar-body">
+      <div class="guitar-string-wrap" onclick="pluckGuitar(0)"><div class="guitar-string g-E2"><span>E2</span><span style="font-size:.5rem;opacity:.7">82 Hz</span></div><div class="guitar-string-label">E2 · 82 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(1)"><div class="guitar-string g-A2"><span>A2</span><span style="font-size:.5rem;opacity:.7">110 Hz</span></div><div class="guitar-string-label">A2 · 110 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(2)"><div class="guitar-string g-D3"><span>D3</span><span style="font-size:.5rem;opacity:.7">147 Hz</span></div><div class="guitar-string-label">D3 · 147 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(3)"><div class="guitar-string g-G3"><span>G3</span><span style="font-size:.5rem;opacity:.7">196 Hz</span></div><div class="guitar-string-label">G3 · 196 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(4)"><div class="guitar-string g-B3"><span>B3</span><span style="font-size:.5rem;opacity:.7">247 Hz</span></div><div class="guitar-string-label">B3 · 247 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(5)"><div class="guitar-string g-E4"><span>E4</span><span style="font-size:.5rem;opacity:.7">330 Hz</span></div><div class="guitar-string-label">E4 · 330 Hz</div></div>
+    </div>
+    <div class="inst-hint">Tap each string to pluck it!</div>
+  </div>
+</div>
+
+<!-- TRUMPET -->
+<div id="trumpet" class="screen">
+  <div class="inst-header"><button class="back-btn" onclick="showScreen('menu')">&#8592;</button><h2>🎺 Trumpet</h2></div>
+  <div class="inst-body">
+    <div class="trumpet-wrap">
+      <div class="note-display" id="trumpet-note">Press valves to play!</div>
+      <div class="trumpet-tube-wrap"><div class="trumpet-mouthpiece"></div><div class="trumpet-tube"><div class="trumpet-bell"></div></div></div>
+      <div class="trumpet-valves">
+        <div class="valve-btn" id="v1" onclick="toggleValve(1)">1</div>
+        <div class="valve-btn" id="v2" onclick="toggleValve(2)">2</div>
+        <div class="valve-btn" id="v3" onclick="toggleValve(3)">3</div>
+      </div>
+      <div class="valve-hint">Press 1, 2, or 3 valves to change the note</div>
+    </div>
+  </div>
+</div>
+
+<!-- PIANO -->
+<div id="piano" class="screen">
+  <div class="inst-header"><button class="back-btn" onclick="showScreen('menu')">&#8592;</button><h2>🎹 Piano</h2></div>
+  <div class="inst-body">
+    <div class="piano-keys">
+      <div class="piano-key" onclick="playPiano(0,this)"><span class="key-label">C4</span><span class="key-hz">262 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(1,this)"><span class="key-label">D4</span><span class="key-hz">294 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(2,this)"><span class="key-label">E4</span><span class="key-hz">330 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(3,this)"><span class="key-label">F4</span><span class="key-hz">349 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(4,this)"><span class="key-label">G4</span><span class="key-hz">392 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(5,this)"><span class="key-label">A4</span><span class="key-hz">440 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(6,this)"><span class="key-label">B4</span><span class="key-hz">494 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(7,this)"><span class="key-label">C5</span><span class="key-hz">523 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(8,this)"><span class="key-label">D5</span><span class="key-hz">587 Hz</span></div>
+      <div class="piano-key" onclick="playPiano(9,this)"><span class="key-label">E5</span><span class="key-hz">659 Hz</span></div>
+    </div>
+    <div class="inst-hint" style="color:rgba(255,255,255,.5)">Tap the keys to play notes!</div>
+  </div>
+</div>
+
+<!-- BELLS -->
+<div id="bells" class="screen">
+  <div class="inst-header"><button class="back-btn" onclick="showScreen('menu')">&#8592;</button><h2>🔔 Bells</h2></div>
+  <div class="inst-body">
+    <div class="bells-area">
+      <div class="bell-item" style="left:8%;top:0" onclick="ringBell(0,this)"><div class="bell-string" style="height:50px"></div><svg width="48" height="68" viewBox="0 0 48 68"><ellipse cx="24" cy="52" rx="22" ry="16" fill="#d4a820"/><ellipse cx="24" cy="52" rx="18" ry="12" fill="#e8bc30"/><path d="M8 52 Q6 30 24 8 Q42 30 40 52" fill="#c89810"/><rect x="20" y="2" width="8" height="12" rx="3" fill="#a07800"/></svg><div class="bell-clapper"></div><div class="bell-label">C4 · 262 Hz</div></div>
+      <div class="bell-item" style="left:28%;top:0" onclick="ringBell(1,this)"><div class="bell-string" style="height:40px"></div><svg width="60" height="82" viewBox="0 0 60 82"><ellipse cx="30" cy="64" rx="28" ry="18" fill="#c8a020"/><ellipse cx="30" cy="64" rx="22" ry="14" fill="#dbb430"/><path d="M8 64 Q5 35 30 8 Q55 35 52 64" fill="#b89010"/><rect x="25" y="2" width="10" height="12" rx="3" fill="#a07800"/></svg><div class="bell-clapper"></div><div class="bell-label">D4 · 294 Hz</div></div>
+      <div class="bell-item" style="left:50%;top:0" onclick="ringBell(2,this)"><div class="bell-string" style="height:32px;margin-left:38px"></div><svg width="76" height="100" viewBox="0 0 76 100" style="display:block"><ellipse cx="38" cy="78" rx="36" ry="22" fill="#c09818"/><ellipse cx="38" cy="78" rx="28" ry="16" fill="#d4ac20"/><path d="M10 78 Q6 42 38 10 Q70 42 66 78" fill="#b08808"/><rect x="31" y="2" width="14" height="14" rx="4" fill="#a07800"/></svg><div class="bell-clapper"></div><div class="bell-label">F4 · 349 Hz</div></div>
+      <div class="bell-item" style="right:28%;top:0" onclick="ringBell(3,this)"><div class="bell-string" style="height:44px"></div><svg width="52" height="90" viewBox="0 0 52 90"><ellipse cx="26" cy="72" rx="22" ry="18" fill="#d4a820"/><ellipse cx="26" cy="72" rx="17" ry="13" fill="#e8bc30"/><path d="M4 72 Q2 38 26 6 Q50 38 48 72" fill="#c89810"/><rect x="21" y="2" width="10" height="10" rx="3" fill="#a07800"/></svg><div class="bell-clapper"></div><div class="bell-label">G4 · 392 Hz</div></div>
+      <div class="bell-item" style="right:8%;top:0" onclick="ringBell(4,this)"><div class="bell-string" style="height:36px"></div><svg width="56" height="84" viewBox="0 0 56 84"><ellipse cx="28" cy="66" rx="26" ry="18" fill="#cc9c14"/><ellipse cx="28" cy="66" rx="20" ry="13" fill="#e0b020"/><path d="M6 66 Q3 36 28 8 Q53 36 50 66" fill="#bc8c08"/><rect x="10" y="2" width="5" height="10" rx="2" fill="#a07800"/><rect x="25.5" y="2" width="5" height="10" rx="2" fill="#a07800"/><rect x="41" y="2" width="5" height="10" rx="2" fill="#a07800"/><rect x="22" y="2" width="12" height="10" rx="3" fill="#a07800"/></svg><div class="bell-clapper"></div><div class="bell-label">A4 · 440 Hz</div></div>
+    </div>
+    <div class="inst-hint" style="color:rgba(255,255,255,.45)">Tap each bell to ring it!</div>
+  </div>
+</div>
+
+<!-- VIOLIN -->
+<div id="violin" class="screen">
+  <div class="inst-header"><button class="back-btn" onclick="showScreen('menu')">&#8592;</button><h2>🎻 Violin</h2></div>
+  <div class="inst-body">
+    <div class="violin-body">
+      <div class="violin-strings-area" id="violin-area">
+        <div class="v-strings-layer">
+          <div class="v-string" id="vs0" onclick="pluckViolin(0,this)" style="top:15%">G3 · 196 Hz<span class="v-string-label">G3</span></div>
+          <div class="v-string" id="vs1" onclick="pluckViolin(1,this)" style="top:38%">D4 · 293 Hz<span class="v-string-label">D4</span></div>
+          <div class="v-string" id="vs2" onclick="pluckViolin(2,this)" style="top:61%">A4 · 440 Hz<span class="v-string-label">A4</span></div>
+          <div class="v-string" id="vs3" onclick="pluckViolin(3,this)" style="top:84%">E5 · 659 Hz<span class="v-string-label">E5</span></div>
+        </div>
+      </div>
+      <div class="v-bow-wrap"><div class="v-bow" id="violin-bow"><div class="v-bow-label">Drag bow across strings</div></div></div>
+      <div class="violin-status" id="violin-status">Tap a string to pluck, or drag the bow!</div>
+      <div class="inst-hint">Pluck a string or drag the bow for a sustained note</div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
+
+(function(){
+var audioCtx=null;
+function getAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();return audioCtx;}
+function makeMaster(vol){var ctx=getAudio(),m=ctx.createGain();m.gain.setValueAtTime(vol||0.6,ctx.currentTime);m.connect(ctx.destination);return m;}
+
+// Screen navigation
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');s.style.opacity='0';s.style.pointerEvents='none'});
+  var t=document.getElementById(id);
+  if(t){t.classList.add('active');t.style.opacity='1';t.style.pointerEvents='all'}
+  if(id!=='trumpet')stopTrumpet();
+  if(id!=='violin')stopViolinBow();
+  window.currentScreen=id;
+}
+window.showScreen=showScreen;
+
+// DRUMS
+function hitDrum(el,type){
+  el.classList.remove('hit');void el.offsetWidth;el.classList.add('hit');
+  setTimeout(function(){el.classList.remove('hit')},400);
+  var ctx=getAudio(),now=ctx.currentTime,m=makeMaster(0.65);
+  if(type==='kick'){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(150,now);
+    o.frequency.exponentialRampToValueAtTime(50,now+0.5);
+    g.gain.setValueAtTime(1,now);
+    g.gain.exponentialRampToValueAtTime(0.001,now+0.5);
+    o.connect(g).connect(m);o.start(now);o.stop(now+0.5);
+  } else if(type==='snare'){
+    var buf=ctx.createBuffer(1,ctx.sampleRate*0.2,ctx.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    var src=ctx.createBufferSource();src.buffer=buf;
+    var bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=3000;bp.Q.value=1;
+    var g2=ctx.createGain();g2.gain.setValueAtTime(0.8,now);g2.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+    src.connect(bp).connect(g2).connect(m);
+    var o2=ctx.createOscillator(),g3=ctx.createGain();o2.type='triangle';o2.frequency.value=180;
+    g3.gain.setValueAtTime(0.4,now);g3.gain.exponentialRampToValueAtTime(0.001,now+0.1);
+    o2.connect(g3).connect(m);o2.start(now);o2.stop(now+0.15);src.start(now);
+  } else if(type==='hihat'){
+    var buf2=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate),d2=buf2.getChannelData(0);
+    for(var i2=0;i2<d2.length;i2++)d2[i2]=Math.random()*2-1;
+    var src2=ctx.createBufferSource();src2.buffer=buf2;
+    var hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=8000;
+    var g4=ctx.createGain();g4.gain.setValueAtTime(0.4,now);g4.gain.exponentialRampToValueAtTime(0.001,now+0.08);
+    src2.connect(hp).connect(g4).connect(m);src2.start(now);
+  } else if(type==='tom1'){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';
+    o.frequency.setValueAtTime(200,now);o.frequency.exponentialRampToValueAtTime(100,now+0.3);
+    g.gain.setValueAtTime(0.7,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.3);
+    o.connect(g).connect(m);o.start(now);o.stop(now+0.3);
+  } else if(type==='tom2'){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';
+    o.frequency.setValueAtTime(180,now);o.frequency.exponentialRampToValueAtTime(90,now+0.3);
+    g.gain.setValueAtTime(0.7,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.3);
+    o.connect(g).connect(m);o.start(now);o.stop(now+0.3);
+  } else if(type==='bongo1'){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';
+    o.frequency.setValueAtTime(300,now);o.frequency.exponentialRampToValueAtTime(200,now+0.15);
+    g.gain.setValueAtTime(0.6,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.15);
+    o.connect(g).connect(m);o.start(now);o.stop(now+0.15);
+  } else if(type==='bongo2'){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';
+    o.frequency.setValueAtTime(400,now);o.frequency.exponentialRampToValueAtTime(250,now+0.12);
+    g.gain.setValueAtTime(0.6,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.12);
+    o.connect(g).connect(m);o.start(now);o.stop(now+0.12);
+  }
+}
+window.hitDrum=hitDrum;
+
+// GUITAR - Karplus-Strong synthesis
+var guitarBuffers={};
+function makeGuitarBuffer(freq){
+  var ctx=getAudio();
+  var rate=ctx.sampleRate;
+  var period=Math.round(rate/freq);
+  var buf=ctx.createBuffer(1,period*4,rate);
+  var data=buf.getChannelData(0);
+  for(var i=0;i<period*4;i++){
+    data[i]=i<period?Math.random()*2-1:0;
+  }
+  return {buf:buf,period:period};
+}
+function pluckGuitar(idx){
+  var wrap=document.querySelectorAll('.guitar-string-wrap')[idx];
+  var str=wrap.querySelector('.guitar-string');
+  str.classList.remove('plucked');void str.offsetWidth;str.classList.add('plucked');
+  setTimeout(function(){str.classList.remove('plucked')},500);
+  var ctx=getAudio();
+  var freqs=[82,110,147,196,247,330];
+  var freq=freqs[idx];
+  if(!guitarBuffers[idx])guitarBuffers[idx]=makeGuitarBuffer(freq);
+  var src=ctx.createBufferSource();
+  src.buffer=guitarBuffers[idx].buf;
+  var g=ctx.createGain();
+  g.gain.setValueAtTime(0.5,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+2);
+  var filt=ctx.createBiquadFilter();
+  filt.type='lowpass';filt.frequency.value=freq*8;
+  var delay=ctx.createDelay(1.0);
+  delay.delayTime.value=freqs[idx]>0?1/freq:1/freq;
+  var feedback=ctx.createGain();feedback.gain.value=0.995;
+  var dry=ctx.createGain();dry.gain.value=0.3;
+  var wet=ctx.createGain();wet.gain.value=0.7;
+  src.connect(filt);
+  filt.connect(dry);dry.connect(g);
+  filt.connect(delay);delay.connect(feedback);feedback.connect(delay);
+  delay.connect(wet);wet.connect(g);
+  g.connect(ctx.destination);
+  src.start(ctx.currentTime);src.stop(ctx.currentTime+2);
+}
+window.pluckGuitar=pluckGuitar;
+
+// TRUMPET
+var trumpetOsc=null,trumpetLfo=null,trumpetGain=null,activeValves=[];
+var trumpetNotes={
+  '0':'Bb4','1':'C4','2':'Bb3','3':'G3',
+  '1,2':'A3','1,3':'F3','2,3':'Eb3','1,2,3':'G3'
+};
+var trumpetFreqs={
+  '0':466.16,'1':523.25,'2':233.08,'3':196.00,
+  '1,2':220.00,'1,3':174.61,'2,3':155.56,'1,2,3':196.00
+};
+function toggleValve(n){
+  var idx=activeValves.indexOf(n);
+  var btn=document.getElementById('v'+n);
+  if(idx===-1){activeValves.push(n);btn.classList.add('pressed');}
+  else{activeValves.splice(idx,1);btn.classList.remove('pressed');}
+  activeValves.sort(function(a,b){return a-b;});
+  var key=activeValves.join(',');
+  var note=trumpetNotes[key]||'Bb4';
+  var freq=trumpetFreqs[key]||466.16;
+  document.getElementById('trumpet-note').textContent=note+' ('+Math.round(freq)+' Hz)';
+  playTrumpet(freq);
+}
+function playTrumpet(freq){
+  stopTrumpet();
+  var ctx=getAudio(),now=ctx.currentTime;
+  trumpetGain=ctx.createGain();trumpetGain.gain.setValueAtTime(0,now);trumpetGain.gain.linearRampToValueAtTime(0.4,now+0.05);
+  trumpetGain.connect(ctx.destination);
+  var filt=ctx.createBiquadFilter();filt.type='lowpass';filt.frequency.value=3000;filt.connect(trumpetGain);
+  trumpetOsc=ctx.createOscillator();trumpetOsc.type='sawtooth';trumpetOsc.frequency.value=freq;
+  trumpetLfo=ctx.createOscillator();trumpetLfo.type='sine';trumpetLfo.frequency.value=5;
+  var lfoGain=ctx.createGain();lfoGain.gain.value=freq*0.03;
+  trumpetLfo.connect(lfoGain);lfoGain.connect(trumpetOsc.frequency);
+  trumpetOsc.connect(filt);trumpetOsc.start(now);trumpetLfo.start(now);
+}
+function stopTrumpet(){
+  if(trumpetOsc){try{trumpetOsc.stop()}catch(e){}trumpetOsc=null;}
+  if(trumpetLfo){try{trumpetLfo.stop()}catch(e){}trumpetLfo=null;}
+  if(trumpetGain){trumpetGain=null;}
+}
+window.toggleValve=toggleValve;window.stopTrumpet=stopTrumpet;
+
+// PIANO - additive synthesis
+function playPiano(idx,el){
+  if(el)el.classList.add('pressed');
+  setTimeout(function(){if(el)el.classList.remove('pressed')},150);
+  var ctx=getAudio(),now=ctx.currentTime;
+  var freqs=[262,294,330,349,392,440,494,523,587,659];
+  var freq=freqs[idx];
+  var master=ctx.createGain();master.gain.setValueAtTime(0.4,now);master.connect(ctx.destination);
+  var ratios=[1,2,3];var amps=[1,0.5,0.25];
+  ratios.forEach(function(ratio,i){
+    var o=ctx.createOscillator();o.type='sine';o.frequency.value=freq*ratio;
+    var g=ctx.createGain();g.gain.setValueAtTime(amps[i]*0.4,now);g.gain.exponentialRampToValueAtTime(0.001,now+1.5);
+    o.connect(g).connect(master);o.start(now);o.stop(now+1.5);
+  });
+}
+window.playPiano=playPiano;
+
+// BELLS - harmonic partials
+function ringBell(idx,el){
+  el.classList.remove('ringing');void el.offsetWidth;el.classList.add('ringing');
+  setTimeout(function(){el.classList.remove('ringing')},750);
+  var ctx=getAudio(),now=ctx.currentTime;
+  var freqs=[262,294,349,392,440];
+  var freq=freqs[idx];
+  var master=ctx.createGain();master.gain.setValueAtTime(0.35,now);master.connect(ctx.destination);
+  var partials=[1,2.4,4.2];var pAmps=[1,0.6,0.3];
+  partials.forEach(function(p,i){
+    var o=ctx.createOscillator();o.type='sine';o.frequency.value=freq*p;
+    var g=ctx.createGain();g.gain.setValueAtTime(pAmps[i]*0.4,now);g.gain.exponentialRampToValueAtTime(0.001,now+2.5);
+    o.connect(g).connect(master);o.start(now);o.stop(now+2.5);
+  });
+}
+window.ringBell=ringBell;
+
+// VIOLIN
+var bowOsc=null,bowLfo=null,bowGain=null,bowActive=false;
+var violinFreqs=[196,293,440,659];
+function pluckViolin(idx,el){
+  el.classList.remove('plucked');void el.offsetWidth;el.classList.add('plucked');
+  setTimeout(function(){el.classList.remove('plucked')},500);
+  var ctx=getAudio(),now=ctx.currentTime;
+  var freq=violinFreqs[idx];
+  var master=ctx.createGain();master.gain.setValueAtTime(0.4,now);master.connect(ctx.destination);
+  var o=ctx.createOscillator();o.type='sawtooth';o.frequency.value=freq;
+  var filt=ctx.createBiquadFilter();filt.type='lowpass';filt.frequency.value=2000;
+  var g=ctx.createGain();g.gain.setValueAtTime(0.4,now);g.gain.exponentialRampToValueAtTime(0.001,now+1.2);
+  var lfo=ctx.createOscillator();lfo.type='sine';lfo.frequency.value=5;
+  var lfoG=ctx.createGain();lfoG.gain.value=freq*0.02;
+  lfo.connect(lfoG).connect(o.frequency);
+  o.connect(filt).connect(g).connect(master);
+  o.start(now);lfo.start(now);o.stop(now+1.2);lfo.stop(now+1.2);
+  document.getElementById('violin-status').textContent='Plucked: '+['G3','D4','A4','E5'][idx]+' ('+freq+' Hz)';
+}
+window.pluckViolin=pluckViolin;
+
+function getStringIdx(y){
+  var area=document.getElementById('violin-area');
+  var rect=area.getBoundingClientRect();
+  var relY=(y-rect.top)/rect.height;
+  if(relY<0.27)return 0;if(relY<0.50)return 1;if(relY<0.73)return 2;return 3;
+}
+function startBow(freq){
+  stopViolinBow();
+  var ctx=getAudio(),now=ctx.currentTime;
+  bowGain=ctx.createGain();bowGain.gain.setValueAtTime(0,now);bowGain.gain.linearRampToValueAtTime(0.25,now+0.1);
+  bowGain.connect(ctx.destination);
+  var filt=ctx.createBiquadFilter();filt.type='lowpass';filt.frequency.value=1800;filt.connect(bowGain);
+  bowOsc=ctx.createOscillator();bowOsc.type='sawtooth';bowOsc.frequency.value=freq;
+  bowLfo=ctx.createOscillator();bowLfo.type='sine';bowLfo.frequency.value=5;
+  var lfoG=ctx.createGain();lfoG.gain.value=freq*0.025;
+  bowLfo.connect(lfoG).connect(bowOsc.frequency);
+  bowOsc.connect(filt);bowOsc.start(now);bowLfo.start(now);bowActive=true;
+}
+function updateBowFreq(freq){
+  if(bowOsc)bowOsc.frequency.setTargetAtTime(freq,getAudio().currentTime,0.05);
+  var names=['G3','D4','A4','E5'];var idx=violinFreqs.indexOf(freq);
+  document.getElementById('violin-status').textContent='Bowing: '+(idx>=0?names[idx]:'')+' ('+Math.round(freq)+' Hz)';
+}
+function stopViolinBow(){
+  if(bowOsc){try{bowOsc.stop()}catch(e){}bowOsc=null;}
+  if(bowLfo){try{bowLfo.stop()}catch(e){}bowLfo=null;}
+  if(bowGain){bowGain.gain.setTargetAtTime(0,getAudio().currentTime,0.1);bowGain=null;}
+  bowActive=false;
+}
+window.stopViolinBow=stopViolinBow;
+
+// Bow drag handling
+(function(){
+  var bow=document.getElementById('violin-bow');
+  var area=document.getElementById('violin-area');
+  var lastFreq=null;
+  function getFreq(e){
+    var rect=area.getBoundingClientRect();
+    var y=(e.touches?e.touches[0].clientY:e.clientY);
+    var relY=Math.max(0,Math.min(1,(y-rect.top)/rect.height));
+    if(relY<0.27)return violinFreqs[0];
+    if(relY<0.50)return violinFreqs[1];
+    if(relY<0.73)return violinFreqs[2];
+    return violinFreqs[3];
+  }
+  bow.addEventListener('mousedown',function(e){e.preventDefault();lastFreq=getFreq(e);startBow(lastFreq);});
+  bow.addEventListener('touchstart',function(e){e.preventDefault();lastFreq=getFreq(e);startBow(lastFreq);},{passive:false});
+  document.addEventListener('mousemove',function(e){
+    if(bowActive){var f=getFreq(e);if(f!==lastFreq){updateBowFreq(f);lastFreq=f;}}
+  });
+  document.addEventListener('touchmove',function(e){
+    if(bowActive&&e.touches.length>0){var f=getFreq(e);if(f!==lastFreq){updateBowFreq(f);lastFreq=f;}}
+  },{passive:false});
+  document.addEventListener('mouseup',stopViolinBow);
+  document.addEventListener('touchend',stopViolinBow);
+})();
+})();
+</script>
