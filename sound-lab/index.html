@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>The Sound Lab</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}:root{--bg:#FFF8F0;--card-bg:#fff;--text:#2d2a26;--text-light:#6b6560;--spring:cubic-bezier(0.34,1.56,0.64,1)}html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);touch-action:manipulation}.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s ease;overflow:hidden}.screen.active{opacity:1;pointer-events:all}#menu{background:var(--bg);justify-content:flex-start;padding:48px 24px 32px}.menu-header{text-align:center;margin-bottom:36px}.menu-header h1{font-size:clamp(2.2rem,6vw,3.5rem);font-weight:800;color:#1a1714;letter-spacing:-1px}.menu-header p{font-size:1.1rem;color:var(--text-light);margin-top:6px}.menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:100%;max-width:480px}.menu-card{background:var(--card-bg);border-radius:20px;padding:20px 12px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.08);transition:transform .2s var(--spring),box-shadow .2s ease;-webkit-tap-highlight-color:transparent;touch-action:manipulation}.menu-card:active{transform:scale(.94);box-shadow:0 4px 20px rgba(0,0,0,.13)}.menu-card .icon{font-size:2.8rem;line-height:1}.menu-card .name{font-size:1rem;font-weight:700}.menu-card .hint{font-size:.72rem;color:var(--text-light)}.menu-card.drum{border-bottom:5px solid #e74c3c}.menu-card.guitar{border-bottom:5px solid #e67e22}.menu-card.trumpet{border-bottom:5px solid #f1c40f}.menu-card.piano{border-bottom:5px solid #bdc3c7}.menu-card.bells{border-bottom:5px solid #d35400}.menu-card.violin{border-bottom:5px solid #8e44ad}.inst-header{width:100%;display:flex;align-items:center;justify-content:center;padding:18px 24px 10px;position:relative;flex-shrink:0}.inst-header h2{font-size:clamp(1.6rem,5vw,2.4rem);font-weight:800}.back-btn{position:absolute;left:20px;top:50%;transform:translateY(-50%);background:#fff;border:none;border-radius:50%;width:46px;height:46px;font-size:1.4rem;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;transition:transform .15s var(--spring);-webkit-tap-highlight-color:transparent;line-height:1}.back-btn:active{transform:translateY(-50%) scale(.88)}.inst-body{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 20px 24px;overflow:hidden;gap:12px}#drums{background:#1c1c1c}#drums .inst-header h2{color:#fff}.drum-layout{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;justify-content:center}.drum-col{display:flex;flex-direction:column;align-items:center;gap:4px}.drum{border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:rgba(255,255,255,.65);text-align:center;transition:transform .12s var(--spring);-webkit-tap-highlight-color:transparent;user-select:none;position:relative}.drum.hit{animation:drumHit .35s var(--spring) forwards}@keyframes drumHit{0%{transform:scale(1)}30%{transform:scale(.82)}70%{transform:scale(1.08)}100%{transform:scale(1)}}.drum-kick{width:110px;height:110px;background:radial-gradient(circle at 35% 35%,#e74c3c,#6b1a1a)}.drum-snare{width:90px;height:90px;background:radial-gradient(circle at 35% 35%,#ecf0f1,#7f8c8d)}.drum-tom1{width:80px;height:80px;background:radial-gradient(circle at 35% 35%,#3498db,#154360)}.drum-tom2{width:74px;height:74px;background:radial-gradient(circle at 35% 35%,#9b59b6,#4a235a)}.drum-bongo1{width:60px;height:60px;background:radial-gradient(circle at 35% 35%,#1abc9c,#0a5e50)}.drum-bongo2{width:54px;height:54px;background:radial-gradient(circle at 35% 35%,#f39c12,#7d5000)}.drum-hihat{width:88px;height:26px;border-radius:13px;background:linear-gradient(to right,#bdc3c7,#7f8c8d)}.drum-label{font-size:.65rem;color:rgba(255,255,255,.45);text-align:center;line-height:1.2}.hihat-row{display:flex;justify-content:center;margin-bottom:6px}#guitar{background:var(--bg)}.guitar-body{display:flex;gap:8px;align-items:stretch;height:300px}.guitar-string-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;-webkit-tap-highlight-color:transparent}.guitar-string{width:36px;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.6rem;font-weight:800;color:rgba(255,255,255,.9);cursor:pointer;user-select:none;line-height:1.3;text-align:center}.guitar-string.plucked{animation:strPluck .4s ease-out}@keyframes strPluck{0%{transform:translateX(0)}15%{transform:translateX(-7px)}30%{transform:translateX(6px)}45%{transform:translateX(-4px)}60%{transform:translateX(3px)}75%{transform:translateX(-2px)}100%{transform:translateX(0)}}.guitar-string-label{font-size:.62rem;color:var(--text-light);text-align:center}.g-E2{height:270px;background:linear-gradient(to bottom,#5c2e2a,#8B4513)}.g-A2{height:258px;background:linear-gradient(to bottom,#5a3830,#7a5040)}.g-D3{height:246px;background:linear-gradient(to bottom,#3a5c3a,#4a7a4a)}.g-G3{height:234px;background:linear-gradient(to bottom,#3a4a6c,#4a6090)}.g-B3{height:222px;background:linear-gradient(to bottom,#5a4a2a,#7a6a40)}.g-E4{height:210px;background:linear-gradient(to bottom,#6a5a1a,#9a8a2a)}#trumpet{background:#f9f3e3}.trumpet-wrap{display:flex;flex-direction:column;align-items:center;gap:14px}.note-display{font-size:2rem;font-weight:800;color:#5a3a00;min-height:2.5rem;text-align:center}.trumpet-tube-wrap{position:relative;width:100%;max-width:400px}.trumpet-tube{height:18px;background:linear-gradient(to bottom,#f9c74f,#c8a000);border-radius:9px;position:relative}.trumpet-mouthpiece{position:absolute;left:-14px;top:-6px;width:22px;height:30px;background:linear-gradient(to right,#c8a000,#a08000);border-radius:4px 2px 2px 4px}.trumpet-bell-flare{position:absolute;right:-10px;top:-28px;width:56px;height:74px;background:linear-gradient(to right,#f9c74f,#c8a000);border-radius:50% 50% 50% 50%/80% 80% 20% 20%}.trumpet-valves{display:flex;gap:14px}.valve-btn{width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#f9c74f,#c8a000);border:3px solid #a07800;font-size:1.25rem;font-weight:800;color:#5a3a00;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 #7a5a00,0 6px 12px rgba(0,0,0,.2);transition:transform .1s,box-shadow .1s;-webkit-tap-highlight-color:transparent;user-select:none}.valve-btn.pressed{transform:translateY(4px);box-shadow:0 0 0 #7a5a00,0 2px 6px rgba(0,0,0,.15)}#piano{background:#1a1a1a}#piano .inst-header h2{color:#fff}.piano-keys{display:flex;gap:5px}.piano-key{width:54px;height:200px;background:linear-gradient(to bottom,#fff,#f0f0f0);border-radius:0 0 8px 8px;border:2px solid #ccc;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:12px;cursor:pointer;transition:transform .08s,box-shadow .08s;box-shadow:0 4px 8px rgba(0,0,0,.3),inset 0 -4px 0 #ddd;-webkit-tap-highlight-color:transparent;user-select:none}.piano-key:active,.piano-key.pressed{transform:translateY(4px);box-shadow:0 1px 3px rgba(0,0,0,.3),inset 0 -1px 0 #ccc}.piano-key .key-label{font-size:.72rem;font-weight:700;color:#444}.piano-key .key-hz{font-size:.56rem;color:#999;margin-top:2px}#bells{background:#080818}.bells-area{position:relative;width:100%;max-width:480px;height:340px}.bell-item{position:absolute;cursor:pointer;transform-origin:top center;-webkit-tap-highlight-color:transparent;user-select:none}.bell-item.ringing{animation:bellRing .65s ease-out}@keyframes bellRing{0%{transform:rotate(0) scale(1)}15%{transform:rotate(-14deg) scale(1.07)}30%{transform:rotate(11deg) scale(1.05)}45%{transform:rotate(-8deg)}60%{transform:rotate(6deg)}75%{transform:rotate(-3deg)}100%{transform:rotate(0)}}.bell-string{width:2px;background:rgba(255,255,255,.25);margin:0 auto}.bell-clapper{width:10px;height:10px;background:#8B6914;border-radius:50%;margin:0 auto}#violin{background:#f5edd8}.violin-body{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;max-width:460px}.violin-strings-area{width:100%;height:190px;position:relative;background:linear-gradient(to bottom,#8B4513,#A0522D);border-radius:16px 16px 10px 10px;box-shadow:inset 0 -20px 40px rgba(0,0,0,.35),0 4px 16px rgba(0,0,0,.2);overflow:hidden}.v-string{position:absolute;left:0;right:0;height:3px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}.v-string.plucked{animation:vPluck .4s ease-out}@keyframes vPluck{0%{transform:translateY(0)}20%{transform:translateY(-10px)}40%{transform:translateY(7px)}60%{transform:translateY(-4px)}80%{transform:translateY(2px)}100%{transform:translateY(0)}}.v-string-label{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:4px}.v-bow{width:100%;height:42px;background:linear-gradient(to right,#3a2a1a,#7a5a2a 30%,#7a5a2a 70%,#3a2a1a);border-radius:21px;cursor:grab;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.3);touch-action:none;user-select:none;display:flex;align-items:center;justify-content:center}.v-bow-label{font-size:.82rem;color:rgba(255,255,255,.65);font-weight:600}.violin-status{font-size:1rem;font-weight:700;color:#5a3a1a;min-height:1.5rem;text-align:center}
+</style>
+</head>
+<body>
+<!-- SCREEN 1: MAIN MENU -->
+<div id="menu" class="screen active">
+  <div class="menu-header">
+    <h1>The Sound Lab</h1>
+    <p>Tap an instrument to play!</p>
+  </div>
+  <div class="menu-grid">
+    <div class="menu-card drum"    onclick="show('drums')">  <div class="icon">&#127934;</div><div class="name">Drum Kit</div><div class="hint">Tap to play</div></div>
+    <div class="menu-card guitar"   onclick="show('guitar')"> <div class="icon">&#127928;</div><div class="name">Guitar</div><div class="hint">Pluck strings</div></div>
+    <div class="menu-card trumpet"  onclick="show('trumpet')"><div class="icon">&#127942;</div><div class="name">Trumpet</div><div class="hint">Press valves</div></div>
+    <div class="menu-card piano"    onclick="show('piano')">  <div class="icon">&#127929;</div><div class="name">Piano</div><div class="hint">Tap keys</div></div>
+    <div class="menu-card bells"    onclick="show('bells')">  <div class="icon">&#128276;</div><div class="name">Bells</div><div class="hint">Ring bells</div></div>
+    <div class="menu-card violin"   onclick="show('violin')"> <div class="icon">&#127931;</div><div class="name">Violin</div><div class="hint">Pluck or bow</div></div>
+  </div>
+</div>
+
+<!-- SCREEN 2: DRUM KIT -->
+<div id="drums" class="screen">
+  <div class="inst-header">
+    <button class="back-btn" onclick="show('menu')">&larr;</button>
+    <h2>&#127934; Drum Kit</h2>
+  </div>
+  <div class="inst-body">
+    <div class="hihat-row">
+      <div class="drum-col">
+        <div class="drum drum-hihat" id="drum-hihat" onclick="hitDrum('hihat')"></div>
+        <div class="drum-label">Hi-Hat</div>
+      </div>
+    </div>
+    <div class="drum-layout">
+      <div class="drum-col">
+        <div class="drum drum-kick" id="drum-kick" onclick="hitDrum('kick')"></div>
+        <div class="drum-label">Floor Tom<br><small style="font-size:.55rem">~150 Hz</small></div>
+      </div>
+      <div class="drum-col">
+        <div class="drum drum-snare" id="drum-snare" onclick="hitDrum('snare')"></div>
+        <div class="drum-label">Snare</div>
+      </div>
+      <div class="drum-col">
+        <div class="drum drum-tom1" id="drum-tom1" onclick="hitDrum('tom1')"></div>
+        <div class="drum-label">Rack Tom 1<br><small style="font-size:.55rem">~200 Hz</small></div>
+      </div>
+      <div class="drum-col">
+        <div class="drum drum-tom2" id="drum-tom2" onclick="hitDrum('tom2')"></div>
+        <div class="drum-label">Rack Tom 2<br><small style="font-size:.55rem">~180 Hz</small></div>
+      </div>
+      <div class="drum-col">
+        <div class="drum drum-bongo1" id="drum-bongo1" onclick="hitDrum('bongo1')"></div>
+        <div class="drum-label">Bongo 1<br><small style="font-size:.55rem">~300 Hz</small></div>
+      </div>
+      <div class="drum-col">
+        <div class="drum drum-bongo2" id="drum-bongo2" onclick="hitDrum('bongo2')"></div>
+        <div class="drum-label">Bongo 2<br><small style="font-size:.55rem">~400 Hz</small></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 3: GUITAR -->
+<div id="guitar" class="screen">
+  <div class="inst-header">
+    <button class="back-btn" onclick="show('menu')">&larr;</button>
+    <h2>&#127928; Guitar</h2>
+  </div>
+  <div class="inst-body">
+    <p style="color:#6b6560;font-size:.85rem;margin-bottom:4px">Tap or swipe a string to pluck</p>
+    <div class="guitar-body">
+      <div class="guitar-string-wrap" onclick="pluckGuitar(0)"><div class="guitar-string g-E2" id="gs0">E2<br><small style="font-size:.5rem">82 Hz</small></div><div class="guitar-string-label">82 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(1)"><div class="guitar-string g-A2" id="gs1">A2<br><small style="font-size:.5rem">110 Hz</small></div><div class="guitar-string-label">110 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(2)"><div class="guitar-string g-D3" id="gs2">D3<br><small style="font-size:.5rem">147 Hz</small></div><div class="guitar-string-label">147 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(3)"><div class="guitar-string g-G3" id="gs3">G3<br><small style="font-size:.5rem">196 Hz</small></div><div class="guitar-string-label">196 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(4)"><div class="guitar-string g-B3" id="gs4">B3<br><small style="font-size:.5rem">247 Hz</small></div><div class="guitar-string-label">247 Hz</div></div>
+      <div class="guitar-string-wrap" onclick="pluckGuitar(5)"><div class="guitar-string g-E4" id="gs5">E4<br><small style="font-size:.5rem">330 Hz</small></div><div class="guitar-string-label">330 Hz</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 4: TRUMPET -->
+<div id="trumpet" class="screen">
+  <div class="inst-header">
+    <button class="back-btn" onclick="show('menu')">&larr;</button>
+    <h2>&#127942; Trumpet</h2>
+  </div>
+  <div class="inst-body">
+    <div class="trumpet-wrap">
+      <div class="note-display" id="noteDisplay">Bb4 &mdash; Resting</div>
+      <div class="trumpet-tube-wrap">
+        <div class="trumpet-tube">
+          <div class="trumpet-mouthpiece"></div>
+          <div class="trumpet-bell-flare"></div>
+        </div>
+      </div>
+      <div style="font-size:.8rem;color:#7a5a00;margin-bottom:4px">Press valves to change notes</div>
+      <div class="trumpet-valves">
+        <div class="valve-btn" id="v1" onclick="toggleValve(1)">1</div>
+        <div class="valve-btn" id="v2" onclick="toggleValve(2)">2</div>
+        <div class="valve-btn" id="v3" onclick="toggleValve(3)">3</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 5: PIANO -->
+<div id="piano" class="screen">
+  <div class="inst-header">
+    <button class="back-btn" onclick="show('menu')">&larr;</button>
+    <h2>&#127929; Piano</h2>
+  </div>
+  <div class="inst-body"><div class="piano-keys" id="pianoKeys"></div></div>
+</div>
+
+<!-- SCREEN 6: BELLS -->
+<div id="bells" class="screen">
+  <div class="inst-header">
+    <button class="back-btn" onclick="show('menu')">&larr;</button>
+    <h2 style="color:#fff">&#128276; Bells</h2>
+  </div>
+  <div class="inst-body"><div class="bells-area" id="bellsArea"></div></div>
+</div>
+
+<!-- SCREEN 7: VIOLIN -->
+<div id="violin" class="screen">
+  <div class="inst-header">
+    <button class="back-btn" onclick="show('menu')">&larr;</button>
+    <h2>&#127931; Violin</h2>
+  </div>
+  <div class="inst-body">
+    <p style="color:#7a5a2a;font-size:.85rem;margin-bottom:6px">Tap strings to pluck, or drag the bow</p>
+    <div class="violin-body">
+      <div class="violin-strings-area" id="violinStringsArea"></div>
+      <div class="v-bow" id="violinBow"><div class="v-bow-label">&#127931; Bow &mdash; drag across strings</div></div>
+      <div class="violin-status" id="violinStatus">Tap a string to pluck</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var audioCtx=null;
+function getAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==="suspended")audioCtx.resume();return audioCtx}
+function show(id){document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active")});document.getElementById(id).classList.add("active")}
+
+// DRUMS
+function hitDrum(type){
+  var ctx=getAudio(),now=ctx.currentTime;
+  var el=document.getElementById("drum-"+type);
+  if(el){el.classList.remove("hit");void el.offsetWidth;el.classList.add("hit");setTimeout(function(){el.classList.remove("hit")},400);}
+  if(type==="kick"){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
+    o.frequency.setValueAtTime(150,now);o.frequency.exponentialRampToValueAtTime(50,now+.5);
+    g.gain.setValueAtTime(1.2,now);g.gain.exponentialRampToValueAtTime(.001,now+.5);
+    o.start(now);o.stop(now+.5);
+  }else if(type==="snare"){
+    var bl=Math.floor(ctx.sampleRate*.18),buf=ctx.createBuffer(1,bl,ctx.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<bl;i++)d[i]=Math.random()*2-1;
+    var n=ctx.createBufferSource();n.buffer=buf;
+    var ng=ctx.createGain(),bpf=ctx.createBiquadFilter();bpf.type="bandpass";bpf.frequency.value=2500;bpf.Q.value=.8;
+    n.connect(bpf);bpf.connect(ng);ng.connect(ctx.destination);
+    ng.gain.setValueAtTime(.9,now);ng.gain.exponentialRampToValueAtTime(.001,now+.18);n.start(now);n.stop(now+.18);
+    var o2=ctx.createOscillator(),og=ctx.createGain();o2.connect(og);og.connect(ctx.destination);o2.frequency.value=180;
+    og.gain.setValueAtTime(.6,now);og.gain.exponentialRampToValueAtTime(.001,now+.12);o2.start(now);o2.stop(now+.12);
+  }else if(type==="tom1"){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
+    o.frequency.setValueAtTime(200,now);o.frequency.exponentialRampToValueAtTime(100,now+.4);
+    g.gain.setValueAtTime(.9,now);g.gain.exponentialRampToValueAtTime(.001,now+.4);o.start(now);o.stop(now+.4);
+  }else if(type==="tom2"){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
+    o.frequency.setValueAtTime(180,now);o.frequency.exponentialRampToValueAtTime(90,now+.38);
+    g.gain.setValueAtTime(.85,now);g.gain.exponentialRampToValueAtTime(.001,now+.38);o.start(now);o.stop(now+.38);
+  }else if(type==="bongo1"){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
+    o.frequency.setValueAtTime(300,now);o.frequency.exponentialRampToValueAtTime(200,now+.2);
+    g.gain.setValueAtTime(.8,now);g.gain.exponentialRampToValueAtTime(.001,now+.2);o.start(now);o.stop(now+.2);
+  }else if(type==="bongo2"){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
+    o.frequency.setValueAtTime(400,now);o.frequency.exponentialRampToValueAtTime(250,now+.18);
+    g.gain.setValueAtTime(.75,now);g.gain.exponentialRampToValueAtTime(.001,now+.18);o.start(now);o.stop(now+.18);
+  }else if(type==="hihat"){
+    var bl=Math.floor(ctx.sampleRate*.08),buf=ctx.createBuffer(1,bl,ctx.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<bl;i++)d[i]=Math.random()*2-1;
+    var n=ctx.createBufferSource();n.buffer=buf;
+    var ng=ctx.createGain(),hpf=ctx.createBiquadFilter();hpf.type="highpass";hpf.frequency.value=7000;
+    n.connect(hpf);hpf.connect(ng);ng.connect(ctx.destination);
+    ng.gain.setValueAtTime(.6,now);ng.gain.exponentialRampToValueAtTime(.001,now+.08);n.start(now);n.stop(now+.08);
+  }
+}
+
+// GUITAR Karplus-Strong
+var GFREQS=[82,110,147,196,247,330];
+function pluckGuitar(idx){
+  var el=document.getElementById("gs"+idx);
+  if(el){el.classList.remove("plucked");void el.offsetWidth;el.classList.add("plucked");setTimeout(function(){el.classList.remove("plucked")},450);}
+  karplusStrong(getAudio(),GFREQS[idx],1.8);
+}
+function karplusStrong(ctx,freq,dur){
+  var rate=ctx.sampleRate,N=Math.round(rate/freq);
+  var buf=ctx.createBuffer(1,Math.floor(rate*dur),rate);
+  var d=buf.getChannelData(0);
+  for(var i=0;i<N;i++)d[i]=Math.random()*2-1;
+  for(var i=N;i<d.length;i++){
+    var p1=d[i-N];
+    var p2=d[i-N+1>=N?i-N+1-N:i-N+1];
+    d[i]=(p1+p2)*.5*(.996-.003*Math.sin(Math.PI*2*i/(N*.5)));
+  }
+  var src=ctx.createBufferSource();src.buffer=buf;
+  var g=ctx.createGain();g.gain.setValueAtTime(.8,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+dur);
+  src.connect(g);g.connect(ctx.destination);src.start();
+}
+
+// TRUMPET
+var activeValves={1:false,2:false,3:false};
+var trumpetNotes={"000":"Bb4,466","100":"C4,523","010":"Bb3,233","001":"G3,196","110":"A3,220","101":"F3,175","011":"Eb3,156","111":"G3,196"};
+function toggleValve(n){
+  activeValves[n]=!activeValves[n];
+  document.getElementById("v"+n).classList.toggle("pressed",activeValves[n]);
+  var key=(activeValves[1]?"1":"0")+(activeValves[2]?"1":"0")+(activeValves[3]?"1":"0");
+  var info=trumpetNotes[key].split(",");
+  document.getElementById("noteDisplay").textContent=info[0];
+  playTrumpet(parseInt(info[1]));
+}
+var trumpetOsc=null,trumpetLfo=null;
+function playTrumpet(freq){
+  var ctx=getAudio(),now=ctx.currentTime;
+  if(trumpetOsc){try{trumpetOsc.stop()}catch(e){}}
+  if(trumpetLfo){try{trumpetLfo.stop()}catch(e){}}
+  var osc=ctx.createOscillator(),lfo=ctx.createOscillator(),lfoG=ctx.createGain(),lp=ctx.createBiquadFilter(),g=ctx.createGain();
+  lfo.frequency.value=6;lfoG.gain.value=3;
+  lfo.connect(lfoG);lfoG.connect(osc.frequency);
+  osc.type="sawtooth";osc.frequency.value=freq;
+  lp.type="lowpass";lp.frequency.value=3000;lp.Q.value=1.5;
+  osc.connect(lp);lp.connect(g);g.connect(ctx.destination);
+  g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(.5,now+.05);g.gain.exponentialRampToValueAtTime(.001,now+1.2);
+  osc.start(now);lfo.start(now);osc.stop(now+1.2);lfo.stop(now+1.2);
+  trumpetOsc=osc;trumpetLfo=lfo;
+}
+
+// PIANO
+var pianoNotes=[{n:"C4",f:262},{n:"D4",f:294},{n:"E4",f:330},{n:"F4",f:349},{n:"G4",f:392},{n:"A4",f:440},{n:"B4",f:494},{n:"C5",f:523},{n:"D5",f:587},{n:"E5",f:659}];
+(function(){
+  var c=document.getElementById("pianoKeys");
+  pianoNotes.forEach(function(note){
+    var key=document.createElement("div");
+    key.className="piano-key";
+    key.innerHTML="<span class='key-label'>"+note.n+"</span><span class='key-hz'>"+note.f+" Hz</span>";
+    key.addEventListener("mousedown",function(){playPiano(note.f,key)});
+    key.addEventListener("touchstart",function(e){e.preventDefault();playPiano(note.f,key)},{passive:false});
+    c.appendChild(key);
+  });
+})();
+function playPiano(freq,el){
+  if(el)el.classList.add("pressed");
+  var ctx=getAudio(),now=ctx.currentTime;
+  [1,.5,.25].forEach(function(amp,i){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type="sine";o.frequency.value=freq*(i+1);
+    o.connect(g);g.connect(ctx.destination);
+    g.gain.setValueAtTime(amp*.6,now);g.gain.exponentialRampToValueAtTime(.001,now+2);
+    o.start(now);o.stop(now+2);
+  });
+  if(el)setTimeout(function(){el.classList.remove("pressed")},200);
+}
+
+// BELLS
+var bellData=[
+  {n:"C4",f:262,x:10,y:10,w:55,h:90,shape:"round"},
+  {n:"D4",f:294,x:28,y:5,w:65,h:100,shape:"round"},
+  {n:"F4",f:349,x:48,y:8,w:58,h:95,shape:"tapered"},
+  {n:"G4",f:392,x:66,y:4,w:72,h:105,shape:"round"},
+  {n:"A4",f:440,x:86,y:6,w:60,h:98,shape:"crown"}
+];
+(function(){
+  var area=document.getElementById("bellsArea");
+  bellData.forEach(function(b,i){
+    var item=document.createElement("div");
+    item.className="bell-item";
+    item.id="bell-"+i;
+    item.style.left=b.x+"%";
+    item.style.top=b.y+"px";
+    item.style.width=b.w+"px";
+    item.style.height=(b.h+30)+"px";
+    var svg="<svg class='bell-svg' width='"+b.w+"' height='"+(b.h+20)+"' viewBox='0 0 "+b.w+" "+(b.h+20)+"'>";
+    var cx=b.w/2;
+    if(b.shape==="round"){
+      svg+="<line x1='"+cx+"' y1='0' x2='"+cx+"' y2='18' stroke='rgba(255,255,255,.3)' stroke-width='2'/>";
+      svg+="<ellipse cx='"+cx+"' cy='"+(20+b.h*.5)+"' rx='"+(b.w*.45)+"' ry='"+(b.h*.5)+"' fill='#D4A017' stroke='#B8860B' stroke-width='2'/>";
+      svg+="<circle cx='"+cx+"' cy='"+(20+b.h+.5)+"' r='5' fill='#8B6914'/>";
+    }else if(b.shape==="tapered"){
+      svg+="<line x1='"+cx+"' y1='0' x2='"+cx+"' y2='18' stroke='rgba(255,255,255,.3)' stroke-width='2'/>";
+      svg+="<path d='M"+(cx-b.w*.25)+" 20 Q"+(cx-b.w*.15)+" "+(20+b.h*.4)+" "+(cx-b.w*.2)+" "+(20+b.h*.85)+" L"+(cx+b.w*.2)+" "+(20+b.h*.85)+" Q"+(cx+b.w*.15)+" "+(20+b.h*.4)+" "+(cx+b.w*.25)+" 20 Z' fill='#D4A017' stroke='#B8860B' stroke-width='2'/>";
+      svg+="<circle cx='"+cx+"' cy='"+(20+b.h+.5)+"' r='5' fill='#8B6914'/>";
+    }else if(b.shape==="crown"){
+      svg+="<line x1='"+cx+"' y1='0' x2='"+cx+"' y2='18' stroke='rgba(255,255,255,.3)' stroke-width='2'/>";
+      svg+="<path d='M"+(cx-b.w*.3)+" 20 L"+(cx-b.w*.3)+" "+(20+b.h*.3)+" L"+(cx-b.w*.2)+" "+(20+b.h*.5)+" L"+(cx-b.w*.15)+" "+(20+b.h*.7)+" L"+(cx+b.w*.15)+" "+(20+b.h*.7)+" L"+(cx+b.w*.2)+" "+(20+b.h*.5)+" L"+(cx+b.w*.3)+" "+(20+b.h*.3)+" L"+(cx+b.w*.3)+" 20 Z' fill='#D4A017' stroke='#B8860B' stroke-width='2'/>";
+      svg+="<circle cx='"+cx+"' cy='"+(20+b.h+.5)+"' r='5' fill='#8B6914'/>";
+    }
+    svg+="</svg>";
+    item.innerHTML=svg+"<div style='text-align:center;font-size:.6rem;color:#D4A017;margin-top:2px;'>"+b.n+"<br>"+b.f+" Hz</div>";
+    item.addEventListener("click",function(){ringBell(i)});
+    item.addEventListener("touchstart",function(e){e.preventDefault();ringBell(i)},{passive:false});
+    area.appendChild(item);
+  });
+})();
+function ringBell(idx){
+  var b=bellData[idx];
+  var el=document.getElementById("bell-"+idx);
+  if(el){el.classList.remove("ringing");void el.offsetWidth;el.classList.add("ringing");setTimeout(function(){el.classList.remove("ringing")},700);}
+  playBell(b.f);
+}
+function playBell(freq){
+  var ctx=getAudio(),now=ctx.currentTime;
+  var partials=[1,2.4,4.2];
+  var amps=[1,0.5,0.25];
+  partials.forEach(function(p,i){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type="sine";o.frequency.value=freq*p;
+    o.connect(g);g.connect(ctx.destination);
+    g.gain.setValueAtTime(amps[i]*.6,now);g.gain.exponentialRampToValueAtTime(.001,now+2.5);
+    o.start(now);o.stop(now+2.5);
+  });
+}
+
+// VIOLIN
+var vStrings=[
+  {n:"G3",f:196,y:30,color:"#2c3e50"},
+  {n:"D4",f:293,y:70,color:"#27ae60"},
+  {n:"A4",f:440,y:110,color:"#8e44ad"},
+  {n:"E5",f:659,y:150,color:"#e74c3c"}
+];
+(function(){
+  var area=document.getElementById("violinStringsArea");
+  vStrings.forEach(function(s,i){
+    var str=document.createElement("div");
+    str.className="v-string";
+    str.id="vstr-"+i;
+    str.style.top=s.y+"px";
+    str.style.background=s.color;
+    str.innerHTML="<span class='v-string-label'>"+s.n+" "+s.f+"Hz</span>";
+    str.addEventListener("mousedown",function(){pluckVString(i)});
+    str.addEventListener("touchstart",function(e){e.preventDefault();pluckVString(i)},{passive:false});
+    area.appendChild(str);
+  });
+})();
+function pluckVString(idx){
+  var s=vStrings[idx];
+  var el=document.getElementById("vstr-"+idx);
+  if(el){el.classList.remove("plucked");void el.offsetWidth;el.classList.add("plucked");setTimeout(function(){el.classList.remove("plucked")},450);}
+  document.getElementById("violinStatus").textContent="Playing: "+s.n+" ("+s.f+" Hz)";
+  karplusStrong(getAudio(),s.f,1.5);
+}
+
+// Violin bow drag
+(function(){
+  var bow=document.getElementById("violinBow");
+  var active=false;
+  var lastX=0;
+  var violinActiveOsc=null,violinActiveGain=null;
+  bow.addEventListener("mousedown",function(e){active=true;lastX=e.clientX;handleBow(e.clientX,e.target||bow)});
+  bow.addEventListener("touchstart",function(e){active=true;lastX=e.touches[0].clientX;handleBow(e.touches[0].clientX,bow)},{passive:false});
+  document.addEventListener("mousemove",function(e){
+    if(!active)return;
+    handleBow(e.clientX,bow);
+    lastX=e.clientX;
+  });
+  document.addEventListener("touchmove",function(e){
+    if(!active)return;
+    handleBow(e.touches[0].clientX,bow);
+    lastX=e.touches[0].clientX;
+  },{passive:false});
+  document.addEventListener("mouseup",function(){active=false;stopViolin()});
+  document.addEventListener("touchend",function(){active=false;stopViolin()});
+  function handleBow(x,el){
+    var rect=el.getBoundingClientRect();
+    var ratio=(x-rect.left)/rect.width;
+    var idx=Math.floor(ratio*vStrings.length);
+    idx=Math.max(0,Math.min(vStrings.length-1,idx));
+    var s=vStrings[idx];
+    document.getElementById("violinStatus").textContent="Bow: "+s.n+" ("+s.f+" Hz)";
+    playViolin(s.f,0.4);
+  }
+  function stopViolin(){
+    if(violinActiveOsc){try{violinActiveOsc.stop()}catch(e){}}
+    violinActiveOsc=null;
+  }
+})();
+function playViolin(freq,vol){
+  var ctx=getAudio(),now=ctx.currentTime;
+  if(violinActiveOsc){try{violinActiveOsc.stop()}catch(e){}}
+  var osc=ctx.createOscillator(),lfo=ctx.createOscillator(),lfoG=ctx.createGain(),lp=ctx.createBiquadFilter(),g=ctx.createGain();
+  lfo.frequency.value=5;lfoG.gain.value=4;
+  lfo.connect(lfoG);lfoG.connect(osc.frequency);
+  osc.type="sawtooth";osc.frequency.value=freq;
+  lp.type="lowpass";lp.frequency.value=1800;lp.Q.value=.7;
+  osc.connect(lp);lp.connect(g);g.connect(ctx.destination);
+  g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(vol||.3,now+.05);g.gain.exponentialRampToValueAtTime(.001,now+.5);
+  osc.start(now);lfo.start(now);osc.stop(now+.5);lfo.stop(now+.5);
+  violinActiveOsc=osc;
+}
+</script>
+</body>
+</html>
