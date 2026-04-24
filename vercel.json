@@ -3,7 +3,8 @@
   "outputDirectory": "dist/public",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.js" },
-    { "handle": "filesystem" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/slides/(.*)", "dest": "/slides/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
