@@ -208,7 +208,7 @@ const Home = () => {
               <Badge variant="outline" className="mb-4 border-primary/30 text-primary bg-primary/5">Why This Exists</Badge>
               <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Built by Someone Living It</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Tyler isn't a VC or a "crypto influencer." He's an inventory manager in Concord, MA — 
+                Tyler isn't a VC or a "crypto influencer." He's an inventory manager in Greater Boston Area — 
                 married, two kids, on the CPA path. He built this because he couldn't find Bitcoin 
                 education that actually taught him how money works.
               </p>
@@ -223,7 +223,7 @@ const Home = () => {
                     </div>
                     <div>
                       <h3 className="text-xl font-semibold text-foreground mb-1">Tyler, Founder</h3>
-                      <p className="text-sm text-muted-foreground">Inventory Manager · Concord, MA · CPA-path Dad of 2</p>
+                      <p className="text-sm text-muted-foreground">Inventory Manager · Greater Boston Area · CPA-path Dad of 2</p>
                     </div>
                   </div>
                   <div className="space-y-4 text-muted-foreground leading-relaxed">
