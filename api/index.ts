@@ -3310,8 +3310,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/financial/treasury-fiscal' || path === '/api/financial/treasury-fiscal/') return handleTreasuryFiscal(req, res);
     if (path === '/api/financial/inflation' || path === '/api/financial/inflation/') return handleFinancialInflation(req, res);
     if (path === '/api/dca-simulator' || path === '/api/dca-simulator/') {
-      const { default: dcaHandler } = await import('./dca-simulator');
-      return dcaHandler(req, res);
+      const { handleDcaSimulator } = await import('./dca-simulator-handler');
+      return handleDcaSimulator(req, res);
     }
 
     // Fallback
