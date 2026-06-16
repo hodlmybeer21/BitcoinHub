@@ -39,11 +39,14 @@ const GlobalMarketIndicators = () => {
     );
   }
 
+  const fmt = (v: number | null | undefined, d = 2, prefix = '', suffix = '') =>
+    v == null ? '—' : `${prefix}${Number(v).toFixed(d)}${suffix}`;
+
   const indicators = [
-    { label: 'DXY', value: data.dxy.value.toFixed(2), change: data.dxy.change, unit: '', desc: 'US Dollar Index' },
-    { label: 'Gold', value: `$${(data.gold.value / 1000).toFixed(1)}K`, change: data.gold.change, unit: '', desc: 'XAU/USD' },
-    { label: 'SPX', value: data.spx.value.toFixed(0), change: data.spx.change, unit: '', desc: 'S&P 500' },
-    { label: 'VIX', value: data.vix.value.toFixed(1), change: data.vix.change, unit: '', desc: 'Fear Index' },
+    { label: 'DXY', value: fmt(data.dxy?.value, 2), change: data.dxy?.change, unit: '', desc: 'US Dollar Index' },
+    { label: 'Gold', value: fmt(data.gold?.value != null ? data.gold.value / 1000 : null, 1, '$', 'K'), change: data.gold?.change, unit: '', desc: 'XAU/USD' },
+    { label: 'SPX', value: fmt(data.spx?.value, 0), change: data.spx?.change, unit: '', desc: 'S&P 500' },
+    { label: 'VIX', value: fmt(data.vix?.value, 1), change: data.vix?.change, unit: '', desc: 'Fear Index' },
   ];
 
   return (
@@ -59,7 +62,8 @@ const GlobalMarketIndicators = () => {
       {/* Indicators */}
       <div className="space-y-1.5">
         {indicators.map((ind) => {
-          const pos = ind.change >= 0;
+          const change = ind.change ?? 0;
+          const pos = change >= 0;
           return (
             <div key={ind.label} className="flex items-center gap-2 p-2 bg-white/[0.03] rounded-lg hover:bg-white/[0.06] transition-colors">
               <div className="w-12">
@@ -71,7 +75,7 @@ const GlobalMarketIndicators = () => {
               </div>
               <div className={`flex items-center gap-0.5 text-[11px] font-mono font-bold ${pos ? 'text-green-400/70' : 'text-red-400/70'}`}>
                 {pos ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                {Math.abs(ind.change).toFixed(2)}%
+                {Math.abs(change).toFixed(2)}%
               </div>
             </div>
           );

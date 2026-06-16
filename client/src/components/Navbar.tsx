@@ -66,6 +66,7 @@ const Navbar = () => {
   const navLinks = [
     { href: "/", label: "Learn" },
     { href: "/analytics", label: "Analytics" },
+    { href: "/cycle", label: "4-Year Cycle" },
     { href: "/news", label: "News" },
     { href: "/web-resources", label: "Web Resources" },
     { href: "/legislation", label: "Legislation" },
@@ -77,7 +78,7 @@ const Navbar = () => {
       label: "DCA Simulator", 
       description: "Simulate dollar-cost averaging strategies",
       icon: Coins,
-      comingSoon: true
+      comingSoon: false
     },
     { 
       href: "https://tracker.goodbotai.tech", 

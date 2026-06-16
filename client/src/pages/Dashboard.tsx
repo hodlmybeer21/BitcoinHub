@@ -6,6 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { useState } from "react";
 
 // ── Premium Components ───────────────────────────────────────────────────────
@@ -381,8 +382,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      <div className="max-w-[1800px] mx-auto px-4 pt-6 pb-4">
+    <ErrorBoundary label="Analytics dashboard">
+      <div className="min-h-screen bg-[#0a0a0f] text-white">
+        <div className="max-w-[1800px] mx-auto px-4 pt-6 pb-4">
 
         {/* ── Row 1: Bitcoin Hero Strip ───────────────────────────────────── */}
         <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 mb-4">
@@ -494,7 +496,10 @@ export default function Dashboard() {
           </div>
         </div>
 
+        </div>
+
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

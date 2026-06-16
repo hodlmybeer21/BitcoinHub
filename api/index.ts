@@ -256,7 +256,7 @@ async function getWhaleAlerts() {
   for (const tx of txData.txs || []) {
     const totalOut = tx.out.reduce((s: number, o: any) => s + o.value, 0);
     const amountBTC = totalOut / 1e8;
-    if (amountBTC >= 100) {
+    if (amountBTC >= 50) {
       const from = tx.inputs?.[0]?.prev_out?.addr || 'Unknown';
       const to = tx.out?.[0]?.addr || 'Unknown';
       const fromEx = EXCHANGES.has(from);
@@ -271,7 +271,7 @@ async function getWhaleAlerts() {
         amount: amountBTC,
         amountUSD: amountBTC * btcPrice,
         from, to, type,
-        significance: amountBTC >= 500 ? 'high' : amountBTC >= 200 ? 'medium' : 'low',
+        significance: amountBTC >= 500 ? 'high' : amountBTC >= 100 ? 'medium' : 'low',
       });
     }
     if (whales.length >= 20) break;
@@ -3309,6 +3309,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/ai/multi-timeframe-predictions' || path === '/api/ai/multi-timeframe-predictions/') return handleAiMultiTimeframe(req, res);
     if (path === '/api/financial/treasury-fiscal' || path === '/api/financial/treasury-fiscal/') return handleTreasuryFiscal(req, res);
     if (path === '/api/financial/inflation' || path === '/api/financial/inflation/') return handleFinancialInflation(req, res);
+    if (path === '/api/dca-simulator' || path === '/api/dca-simulator/') {
+      const { default: dcaHandler } = await import('./dca-simulator');
+      return dcaHandler(req, res);
+    }
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);
