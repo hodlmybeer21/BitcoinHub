@@ -5,6 +5,7 @@
     { "src": "/api/(.*)", "dest": "/api/index.js" },
     { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/slides/(.*)", "dest": "/slides/$1" },
+    { "src": "/cycle/(.*)", "dest": "/cycle/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
