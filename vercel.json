@@ -1,7 +1,14 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
+  "functions": {
+    "api/dca-simulator.ts": {
+      "maxDuration": 10
+    }
+  },
   "routes": [
+    { "src": "/api/dca-simulator", "dest": "/api/dca-simulator.js" },
+    { "src": "/api/dca-simulator/", "dest": "/api/dca-simulator.js" },
     { "src": "/api/(.*)", "dest": "/api/index.js" },
     { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/slides/(.*)", "dest": "/slides/$1" },
