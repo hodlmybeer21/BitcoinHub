@@ -2,6 +2,7 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { handleDcaSimulator } from './dca-simulator-handler';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -3309,10 +3310,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/ai/multi-timeframe-predictions' || path === '/api/ai/multi-timeframe-predictions/') return handleAiMultiTimeframe(req, res);
     if (path === '/api/financial/treasury-fiscal' || path === '/api/financial/treasury-fiscal/') return handleTreasuryFiscal(req, res);
     if (path === '/api/financial/inflation' || path === '/api/financial/inflation/') return handleFinancialInflation(req, res);
-    if (path === '/api/dca-simulator' || path === '/api/dca-simulator/') {
-      const { handleDcaSimulator } = await import('./dca-simulator-handler');
-      return handleDcaSimulator(req, res);
-    }
+    if (path === '/api/dca-simulator' || path === '/api/dca-simulator/') return handleDcaSimulator(req, res);
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);
