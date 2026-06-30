@@ -136,27 +136,50 @@ const Navbar = () => {
                   <DropdownMenuContent align="start" className="w-72">
                     {toolsLinks.map((tool) => (
                       <DropdownMenuItem key={tool.href} asChild>
-                        <Link 
-                          href={tool.href} 
-                          className={tool.comingSoon ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}
-                          {...(tool.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                        >
-                          <div className="flex items-start gap-3 w-full">
-                            <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
-                              <tool.icon className="w-4 h-4 text-primary" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{tool.label}</span>
-                                {tool.external && <ExternalLink className="w-3 h-3 text-muted-foreground" />}
-                                {tool.comingSoon && (
-                                  <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Coming Soon</span>
-                                )}
+                        {tool.external ? (
+                          <a
+                            href={tool.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={tool.comingSoon ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}
+                          >
+                            <div className="flex items-start gap-3 w-full">
+                              <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+                                <tool.icon className="w-4 h-4 text-primary" />
                               </div>
-                              <p className="text-xs text-muted-foreground">{tool.description}</p>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{tool.label}</span>
+                                  <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                                  {tool.comingSoon && (
+                                    <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Coming Soon</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">{tool.description}</p>
+                              </div>
                             </div>
-                          </div>
-                        </Link>
+                          </a>
+                        ) : (
+                          <Link
+                            href={tool.href}
+                            className={tool.comingSoon ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}
+                          >
+                            <div className="flex items-start gap-3 w-full">
+                              <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+                                <tool.icon className="w-4 h-4 text-primary" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{tool.label}</span>
+                                  {tool.comingSoon && (
+                                    <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Coming Soon</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">{tool.description}</p>
+                              </div>
+                            </div>
+                          </Link>
+                        )}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -348,23 +371,42 @@ const Navbar = () => {
                   Tools
                 </p>
                 {toolsLinks.map((tool) => (
-                  <Link 
-                    key={tool.href} 
-                    href={tool.href}
-                    onClick={closeMobileMenu}
-                    {...(tool.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                  >
-                    <span className={`${tool.comingSoon ? 'opacity-50' : 'hover:bg-muted/50'} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer`}>
-                      <div className="p-1.5 rounded-md bg-primary/10">
-                        <tool.icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <span className="flex-1 text-muted-foreground">{tool.label}</span>
-                      {tool.external && <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />}
-                      {tool.comingSoon && (
-                        <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Soon</span>
-                      )}
-                    </span>
-                  </Link>
+                  tool.external ? (
+                    <a
+                      key={tool.href}
+                      href={tool.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={closeMobileMenu}
+                    >
+                      <span className={`${tool.comingSoon ? 'opacity-50' : 'hover:bg-muted/50'} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer`}>
+                        <div className="p-1.5 rounded-md bg-primary/10">
+                          <tool.icon className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="flex-1 text-muted-foreground">{tool.label}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                        {tool.comingSoon && (
+                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Soon</span>
+                        )}
+                      </span>
+                    </a>
+                  ) : (
+                    <Link 
+                      key={tool.href} 
+                      href={tool.href}
+                      onClick={closeMobileMenu}
+                    >
+                      <span className={`${tool.comingSoon ? 'opacity-50' : 'hover:bg-muted/50'} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer`}>
+                        <div className="p-1.5 rounded-md bg-primary/10">
+                          <tool.icon className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="flex-1 text-muted-foreground">{tool.label}</span>
+                        {tool.comingSoon && (
+                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Soon</span>
+                        )}
+                      </span>
+                    </Link>
+                  )
                 ))}
               </div>
               
