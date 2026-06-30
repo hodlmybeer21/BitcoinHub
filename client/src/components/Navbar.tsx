@@ -126,9 +126,9 @@ const Navbar = () => {
                 {/* Tools Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <span className="inline-flex items-baseline text-muted-foreground hover:text-foreground px-3 py-2 text-sm font-medium cursor-pointer">
+                    <span className="text-muted-foreground hover:text-foreground px-3 py-2 text-sm font-medium cursor-pointer">
                       Tools
-                      <svg className="ml-1 w-3 h-3 self-center" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="ml-1 inline-block w-3 h-3 align-middle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </span>
