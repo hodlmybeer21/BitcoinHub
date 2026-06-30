@@ -43,7 +43,7 @@ function shareToX(score: number, total: number, gameName: string) {
     `I just completed "${gameName}" on @BitcoinHub 🦇⚡\n\n` +
     `Score: ${score}/${total} (${pct}%)\n\n` +
     `Learning Bitcoin through interactive challenges.\n\n` +
-    `👉 Try it free: hub.goodbotai.tech\n\n` +
+    `👉 Try it free: bitcoinhub.goodbotai.tech\n\n` +
     `#Bitcoin #SoundMoney`
   );
   window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');

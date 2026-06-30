@@ -125,7 +125,7 @@ function shareScore(score: number, maxScore: number) {
     `I just escaped the "Fiat Prison" on @BitcoinHub 🔐⚡\n\n` +
     `Freedom Keys: ${score}/${maxScore} (${pct}%)\n\n` +
     `Breaking free from inflation, debt, and the system that traps wealth.\n\n` +
-    `👉 Try it free: hub.goodbotai.tech\n\n` +
+    `👉 Try it free: bitcoinhub.goodbotai.tech\n\n` +
     `#MillennialFinance #Bitcoin #EscapeFiat`
   );
   window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');

@@ -51,7 +51,7 @@ function calcBTCValue(amount: number, birthYear: number): number {
 
 // ── Shareable URL ────────────────────────────────────────────────────────────
 function buildShareUrl(birthYear: number, savings: number): string {
-  const base = 'https://hub.goodbotai.tech/calculator';
+  const base = 'https://bitcoinhub.goodbotai.tech/calculator';
   return `${base}?birthyear=${birthYear}&savings=${savings}`;
 }
 
@@ -265,7 +265,7 @@ export function InflationCalculator({ initialBirthYear, initialSavings, embedMod
               {/* Attribution */}
               <p className="text-center text-xs text-muted-foreground">
                 Made by Human + AI team —{' '}
-                <a href="https://hub.goodbotai.tech" className="text-amber-500 hover:underline">
+                <a href="https://bitcoinhub.goodbotai.tech" className="text-amber-500 hover:underline">
                   BitcoinHub
                 </a>
               </p>

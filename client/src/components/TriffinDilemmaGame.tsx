@@ -117,7 +117,7 @@ const TOTAL_POSSIBLE = LEVELS.reduce((sum, l) => sum + l.quiz.points, 0);
 
 function shareScore(score: number) {
   const pct = Math.round((score / TOTAL_POSSIBLE) * 100);
-  const text = encodeURIComponent(`I just completed "Triffin's Dilemma" on @BitcoinHub 🏦⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nUnderstanding the impossible tradeoff at the heart of the dollar's reserve currency status.\n\n👉 Try it free: hub.goodbotai.tech\n\n#Bitcoin #TriffinsDilemma #Dollar #Macro`);
+  const text = encodeURIComponent(`I just completed "Triffin's Dilemma" on @BitcoinHub 🏦⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nUnderstanding the impossible tradeoff at the heart of the dollar's reserve currency status.\n\n👉 Try it free: bitcoinhub.goodbotai.tech\n\n#Bitcoin #TriffinsDilemma #Dollar #Macro`);
   window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
 }
 

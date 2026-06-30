@@ -536,7 +536,7 @@ const Home = () => {
                   </a>
                 </li>
                 <li>
-                  <a href="https://hub.goodbotai.tech" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
+                  <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
                     BitcoinHub <ExternalLink className="w-3 h-3 opacity-50" />
                   </a>
                 </li>

@@ -157,7 +157,7 @@ function shareScore(score: number, total: number, gameName: string) {
     `I just completed "${gameName}" on @BitcoinHub 🦇⚡\n\n` +
     `Score: ${score}/${total} (${pct}%)\n\n` +
     `Learning how fiat money shapes economic inequality — and why Bitcoin matters.\n\n` +
-    `👉 Try it free: hub.goodbotai.tech\n\n` +
+    `👉 Try it free: bitcoinhub.goodbotai.tech\n\n` +
     `#Bitcoin #SoundMoney #FiatFree`
   );
   window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');

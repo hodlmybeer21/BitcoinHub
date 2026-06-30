@@ -117,7 +117,7 @@ const TOTAL_POSSIBLE = LEVELS.reduce((sum, l) => sum + l.quiz.points, 0);
 
 function shareScore(score: number) {
   const pct = Math.round((score / TOTAL_POSSIBLE) * 100);
-  const text = encodeURIComponent(`I just escaped the Millennial Financial Trap on @BitcoinHub 📈⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nBreaking free from wage suppression, housing unaffordability, and student debt.\n\n👉 Try it free: hub.goodbotai.tech\n\n#MillennialFinance #Bitcoin #WealthBuilding #EscapeFiat`);
+  const text = encodeURIComponent(`I just escaped the Millennial Financial Trap on @BitcoinHub 📈⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nBreaking free from wage suppression, housing unaffordability, and student debt.\n\n👉 Try it free: bitcoinhub.goodbotai.tech\n\n#MillennialFinance #Bitcoin #WealthBuilding #EscapeFiat`);
   window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
 }
 

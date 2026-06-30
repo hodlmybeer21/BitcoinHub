@@ -116,7 +116,7 @@ const TOTAL_POSSIBLE = LEVELS.reduce((sum, l) => sum + l.quiz.points, 0);
 
 function shareScore(score: number) {
   const pct = Math.round((score / TOTAL_POSSIBLE) * 100);
-  const text = encodeURIComponent(`I just studied the Bretton Woods Collapse on @BitcoinHub 🏦⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nUnderstanding how 1971 broke the monetary system — and why 2025 looks familiar.\n\n👉 Try it free: hub.goodbotai.tech\n\n#Bitcoin #BrettonWoods #Macro #EconomicHistory`);
+  const text = encodeURIComponent(`I just studied the Bretton Woods Collapse on @BitcoinHub 🏦⚡\n\nScore: ${score}/${TOTAL_POSSIBLE} (${pct}%)\n\nUnderstanding how 1971 broke the monetary system — and why 2025 looks familiar.\n\n👉 Try it free: bitcoinhub.goodbotai.tech\n\n#Bitcoin #BrettonWoods #Macro #EconomicHistory`);
   window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
 }
 

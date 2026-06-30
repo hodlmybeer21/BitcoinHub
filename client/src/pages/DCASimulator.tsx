@@ -139,7 +139,7 @@ export default function DCASimulator() {
 
   const handleCopyShare = async () => {
     if (!data) return;
-    const text = `If I'd invested $${monthlyAmount}/month in Bitcoin starting ${startYear}, I'd have ${formatBTC(data.btcAccumulated)} BTC worth ${formatCurrency(data.currentValue)} today. Start your journey at hub.goodbotai.tech`;
+    const text = `If I'd invested $${monthlyAmount}/month in Bitcoin starting ${startYear}, I'd have ${formatBTC(data.btcAccumulated)} BTC worth ${formatCurrency(data.currentValue)} today. Start your journey at bitcoinhub.goodbotai.tech`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);

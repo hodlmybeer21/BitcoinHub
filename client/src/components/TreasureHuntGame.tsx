@@ -139,7 +139,7 @@ function shareScore(coins: number, maxCoins: number) {
     `I just completed "Bitcoin Treasure Hunt" on @BitcoinHub 🦇⚡\n\n` +
     `Score: ${coins}/${maxCoins} Bitcoin Gold Coins (${pct}%)\n\n` +
     `Navigating economic history to build a Bitcoin legacy for my family.\n\n` +
-    `👉 Try it free: hub.goodbotai.tech\n\n` +
+    `👉 Try it free: bitcoinhub.goodbotai.tech\n\n` +
     `#Bitcoin #LegacyWealth #SoundMoney`
   );
   window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=550,height=420');
