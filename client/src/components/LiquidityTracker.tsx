@@ -447,10 +447,14 @@ export default function LiquidityTracker() {
     );
   }
 
-  const coreIndicators = data.indicators.filter(i => i.category === 'core');
-  const velocityIndicators = data.indicators.filter(i => i.category === 'velocity');
-  const policyIndicators = data.indicators.filter(i => i.category === 'policy');
-  const fedHoldingsIndicators = data.indicators.filter(i => i.category === 'fed_holdings');
+  const indicatorsArray: any[] = Array.isArray(data.indicators)
+    ? data.indicators
+    : Object.values(data.indicators ?? {});
+
+  const coreIndicators = indicatorsArray.filter(i => i.category === 'core');
+  const velocityIndicators = indicatorsArray.filter(i => i.category === 'velocity');
+  const policyIndicators = indicatorsArray.filter(i => i.category === 'policy');
+  const fedHoldingsIndicators = indicatorsArray.filter(i => i.category === 'fed_holdings');
 
   return (
     <Card data-testid="card-liquidity-tracker">

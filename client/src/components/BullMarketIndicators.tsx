@@ -54,7 +54,10 @@ export function BullMarketIndicators() {
   };
 
   // Filter indicators based on search term
-  const filteredIndicators = indicatorsData?.indicators.filter(indicator =>
+  const indicatorsArr: any[] = Array.isArray(indicatorsData?.indicators)
+    ? indicatorsData!.indicators
+    : Object.values(indicatorsData?.indicators ?? {});
+  const filteredIndicators = indicatorsArr.filter(indicator =>
     indicator.name.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
