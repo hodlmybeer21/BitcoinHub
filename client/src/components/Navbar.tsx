@@ -126,11 +126,13 @@ const Navbar = () => {
                 {/* Tools Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <span className="text-muted-foreground hover:text-foreground px-3 py-2 text-sm font-medium cursor-pointer">
-                      Tools
-                      <svg className="ml-1 inline-block w-3 h-3 align-middle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                    <span className="px-3 py-2 text-sm font-medium cursor-pointer text-muted-foreground hover:text-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        Tools
+                        <svg className="inline-block w-3 h-3 leading-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </span>
                     </span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-72">
