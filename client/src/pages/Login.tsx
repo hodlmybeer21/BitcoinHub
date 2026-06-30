@@ -46,9 +46,16 @@ export default function Login() {
       setLocation("/");
     },
     onError: (error: any) => {
+      const msg = (() => {
+        try {
+          const parsed = typeof error.message === "string" ? JSON.parse(error.message) : null;
+          if (parsed && parsed.error === "auth_disabled") return parsed.message;
+        } catch {}
+        return error.message || "Invalid username/email or password";
+      })();
       toast({
-        title: "Login failed",
-        description: error.message || "Invalid username/email or password",
+        title: "Login unavailable",
+        description: msg,
         variant: "destructive",
       });
     },

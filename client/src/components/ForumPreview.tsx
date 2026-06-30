@@ -18,7 +18,7 @@ const ForumPreview = () => {
     <Card className="bg-card shadow-lg overflow-hidden">
       <CardHeader className="py-4 px-6 border-b border-muted/50 flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-semibold">Community Forum</CardTitle>
-        <Link href="/community">
+        <Link href="/news">
           <a className="text-sm text-primary hover:underline">View All</a>
         </Link>
       </CardHeader>
@@ -82,7 +82,7 @@ const ForumPreview = () => {
               </div>
             ))}
             
-            <Link href="/community">
+            <Link href="/news">
               <Button 
                 variant="ghost" 
                 className="w-full text-sm font-medium text-primary hover:text-foreground hover:bg-primary/10"

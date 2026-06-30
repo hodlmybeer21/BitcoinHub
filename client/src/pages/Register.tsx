@@ -48,9 +48,16 @@ export default function Register() {
       });
     },
     onError: (error: any) => {
+      const msg = (() => {
+        try {
+          const parsed = typeof error.message === "string" ? JSON.parse(error.message) : null;
+          if (parsed && parsed.error === "auth_disabled") return parsed.message;
+        } catch {}
+        return error.message || "An error occurred during registration";
+      })();
       toast({
-        title: "Registration failed",
-        description: error.message || "An error occurred during registration",
+        title: "Registration unavailable",
+        description: msg,
         variant: "destructive",
       });
     },

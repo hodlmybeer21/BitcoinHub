@@ -290,7 +290,7 @@ function TreasuryInflationPanel({ fiscal, inflation }: { fiscal?: TreasuryFiscal
           ["CPI YoY", inflation?.cpi?.value, inflation?.cpi?.change],
           ["Core CPI", inflation?.core?.value, null],
           ["PCE YoY", inflation?.pce?.value, null],
-          ["Breakeven", inflation?.breakeven ? `${inflation.breakeven}%` : null, null],
+          ["Breakeven", typeof inflation?.breakeven === "number" ? inflation.breakeven : null, null],
         ].map(([label, val, chg]) => (
           <div key={label as string} className="flex justify-between items-center">
             <span className="text-[10px] text-white/[0.35]">{label}</span>

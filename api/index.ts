@@ -35,6 +35,23 @@ async function handleAuthMe(_: VercelRequest, res: VercelResponse) {
   ok(res, null);
 }
 
+// Auth endpoints exposed by the SPA but unsupported on serverless.
+// Surface a clear, structured 503 so the form can render a useful message
+// instead of a confusing 404.
+function handleAuthDisabled(action: 'login' | 'register' | 'logout') {
+  return (_: VercelRequest, res: VercelResponse) => {
+    res.status(503).json({
+      error: 'auth_disabled',
+      message:
+        'Authentication is currently disabled on this deployment. ' +
+        'Account creation is coming back soon — check back in a few weeks. ' +
+        'In the meantime, the rest of the site (Learn, Analytics, Cycle, DCA Simulator, Newsletter) is fully usable without an account.',
+      action,
+      retryAfter: 30 * 24 * 60 * 60, // 30 days, seconds
+    });
+  };
+}
+
 // ─── Notifications (stub) ──────────────────────────────────────────────────────
 
 async function handleNotifications(_: VercelRequest, res: VercelResponse) {
@@ -3283,6 +3300,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (path === '/api/health' || path === '/api/health/') return handleHealth(req, res);
     if (path === '/api/auth/me' || path === '/api/auth/me/') return handleAuthMe(req, res);
+    if (path === '/api/auth/login' || path === '/api/auth/login/') return handleAuthDisabled('login')(req, res);
+    if (path === '/api/auth/register' || path === '/api/auth/register/') return handleAuthDisabled('register')(req, res);
+    if (path === '/api/auth/logout' || path === '/api/auth/logout/') return handleAuthDisabled('logout')(req, res);
     if (path === '/api/notifications' || path === '/api/notifications/') return handleNotifications(req, res);
     if (path === '/api/bitcoin/market-data' || path === '/api/bitcoin/market-data/') return handleMarketData(req, res);
     if (path.startsWith('/api/bitcoin/chart')) return handleChart(req, res);
