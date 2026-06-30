@@ -126,14 +126,9 @@ const Navbar = () => {
                 {/* Tools Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <span className="text-muted-foreground hover:text-foreground px-3 py-2 text-sm font-medium cursor-pointer">
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 20, lineHeight: '20px' }}>
-                        <span>Tools</span>
-                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true" style={{ display: 'inline-block', flexShrink: 0 }}>
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </span>
-                    </span>
+                    <span className="text-muted-foreground hover:text-foreground px-3 py-2 text-sm font-medium cursor-pointer">Tools<svg className="ml-0.5 inline-block w-3 h-3 align-baseline" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg></span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-72">
                     {toolsLinks.map((tool) => (
