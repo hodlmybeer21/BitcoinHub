@@ -54,16 +54,17 @@ function TransactionTypeBadge({ type }: { type: WhaleTransaction['type'] }) {
   );
 }
 
-function SignificanceBadge({ significance }: { significance: WhaleTransaction['significance'] }) {
-  const variants: Record<WhaleTransaction['significance'], { className: string }> = {
+function SignificanceBadge({ significance }: { significance: string }) {
+  const variants: Record<string, { className: string }> = {
     high: { className: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
     medium: { className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
-    low: { className: 'bg-gray-500/10 text-gray-500 border-gray-500/20' }
+    low: { className: 'bg-gray-500/10 text-gray-500 border-gray-500/20' },
   };
+  const variant = variants[significance] ?? variants.low;
 
   return (
-    <Badge variant="outline" className={variants[significance].className}>
-      {significance.toUpperCase()}
+    <Badge variant="outline" className={variant.className}>
+      {(significance || 'unknown').toUpperCase()}
     </Badge>
   );
 }

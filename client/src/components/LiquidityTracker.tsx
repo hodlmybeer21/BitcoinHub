@@ -341,16 +341,20 @@ function BitcoinOverlayCard({ overlay }: { overlay: BitcoinOverlay }) {
   );
 }
 
-function SignalBadge({ signal }: { signal: 'bullish' | 'bearish' | 'neutral' }) {
-  const config = {
+function SignalBadge({ signal }: { signal: string }) {
+  const config: Record<string, { label: string; className: string }> = {
     bullish: { label: 'Bullish', className: 'bg-green-500/10 text-green-500 border-green-500/20' },
     bearish: { label: 'Bearish', className: 'bg-red-500/10 text-red-500 border-red-500/20' },
-    neutral: { label: 'Neutral', className: 'bg-gray-500/10 text-gray-400 border-gray-500/20' }
+    neutral: { label: 'Neutral', className: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
+    expansionary: { label: 'Expansionary', className: 'bg-green-500/10 text-green-500 border-green-500/20' },
+    contractionary: { label: 'Contractionary', className: 'bg-red-500/10 text-red-500 border-red-500/20' },
+    unavailable: { label: 'Data Unavailable', className: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
   };
-  
+  const entry = config[signal] ?? config.neutral;
+
   return (
-    <Badge variant="outline" className={config[signal].className} data-testid="signal-badge">
-      {config[signal].label}
+    <Badge variant="outline" className={entry.className} data-testid="signal-badge">
+      {entry.label}
     </Badge>
   );
 }

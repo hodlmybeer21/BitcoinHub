@@ -34,14 +34,14 @@ interface OptionsFlowResponse {
   timestamp: string;
 }
 
-function SentimentBadge({ sentiment }: { sentiment: 'bullish' | 'bearish' | 'neutral' }) {
-  const variants = {
+function SentimentBadge({ sentiment }: { sentiment: string }) {
+  const variants: Record<string, { icon: any; label: string; className: string }> = {
     bullish: { icon: TrendingUp, label: 'Bullish', className: 'bg-green-500/10 text-green-500 border-green-500/20' },
     bearish: { icon: TrendingDown, label: 'Bearish', className: 'bg-red-500/10 text-red-500 border-red-500/20' },
-    neutral: { icon: Activity, label: 'Neutral', className: 'bg-gray-500/10 text-gray-500 border-gray-500/20' }
+    neutral: { icon: Activity, label: 'Neutral', className: 'bg-gray-500/10 text-gray-500 border-gray-500/20' },
+    unavailable: { icon: Activity, label: 'No data', className: 'bg-gray-500/10 text-gray-500 border-gray-500/20' },
   };
-
-  const variant = variants[sentiment];
+  const variant = variants[sentiment] ?? variants.neutral;
   const Icon = variant.icon;
 
   return (
