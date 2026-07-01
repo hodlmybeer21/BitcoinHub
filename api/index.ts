@@ -2,6 +2,7 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getCycleState, getCycleScore } from './cycle';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -3331,6 +3332,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/financial/inflation' || path === '/api/financial/inflation/') return handleFinancialInflation(req, res);
 
 
+
+    if (path === '/api/cycle/state' || path === '/api/cycle/state/') {
+      try {
+        const state = await getCycleState();
+        return ok(res, state);
+      } catch (e: any) {
+        console.error('cycle/state error:', e);
+        return err(res, 500, e.message || 'Failed to fetch cycle state');
+      }
+    }
+
+    if (path === '/api/cycle/score' || path === '/api/cycle/score/') {
+      try {
+        const score = await getCycleScore();
+        return ok(res, score);
+      } catch (e: any) {
+        console.error('cycle/score error:', e);
+        return err(res, 500, e.message || 'Failed to fetch cycle score');
+      }
+    }
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);
