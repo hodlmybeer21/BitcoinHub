@@ -4,7 +4,7 @@
   "routes": [
     { "src": "/api/dca-simulator", "dest": "/api/dca-simulator" },
     { "src": "/api/dca-simulator/", "dest": "/api/dca-simulator" },
-    { "src": "/api/(.*)", "dest": "/api/index.cjs" },
+    { "src": "/api/(.*)", "dest": "/api/index" },
     { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/slides/(.*)", "dest": "/slides/$1" },
     { "src": "/cycle/(.*)", "dest": "/cycle/$1" },
