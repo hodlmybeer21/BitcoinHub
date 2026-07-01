@@ -11,8 +11,9 @@
  */
 
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { TrendingDown, Clock, Target, AlertTriangle, ArrowRight, Play } from "lucide-react";
+import { TrendingDown, Clock, Target, AlertTriangle, ArrowRight, Play, Loader2, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,32 +30,58 @@ const staggerContainer = {
   },
 };
 
-// Snapshot of the BTC Daily Pulse as of 2026-06-16.
-// In a future iteration this could be a live fetch from /api/cycle-score.
-const CYCLE_SNAPSHOT = {
-  asOf: "2026-06-16 11:15 UTC",
-  price: 66459,
-  change24h: 0.65,
-  change7d: 6.01,
-  change30d: -15.05,
-  score: 6.4,
-  label: "LATE BEAR — Q4 window opening soon",
-  pctFromTop: 46.7,
-  weeksToQ4: 15.2,
-  consensus: {
-    bottomCall: 3, // 3 of 4 analysts actively call the bottom
-    accumulating: 2,
-    cautious: 1,
-  },
-};
-
+// Static analyst positions and the historical milestones are *not* live.
+// They change when new posts from the analysts warrant a thesis refresh
+// (manual edit). The price fields in CYCLE_MILESTONES are recomputed at
+// render time from /api/cycle/state for the "Current" row only — the Q4
+// 2025 top, the Feb 2026 bottom, and the Q4 2026 target stay static
+// because they are historical or model outputs, not market quotes.
 const CYCLE_MILESTONES = [
-  { date: "Q4 2025", event: "Cycle top", price: "$124,774", note: "Confirmed. Per Ben Cowen + multiple analysts." },
-  { date: "Feb 6, 2026", event: "Local bottom", price: "$62,854", note: "First leg down. -50% from peak. 200-wk MA floor at ~$61.6K." },
-  { date: "Jun 16, 2026", event: "Current", price: "$66,459", note: "Late bear. Reclaiming strength. 15 weeks to Q4 window." },
-  { date: "Q4 2026", event: "Target cycle low", price: "$25K – $31K", note: "Historical -75% to -80% from $124,774 peak. Window: Aug-Oct." },
-  { date: "Q4 2027", event: "Next cycle top", price: "TBD", note: "If cycle holds, post-halving blow-off top in late 2025/early 2026." },
+  {
+    date: "Oct 6, 2025",
+    event: "Cycle top",
+    price: "$126,080",
+    note: "Confirmed all-time high. Per CoinGecko tick data and Ben Cowen + multiple analysts.",
+  },
+  {
+    date: "Feb 24, 2026",
+    event: "Local bottom",
+    price: "$65,021",
+    note: "First leg down. -48% from peak. Tagging the 200-wk MA zone.",
+  },
+  {
+    date: "Today",
+    event: "Current",
+    price: null as string | null, // populated live from /api/cycle/state
+    note: "Live snapshot. Drawdown vs cycle top shown beside the price.",
+  },
+  {
+    date: "Q4 2026",
+    event: "Target cycle low",
+    price: "$25.2K – $31.5K",
+    note: "Historical -75% to -80% from the $126,080 peak. Window: Aug–Oct 2026.",
+  },
+  {
+    date: "Q4 2027",
+    event: "Next cycle top",
+    price: "TBD",
+    note: "If the cycle holds, post-halving blow-off top in late 2027 / early 2028.",
+  },
 ];
+
+interface CycleState {
+  price: number;
+  change24h: number;
+  change7d: number | null;
+  change30d: number | null;
+  drawdownPctFromTop: number;
+  weeksToWindow: number;
+  cycleTop: { price: number; date: string };
+  cycleLowTarget: { min: number; max: number };
+  windowOpen: string;
+  asOf: string;
+  source: 'live' | 'fallback';
+}
 
 const ANALYSTS = [
   {
@@ -88,6 +115,18 @@ const ANALYSTS = [
 ];
 
 export default function Cycle() {
+  const { data: cycleState, isLoading: stateLoading } = useQuery<CycleState>({
+    queryKey: ["/api/cycle/state"],
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+  });
+
+  const live = cycleState?.source === "live";
+  const priceFmt = (n: number) =>
+    n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  const pctFmt = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
@@ -105,7 +144,7 @@ export default function Cycle() {
             <motion.p variants={fadeInUp} className="mt-6 text-lg text-muted-foreground max-w-3xl">
               Bitcoin tops in Q4 of post-halving years and bottoms in Q4 of midterm years. The pattern
               has survived ETFs, MicroStrategy, and trillions in corporate buying. Q4 2026 is the next
-              textbook bottom window — 15 weeks away.
+              textbook bottom window — {cycleState ? `${cycleState.weeksToWindow} weeks away.` : "approaching."}
             </motion.p>
             <motion.div variants={fadeInUp} className="mt-8 flex flex-wrap gap-3">
               <Link href="/dca-simulator">
@@ -128,43 +167,135 @@ export default function Cycle() {
       <section className="border-b border-border/40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Live Cycle State</h2>
-            <span className="text-xs text-muted-foreground">Snapshot {CYCLE_SNAPSHOT.asOf}</span>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Live Cycle State</h2>
+              {cycleState && cycleState.drawdownPctFromTop > 0 && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                  -{cycleState.drawdownPctFromTop.toFixed(1)}% from ${cycleState.cycleTop.price.toLocaleString()} top
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+              {stateLoading ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching…
+                </>
+              ) : live ? (
+                <>
+                  <Activity className="h-3 w-3 text-emerald-400" />
+                  Live · updated {cycleState ? new Date(cycleState.asOf).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-3 w-3 text-amber-400" />
+                  Live data unavailable — figures shown are from the previous pulse.
+                </>
+              )}
+            </span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="text-3xl font-bold font-mono text-[#F7931A]">
-                  ${CYCLE_SNAPSHOT.price.toLocaleString()}
+                  {cycleState && cycleState.price > 0 ? priceFmt(cycleState.price) : "—"}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">BTC spot</div>
-                <div className="text-xs text-red-400 mt-2 font-mono">
-                  {CYCLE_SNAPSHOT.change24h >= 0 ? "+" : ""}{CYCLE_SNAPSHOT.change24h.toFixed(2)}% (24h) · {CYCLE_SNAPSHOT.change7d >= 0 ? "+" : ""}{CYCLE_SNAPSHOT.change7d.toFixed(1)}% (7d)
+                <div className="text-xs mt-2 font-mono">
+                  {cycleState && cycleState.price > 0 ? (
+                    <span className={cycleState.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>
+                      {pctFmt(cycleState.change24h)} (24h)
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                  {cycleState?.change7d != null && (
+                    <span className={cycleState.change7d >= 0 ? "text-emerald-400" : "text-red-400"}>
+                      {` · ${pctFmt(cycleState.change7d)} (7d)`}
+                    </span>
+                  )}
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold font-mono">{CYCLE_SNAPSHOT.score.toFixed(1)}<span className="text-base text-muted-foreground">/10</span></div>
-                <div className="text-xs text-muted-foreground mt-1">Cycle score</div>
-                <div className="text-xs text-amber-400 mt-2">{CYCLE_SNAPSHOT.label}</div>
+                <div className="text-3xl font-bold font-mono">
+                  {cycleState && cycleState.ma200w > 0
+                    ? priceFmt(cycleState.ma200w)
+                    : "—"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">200-week MA</div>
+                <div className="text-xs mt-2 font-mono">
+                  {cycleState && cycleState.ma200w > 0 && cycleState.price > 0 ? (
+                    cycleState.price < cycleState.ma200w ? (
+                      <span className="text-amber-400">
+                        {((cycleState.ma200w - cycleState.price) / cycleState.ma200w * 100).toFixed(1)}% below — cycle floor zone
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400">
+                        {((cycleState.price - cycleState.ma200w) / cycleState.ma200w * 100).toFixed(1)}% above
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold font-mono">-{CYCLE_SNAPSHOT.pctFromTop.toFixed(1)}%</div>
-                <div className="text-xs text-muted-foreground mt-1">from $124,774 top</div>
-                <div className="text-xs text-muted-foreground mt-2">200-wk MA floor intact</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl font-bold font-mono text-amber-400">{CYCLE_SNAPSHOT.weeksToQ4.toFixed(1)}</div>
+                <div className="text-3xl font-bold font-mono text-amber-400">
+                  {cycleState ? cycleState.weeksToWindow : "—"}
+                </div>
                 <div className="text-xs text-muted-foreground mt-1">weeks to Q4 window</div>
-                <div className="text-xs text-muted-foreground mt-2">Aug-Oct optimal entry</div>
+                <div className="text-xs text-muted-foreground mt-2">Aug–Oct optimal entry</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-3xl font-bold font-mono text-foreground">
+                  {cycleState ? `${priceFmt(cycleState.cycleLowTarget.min)} – ${priceFmt(cycleState.cycleLowTarget.max)}` : "—"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Q4 2026 target</div>
+                <div className="text-xs text-muted-foreground mt-2">−75% to −80% drawdown</div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Cycle Pulse — editorial score, sourced from data/cycle-score.json */}
+          <Card className="mt-4 bg-gradient-to-br from-[#F7931A]/[0.06] to-transparent border-[#F7931A]/25">
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap items-baseline gap-3 mb-2">
+                <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+                  Cycle Pulse
+                </h3>
+                {cycleState && cycleState.score?.updatedAt && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Last updated {new Date(cycleState.score.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-2">
+                {cycleState && cycleState.score.score > 0 ? (
+                  <>
+                    <span className="text-4xl font-bold font-mono text-[#F7931A]">
+                      {cycleState.score.score.toFixed(1)}
+                      <span className="text-base text-muted-foreground font-normal">/10</span>
+                    </span>
+                    <span className="text-sm font-medium text-foreground">
+                      {cycleState.score.label}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Score unavailable.</span>
+                )}
+              </div>
+              {cycleState?.score?.notes && (
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
+                  {cycleState.score.notes}
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -227,26 +358,39 @@ export default function Cycle() {
         <h2 className="text-3xl font-bold mb-2">Cycle milestones</h2>
         <p className="text-muted-foreground mb-8">Where we are, where we're going.</p>
         <div className="space-y-3">
-          {CYCLE_MILESTONES.map((m, i) => (
-            <Card key={i} className={i === 2 ? "border-[#F7931A]/40 bg-[#F7931A]/[0.03]" : ""}>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                  <div className="md:col-span-3">
-                    <div className="text-xs uppercase tracking-widest text-muted-foreground">{m.date}</div>
+          {CYCLE_MILESTONES.map((m, i) => {
+            // The "Current" milestone (i === 2) gets its price from live data
+            // and the note augmented with the live drawdown vs cycle top.
+            const isCurrent = i === 2;
+            const currentPrice = isCurrent && cycleState && cycleState.price > 0
+              ? priceFmt(cycleState.price)
+              : "—";
+            const currentNote = isCurrent && cycleState && cycleState.price > 0
+              ? `Live. ${cycleState.drawdownPctFromTop.toFixed(1)}% below the $${cycleState.cycleTop.price.toLocaleString()} top. ${cycleState.weeksToWindow} weeks to the Q4 window.`
+              : m.note;
+            return (
+              <Card key={i} className={isCurrent ? "border-[#F7931A]/40 bg-[#F7931A]/[0.03]" : ""}>
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    <div className="md:col-span-3">
+                      <div className="text-xs uppercase tracking-widest text-muted-foreground">{m.date}</div>
+                    </div>
+                    <div className="md:col-span-3">
+                      <div className="font-semibold text-foreground">{m.event}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="font-mono text-[#F7931A] font-bold">
+                        {isCurrent ? currentPrice : m.price}
+                      </div>
+                    </div>
+                    <div className="md:col-span-4">
+                      <div className="text-sm text-muted-foreground">{currentNote}</div>
+                    </div>
                   </div>
-                  <div className="md:col-span-3">
-                    <div className="font-semibold text-foreground">{m.event}</div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <div className="font-mono text-[#F7931A] font-bold">{m.price}</div>
-                  </div>
-                  <div className="md:col-span-4">
-                    <div className="text-sm text-muted-foreground">{m.note}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </section>
 
@@ -301,25 +445,29 @@ export default function Cycle() {
         </div>
       </section>
 
-      {/* The trade */}
+      {/* What to watch */}
       <section className="border-t border-border/40 bg-muted/20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
-              <h2 className="text-3xl font-bold mb-4">The trade plan</h2>
+              <h2 className="text-3xl font-bold mb-4">What to watch at this window</h2>
               <div className="space-y-3 text-muted-foreground">
                 <p>
-                  <strong className="text-foreground">Stage 1 — SBIT calls (mid-June expiry).</strong>{" "}
-                  Long puts/short-equity exposure that benefits as BTC drops toward the bottom window.
+                  <strong className="text-foreground">200-week moving average.</strong>{" "}
+                  Every cycle bottom has tagged this line. Current value is shown in
+                  the live state strip above. A decisive weekly close below it is the
+                  historical "this is the zone" signal.
                 </p>
                 <p>
-                  <strong className="text-foreground">Stage 2 — Accumulation below $70K.</strong>{" "}
-                  Begin staged accumulation now. Keep 50% dry powder for the $25K-$31K zone.
+                  <strong className="text-foreground">Pi Cycle top-cross confirmation.</strong>{" "}
+                  The 111-day MA crossing the 350-day MA at the prior cycle top is the
+                  other end of the pattern. Tracking the inverse (350 above 111) is the
+                  bottom-phase analog the analysts watch.
                 </p>
                 <p>
-                  <strong className="text-foreground">Stage 3 — Flip to spot SBIT at bottom.</strong>{" "}
-                  After the Q4 low, rotate from puts to spot exposure. Use 10-15-20% pullbacks in the
-                  next bull market as entries for leveraged long (IBIT) positions.
+                  <strong className="text-foreground">M2 money supply inflection.</strong>{" "}
+                  Global liquidity expansion historically leads BTC by ~3 months. When
+                  central banks pivot from QT to QE, the cycle bottom forms.
                 </p>
               </div>
             </div>

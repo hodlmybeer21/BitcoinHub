@@ -9,7 +9,7 @@ import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
 import TradingCockpit from "@/components/TradingCockpit";
 import Learn from "@/pages/Learn";
-import NewsFeed from "@/pages/NewsFeed";
+import { Redirect } from "wouter";
 import WebResources from "@/pages/WebResources";
 import Legislation from "@/pages/Legislation";
 import Admin from "@/pages/Admin";
@@ -32,7 +32,7 @@ function Router() {
         <Route path="/learn" component={Learn} />
         <Route path="/games" component={Learn} />
         <Route path="/analytics" component={Dashboard} />
-        <Route path="/news" component={NewsFeed} />
+        <Route path="/news">{() => <Redirect to="/cycle" />}</Route>
         <Route path="/web-resources" component={WebResources} />
         <Route path="/legislation" component={Legislation} />
         <Route path="/admin" component={Admin} />

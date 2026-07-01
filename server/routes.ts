@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getBitcoinMarketData, getBitcoinChart, getBitcoinPrice } from "./api/cryptocompare";
 import { getLatestNews } from "./api/newsapi";
+import { getCycleState, getCycleScore } from "./api/cycle";
 // Twitter imports removed - now using specific HodlMyBeer integration
 import { getLatestTweets, getTrendingHashtags, getPopularAccounts, getHodlMyBeerFollowing } from "./api/social";
 
@@ -507,7 +508,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DCA Simulator
   app.use(dcaSimulatorRouter);
 
-  // News
+  // News — RSS-backed list. Still consumed by the notifications feed
+  // (in-app alerts); not exposed via a public page since the /news page was
+  // replaced with the 4-Year Cycle section.
   app.get(`${apiPrefix}/news`, async (req, res) => {
     try {
       const category = req.query.category as string;
@@ -520,6 +523,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+
+  // 4-Year Cycle page state — live BTC price, drawdown from cycle top,
+  // weeks until the Q4 2026 bottom window opens, plus the editorial score
+  // (loaded from data/cycle-score.json — no HTTP write endpoint by design).
+  app.get(`${apiPrefix}/cycle/state`, async (_req, res) => {
+    try {
+      const state = await getCycleState();
+      res.json(state);
+    } catch (error) {
+      console.error("Error fetching cycle state:", error);
+      res.status(500).json({ message: "Failed to fetch cycle state" });
+    }
+  });
+
+  // Editorial cycle score only — cheap read from data/cycle-score.json with
+  // no upstream API calls. Useful for cron-style jobs that just need the
+  // latest score without paying for the market fetch.
+  app.get(`${apiPrefix}/cycle/score`, async (_req, res) => {
+    try {
+      const score = await getCycleScore();
+      res.json(score);
+    } catch (error) {
+      console.error("Error fetching cycle score:", error);
+      res.status(500).json({ message: "Failed to fetch cycle score" });
+    }
+  });
 
   app.get(`${apiPrefix}/financial/fedwatch`, async (_req, res) => {
     try {

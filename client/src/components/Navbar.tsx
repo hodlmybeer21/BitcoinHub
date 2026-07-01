@@ -67,7 +67,6 @@ const Navbar = () => {
     { href: "/", label: "Learn" },
     { href: "/analytics", label: "Analytics" },
     { href: "/cycle", label: "4-Year Cycle" },
-    { href: "/news", label: "News" },
     { href: "/web-resources", label: "Web Resources" },
     { href: "/legislation", label: "Legislation" },
   ];
@@ -192,9 +191,9 @@ const Navbar = () => {
                     Analytics
                   </span>
                 </Link>
-                <Link href="/news">
-                  <span className={`${isActiveLink('/news') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-3 py-2 text-sm font-medium cursor-pointer`}>
-                    News
+                <Link href="/cycle">
+                  <span className={`${isActiveLink('/cycle') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-3 py-2 text-sm font-medium cursor-pointer`}>
+                    4-Year Cycle
                   </span>
                 </Link>
                 <Link href="/web-resources">
