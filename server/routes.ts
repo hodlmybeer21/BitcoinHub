@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getBitcoinMarketData, getBitcoinChart, getBitcoinPrice } from "./api/cryptocompare";
 import { getLatestNews } from "./api/newsapi";
-import { getCycleState, getCycleScore } from "./api/cycle";
+import { getCycleState, getCycleScore } from "../api/cycle";
 // Twitter imports removed - now using specific HodlMyBeer integration
 import { getLatestTweets, getTrendingHashtags, getPopularAccounts, getHodlMyBeerFollowing } from "./api/social";
 

@@ -2,7 +2,7 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCycleState, getCycleScore } from '../server/api/cycle';
+import { getCycleState, getCycleScore } from './cycle';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
