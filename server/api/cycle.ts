@@ -88,30 +88,29 @@ async function loadCycleScore(): Promise<CycleScore> {
     path.resolve(process.cwd(), 'data', 'cycle-score.json'),
     path.resolve(process.cwd(), '..', 'data', 'cycle-score.json'),
   ].filter(Boolean);
-  let filePath: string | null = null;
   for (const c of candidates) {
-    try { await fs.stat(c); filePath = c; break; } catch { /* try next */ }
-  }
-  try {
-    const stat = await fs.stat(filePath);
-    if (scoreCache && scoreCache.mtime === stat.mtimeMs && scoreCache.data) {
-      return scoreCache.data;
+    try {
+      const stat = await fs.stat(c);
+      if (scoreCache && scoreCache.mtime === stat.mtimeMs && scoreCache.data) {
+        return scoreCache.data;
+      }
+      const raw = await fs.readFile(c, 'utf8');
+      const parsed = JSON.parse(raw);
+      const score: CycleScore = {
+        score: typeof parsed.score === 'number' ? parsed.score : 0,
+        label: typeof parsed.label === 'string' ? parsed.label : '',
+        notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+        updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '',
+        updatedBy: typeof parsed.updatedBy === 'string' ? parsed.updatedBy : 'owner',
+      };
+      scoreCache = { data: score, mtime: stat.mtimeMs };
+      return score;
+    } catch {
+      // try next candidate
     }
-    const raw = await fs.readFile(filePath, 'utf8');
-    const parsed = JSON.parse(raw);
-    const score: CycleScore = {
-      score: typeof parsed.score === 'number' ? parsed.score : 0,
-      label: typeof parsed.label === 'string' ? parsed.label : '',
-      notes: typeof parsed.notes === 'string' ? parsed.notes : '',
-      updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '',
-      updatedBy: typeof parsed.updatedBy === 'string' ? parsed.updatedBy : 'owner',
-    };
-    scoreCache = { data: score, mtime: stat.mtimeMs };
-    return score;
-  } catch (err) {
-    console.warn('[cycle] could not read data/cycle-score.json:', (err as Error).message);
-    return { score: 0, label: '', notes: '', updatedAt: '', updatedBy: 'owner' };
   }
+  console.warn('[cycle] no cycle-score.json candidate found, returning empty score');
+  return { score: 0, label: '', notes: '', updatedAt: '', updatedBy: 'owner' };
 }
 
 export async function getCycleScore(): Promise<CycleScore> {
