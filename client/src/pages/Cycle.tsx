@@ -69,8 +69,16 @@ const CYCLE_MILESTONES = [
   },
 ];
 
+interface CycleScore {
+  score: number;
+  label: string;
+  notes: string;
+  updatedAt: string;
+}
+
 interface CycleState {
   price: number;
+  ma200w: number;
   change24h: number;
   change7d: number | null;
   change30d: number | null;
@@ -81,6 +89,7 @@ interface CycleState {
   windowOpen: string;
   asOf: string;
   source: 'live' | 'fallback';
+  score: CycleScore;
 }
 
 const ANALYSTS = [
@@ -417,7 +426,7 @@ export default function Cycle() {
             <p className="text-muted-foreground mt-2">5-creator synthesis from the BTC Daily Pulse pipeline.</p>
           </div>
           <Badge variant="outline" className="text-xs">
-            {CYCLE_SNAPSHOT.consensus.bottomCall}/4 bottom calls active
+            {ANALYSTS.filter((a) => a.stance.toLowerCase().includes("bottom call")).length}/{ANALYSTS.length} bottom calls active
           </Badge>
         </div>
         <div className="grid md:grid-cols-2 gap-4">
