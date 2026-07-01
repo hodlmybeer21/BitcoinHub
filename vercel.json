@@ -11,6 +11,10 @@
       "dest": "/api/dca-simulator"
     },
     {
+      "src": "/api/(.*)",
+      "dest": "/api/index"
+    },
+    {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
     },
