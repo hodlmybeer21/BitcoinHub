@@ -354,8 +354,8 @@ export default function Cycle() {
             </div>
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground">
-                30-second overview: the cycle pattern, the Q4 2026 window, and what it means for accumulation.
-                Built with HyperFrames.
+                60-second overview: the cycle pattern, the Q4 2026 window, and what it means for accumulation.
+                Built with Grok Imagine.
               </p>
             </CardContent>
           </Card>
