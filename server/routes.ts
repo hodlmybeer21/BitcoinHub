@@ -840,6 +840,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fear & Greed with 90-day history — ADDED 2026-07-31
+  app.get(`${apiPrefix}/web-resources/fear-greed/history`, async (_req, res) => {
+    try {
+      const { getFearGreedWithHistory } = await import("./api/webResources");
+      const data = await getFearGreedWithHistory();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching Fear & Greed history:", error);
+      res.status(500).json({ message: "Failed to fetch Fear & Greed history" });
+    }
+  });
+
+  // BTC dominance 30-day history — ADDED 2026-07-31
+  app.get(`${apiPrefix}/bitcoin/dominance/history`, async (req, res) => {
+    try {
+      const { getDominanceHistory } = await import('./api/dominance');
+      const days = Math.min(180, Math.max(7, parseInt((req.query.days as string) || '30')));
+      const data = await getDominanceHistory(days);
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching dominance history:", error);
+      res.status(500).json({ message: "Failed to fetch dominance history" });
+    }
+  });
+
+  // Live bull-market indicator panel (Pi Cycle, Mayer, Puell, Ahr999, etc.)
+  // — ADDED 2026-07-31; computed from daily BTC closes, no paid APIs.
+  app.get(`${apiPrefix}/indicators/live`, async (_req, res) => {
+    try {
+      const { computeLiveIndicators } = await import('./api/live-indicators');
+      const data = await computeLiveIndicators();
+      res.json(data);
+    } catch (error) {
+      console.error("Error computing live indicators:", error);
+      res.status(500).json({ message: "Failed to compute live indicators" });
+    }
+  });
+
+  // Bitcoin ETF flows — best-effort free sources; returns empty data with
+  // honest "not available" message until a paid Coinglass API key is wired.
+  // ADDED 2026-07-31.
+  app.get(`${apiPrefix}/etf-flows`, async (_req, res) => {
+    try {
+      const { getETFFlowData } = await import('./api/etf-flows');
+      const data = await getETFFlowData();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching ETF flow data:", error);
+      res.status(500).json({ message: "Failed to fetch ETF flow data" });
+    }
+  });
+
+  // Stablecoin market cap + breakdown (CoinGecko category=stablecoins)
+  // — ADDED 2026-07-31. Liquidity proxy / dry-powder gauge.
+  app.get(`${apiPrefix}/stablecoin`, async (_req, res) => {
+    try {
+      const { getStablecoinMarketData } = await import('./api/stablecoin');
+      const data = await getStablecoinMarketData();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching stablecoin market data:", error);
+      res.status(500).json({ message: "Failed to fetch stablecoin market data" });
+    }
+  });
+
 
 
   app.get(`${apiPrefix}/notifications`, async (_req, res) => {

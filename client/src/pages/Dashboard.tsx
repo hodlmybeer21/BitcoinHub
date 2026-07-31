@@ -19,6 +19,9 @@ import OptionsFlowWidget from "@/components/OptionsFlowWidget";
 import AIAnalysis from "@/components/AIAnalysis";
 import FearGreedWidget from "@/components/FearGreedWidget";
 import WhaleAlertsWidget from "@/components/WhaleAlertsWidget";
+import BTCDominanceWidget from "@/components/BTCDominanceWidget";
+import StablecoinWidget from "@/components/StablecoinWidget";
+import ETFFlowsWidget from "@/components/ETFFlowsWidget";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -433,6 +436,18 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* ── Tier 1 Live Indicators (2026-07-31) ─────────────────────────────
+            Real-time dominance, stablecoin liquidity proxy, and BTC ETF flow
+            panel. All three were added in the analytics upgrade; ETF flows
+            shows a "data unavailable" state with a key-wire CTA until a
+            CoinGlass Pro key is configured.
+        */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <BTCDominanceWidget />
+          <StablecoinWidget />
+          <ETFFlowsWidget />
         </div>
 
         {/* ── Row 2: 4-column grid ─────────────────────────────────────────── */}

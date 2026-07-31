@@ -258,6 +258,63 @@ app.get("/api/funding-rates", async (_req: Request, res: Response) => {
   }
 });
 
+// ── Live indicators (Pi Cycle, Mayer, Puell proxy, Ahr999 proxy, Rainbow)
+// ADDED 2026-07-31 as part of analytics upgrade — pure math from daily closes
+app.get("/api/indicators/live", async (_req: Request, res: Response) => {
+  try {
+    const { computeLiveIndicators } = await import("../server/api/live-indicators.js");
+    const data = await computeLiveIndicators();
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ETF flows — honest empty response until paid Coinglass key wired
+app.get("/api/etf-flows", async (_req: Request, res: Response) => {
+  try {
+    const { getETFFlowData } = await import("../server/api/etf-flows.js");
+    const data = await getETFFlowData();
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message, available: false });
+  }
+});
+
+// Stablecoin market cap — CoinGecko category=stablecoins
+app.get("/api/stablecoin", async (_req: Request, res: Response) => {
+  try {
+    const { getStablecoinMarketData } = await import("../server/api/stablecoin.js");
+    const data = await getStablecoinMarketData();
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Fear & Greed with 90-day history (alternative.me)
+app.get("/api/web-resources/fear-greed/history", async (_req: Request, res: Response) => {
+  try {
+    const { getFearGreedWithHistory } = await import("../server/api/webResources.js");
+    const data = await getFearGreedWithHistory();
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// BTC dominance 30-day history (CoinGecko market_chart)
+app.get("/api/bitcoin/dominance/history", async (req: Request, res: Response) => {
+  try {
+    const { getDominanceHistory } = await import("../server/api/dominance.js");
+    const days = Math.min(180, Math.max(7, parseInt((req.query.days as string) || "30")));
+    const data = await getDominanceHistory(days);
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Fallback 404
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "not found" });

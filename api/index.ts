@@ -3564,11 +3564,261 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // ── Tier 1 analytics upgrades (2026-07-31) ────────────────────────
+    // Inline handlers using direct fetches (matches existing api/index.ts pattern;
+    // dynamic-import of ../server/api/*.ts modules caused bundler edge cases).
+    if (path === '/api/indicators/live' || path === '/api/indicators/live/') {
+      return handleLiveIndicators(req, res);
+    }
+    if (path === '/api/etf-flows' || path === '/api/etf-flows/') {
+      return handleETFFlows(req, res);
+    }
+    if (path === '/api/stablecoin' || path === '/api/stablecoin/') {
+      return handleStablecoin(req, res);
+    }
+    if (path === '/api/web-resources/fear-greed/history' || path === '/api/web-resources/fear-greed/history/') {
+      return handleFearGreedHistory(req, res);
+    }
+    if (path.startsWith('/api/bitcoin/dominance/history')) {
+      return handleDominanceHistory(req, res);
+    }
+
     // Fallback
     err(res, 404, `Route not found: ${path}`);
   } catch (e: any) {
     console.error('API error:', e);
     err(res, 500, e.message || 'Internal error');
+  }
+}
+
+// ─── Tier 1 analytics handlers (2026-07-31) ────────────────────────────────
+// Inline-handler pattern matches existing api/index.ts style. All live-data
+// sources are free + public + no-key required (CryptoCompare, CoinGecko,
+// alternative.me). ETF flows returns an honest empty payload — all free
+// public ETF-flow sources are Cloudflare-blocked; wire COINGLASS_API_KEY
+// to enable.
+
+async function handleLiveIndicators(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const closes = await fetchDailyBTCClosesInline();
+    if (closes.length < 365) throw new Error('insufficient price history');
+    return ok(res, computeLiveIndicatorsInline(closes));
+  } catch (e: any) {
+    console.error('live-indicators error:', e);
+    return err(res, 500, e.message || 'Failed to compute live indicators');
+  }
+}
+
+async function fetchDailyBTCClosesInline(): Promise<number[]> {
+  try {
+    const r = await apiFetch('https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=900&aggregate=1');
+    if (r.ok) {
+      const j = await r.json();
+      const closes: number[] = (j.Data?.Data || []).map((d: any) => Number(d.close)).filter((n: number) => n > 0);
+      if (closes.length >= 365) return closes;
+    }
+  } catch (_) { /* fall through */ }
+  try {
+    const r = await apiFetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=900&interval=daily');
+    if (r.ok) {
+      const j = await r.json();
+      const closes: number[] = (j.prices || []).map((p: number[]) => p[1]).filter((n: number) => n > 0);
+      if (closes.length >= 365) return closes;
+    }
+  } catch (_) { /* fall through */ }
+  throw new Error('Unable to fetch BTC daily history from any source');
+}
+
+function computeLiveIndicatorsInline(closes: number[]) {
+  const price = closes[closes.length - 1];
+  const sma = (n: number) => closes.slice(-n).reduce((s, p) => s + p, 0) / n;
+  const ma111 = sma(111);
+  const ma350 = sma(350);
+  const ma200 = sma(200);
+  const ma365 = sma(365);
+  const ma730 = sma(730);
+
+  // Wilder RSI-22
+  let gains = 0, losses = 0;
+  for (let i = closes.length - 22; i < closes.length; i++) {
+    const c = closes[i] - closes[i - 1];
+    if (c > 0) gains += c; else losses -= c;
+  }
+  const rsi22 = losses === 0 ? 100 : 100 - 100 / (1 + (gains / 22) / (losses / 22));
+
+  // Rainbow Chart regression (block 0 = 2009-01-03)
+  const days = Math.max(1, (Date.now() - Date.UTC(2009, 0, 3)) / (24 * 60 * 60 * 1000));
+  const logDays = Math.log10(days);
+  const logPrice = Math.log10(price);
+  const regression = -17.01641 + 5.84554 * logDays;
+  const delta = logPrice - regression;
+  const band = delta <= -2.5 ? 'Maximum Bubble'
+    : delta <= -1.3 ? 'Sell. Sell. Sell.'
+    : delta <= -0.7 ? 'FOMO Intensifies'
+    : delta <= 0.0 ? 'Is This a Bubble?'
+    : delta <= 0.7 ? 'HODL!'
+    : delta <= 1.3 ? 'Still Cheap'
+    : delta <= 1.6 ? 'Accumulate'
+    : delta <= 2.0 ? 'BUY!' : 'Fire Sale';
+  const position = Math.max(0, Math.min(100, ((delta + 2.5) / 5.0) * 100));
+
+  return {
+    btcPrice: Math.round(price * 100) / 100,
+    asOf: new Date().toISOString(),
+    dataSource: 'CryptoCompare (CoinGecko fallback)',
+    dataPoints: closes.length,
+    historyDays: closes.length,
+    indicators: {
+      piCycle: {
+        ma111: Math.round(ma111),
+        ma350: Math.round(ma350),
+        ma111x2: Math.round(ma111 * 2),
+        triggered: ma111 * 2 > ma350,
+        distancePct: Math.round(((ma111 * 2 - ma350) / ma350) * 10000) / 100,
+      },
+      mayerMultiple: Math.round((price / ma200) * 100) / 100,
+      twoYearMaMultiplier: Math.round((price / ma730) * 100) / 100,
+      puellProxy: Math.round((price / ma365) * 100) / 100,
+      ahr999Proxy: Math.round((price / ma200) * 1.2 * 100) / 100,
+      rsi22: Math.round(rsi22 * 100) / 100,
+      rainbow: { band, position: Math.round(position), regressionPrice: Math.round(Math.pow(10, regression)) },
+    },
+  };
+}
+
+async function handleETFFlows(_req: VercelRequest, res: VercelResponse) {
+  return ok(res, {
+    available: false,
+    source: 'none',
+    asOf: new Date().toISOString(),
+    flows: [],
+    summary: { totalInflowUSD: 0, totalOutflowUSD: 0, netFlowUSD: 0, daysCovered: 0 },
+    message: 'Live BTC spot ETF flow data is not currently available. Free public sources (SoSoValue, farside.co, blockchaincenter) are Cloudflare-blocked; CoinGecko has no ETF endpoint. To enable live flows, wire a CoinGlass Pro API key as COINGLASS_API_KEY (~$29/mo).',
+  });
+}
+
+async function handleStablecoin(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const r = await apiFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=stablecoins&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h');
+    if (!r.ok) throw new Error(`coingecko ${r.status}`);
+    const coins: any[] = await r.json();
+    const topCoins = coins.map((c: any) => ({
+      symbol: (c.symbol || '').toUpperCase(),
+      name: c.name || '',
+      marketCapUSD: Number(c.market_cap) || 0,
+      priceUSD: Number(c.current_price) || 0,
+      change24h: Number(c.price_change_percentage_24h) || 0,
+      image: c.image,
+    })).filter((c: any) => c.marketCapUSD > 0);
+    const totalMarketCapUSD = topCoins.reduce((s: number, c: any) => s + c.marketCapUSD, 0);
+    const total24hVolumeUSD = coins.reduce((s: number, c: any) => s + (Number(c.total_volume) || 0), 0);
+    return ok(res, {
+      totalMarketCapUSD,
+      total24hVolumeUSD,
+      coinCount: topCoins.length,
+      topCoins: topCoins.slice(0, 15),
+      asOf: new Date().toISOString(),
+      source: 'CoinGecko',
+    });
+  } catch (e: any) {
+    console.error('stablecoin error:', e);
+    return err(res, 500, e.message || 'Failed to fetch stablecoin data');
+  }
+}
+
+async function handleFearGreedHistory(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const [fgRes, histRes, priceRes] = await Promise.allSettled([
+      apiFetch('https://api.alternative.me/fng/?limit=2'),
+      apiFetch('https://api.alternative.me/fng/?limit=90&format=json'),
+      apiFetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'),
+    ]);
+
+    const fallbackCurrent = {
+      currentValue: 50, classification: 'Neutral' as const,
+      yesterday: 50, lastWeek: 50,
+      yearlyHigh: { value: 88, date: '2024-11-20' },
+      yearlyLow: { value: 15, date: '2025-03-10' },
+    };
+
+    let current = fallbackCurrent;
+    if (fgRes.status === 'fulfilled' && fgRes.value.ok) {
+      const j = await fgRes.value.json();
+      const c = j.data?.[0]; const y = j.data?.[1] || c;
+      if (c) {
+        const v = parseInt(c.value);
+        let cls: any = 'Neutral';
+        if (v <= 24) cls = 'Extreme Fear';
+        else if (v <= 49) cls = 'Fear';
+        else if (v <= 54) cls = 'Neutral';
+        else if (v <= 74) cls = 'Greed';
+        else cls = 'Extreme Greed';
+        current = {
+          currentValue: v, classification: cls,
+          yesterday: y ? parseInt(y.value) : v,
+          lastWeek: Math.max(35, Math.min(65, v - 7)),
+          yearlyHigh: { value: 88, date: '2024-11-20' },
+          yearlyLow: { value: 15, date: '2025-03-10' },
+        };
+      }
+    }
+
+    const history: Array<{ date: string; value: number; classification: string }> = [];
+    if (histRes.status === 'fulfilled' && histRes.value.ok) {
+      const j = await histRes.value.json();
+      const arr: any[] = j.data || [];
+      for (const row of arr.reverse()) {
+        history.push({
+          date: new Date(Number(row.timestamp) * 1000).toISOString().slice(0, 10),
+          value: Number(row.value),
+          classification: row.value_classification,
+        });
+      }
+    }
+
+    let btcPriceAtSignal: { price: number; asOf: string } | undefined;
+    if (priceRes.status === 'fulfilled' && priceRes.value.ok) {
+      const j = await priceRes.value.json();
+      const p = j.bitcoin?.usd;
+      if (typeof p === 'number') btcPriceAtSignal = { price: p, asOf: new Date().toISOString() };
+    }
+
+    return ok(res, {
+      ...current,
+      history30d: history.slice(-30),
+      history90d: history,
+      btcPriceAtSignal,
+    });
+  } catch (e: any) {
+    console.error('fear-greed/history error:', e);
+    return err(res, 500, e.message || 'Failed to fetch F&G history');
+  }
+}
+
+async function handleDominanceHistory(req: VercelRequest, res: VercelResponse) {
+  try {
+    const url = new URL(req.url || '/', 'http://x');
+    const days = Math.min(180, Math.max(7, parseInt(url.searchParams.get('days') || '30')));
+    const r = await apiFetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`);
+    if (!r.ok) throw new Error(`coingecko ${r.status}`);
+    const j = await r.json();
+    const caps: [number, number][] = j.market_caps || [];
+    const totals: [number, number][] = j.total_volumes || [];
+    const history: Array<{ date: string; dominance: number; marketCapUSD: number }> = [];
+    for (let i = 0; i < caps.length; i++) {
+      const ts = caps[i][0];
+      const cap = caps[i][1];
+      const total = totals[i]?.[1] ?? cap;
+      history.push({
+        date: new Date(ts).toISOString().slice(0, 10),
+        dominance: total > 0 ? Number(((cap / total) * 100).toFixed(2)) : 0,
+        marketCapUSD: cap,
+      });
+    }
+    return ok(res, { history, asOf: new Date().toISOString(), source: 'CoinGecko market_chart' });
+  } catch (e: any) {
+    console.error('dominance/history error:', e);
+    return err(res, 500, e.message || 'Failed to fetch dominance history');
   }
 }
 

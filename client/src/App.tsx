@@ -32,6 +32,7 @@ function Router() {
         <Route path="/learn" component={Learn} />
         <Route path="/games" component={Learn} />
         <Route path="/analytics" component={Dashboard} />
+        <Route path="/analytics/cockpit" component={TradingCockpit} />
         <Route path="/news">{() => <Redirect to="/cycle" />}</Route>
         <Route path="/web-resources" component={WebResources} />
         <Route path="/legislation" component={Legislation} />

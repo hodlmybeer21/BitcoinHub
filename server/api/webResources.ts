@@ -33,7 +33,7 @@ export interface FearGreedData {
 }
 
 // Cache for Web Resources data
-let fearGreedCache: { data: FearGreedData; timestamp: number } | null = null; // Clear cache for fresh data
+let fearGreedCache: { data: FearGreedData; timestamp: number } | null = null;
 let piCycleCache: { data: PiCycleData; timestamp: number } | null = null;
 let liquidationCache: { data: LiquidationData; timestamp: number } | null = null;
 
@@ -44,60 +44,49 @@ function isCacheValid(cache: any, maxAgeMs: number): boolean {
 // M2 Money Supply vs Bitcoin correlation data
 export async function getM2ChartData(): Promise<M2ChartData> {
   try {
-    // Fetch current Bitcoin price from CoinGecko
     const btcResponse = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
     const btcPrice = btcResponse.data.bitcoin.usd;
-
-    // M2 Money Supply data would typically come from FRED API or financial data providers
-    // For now, using realistic values based on current economic data
     return {
-      btcPrice: btcPrice,
-      m2Growth: 18.5, // Current M2 Growth percentage from Federal Reserve data
+      btcPrice,
+      m2Growth: 18.5,
       date: new Date().toISOString().split('T')[0],
-      correlation: 'Strong Positive'
+      correlation: 'Strong Positive',
     };
   } catch (error) {
     console.error('Error fetching M2 chart data:', error);
-    // Return realistic fallback data
     return {
       btcPrice: 109800,
       m2Growth: 18.5,
       date: new Date().toISOString().split('T')[0],
-      correlation: 'Strong Positive'
+      correlation: 'Strong Positive',
     };
   }
 }
 
 // Binance liquidation heatmap data
 export async function getLiquidationData(): Promise<LiquidationData> {
-  if (isCacheValid(liquidationCache, 2 * 60 * 1000)) { // 2-minute cache
+  if (isCacheValid(liquidationCache, 2 * 60 * 1000)) {
     return liquidationCache!.data;
   }
 
   try {
-    // Get current Bitcoin price for calculating liquidation zones
     const btcResponse = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
     const currentPrice = btcResponse.data.bitcoin.usd;
 
-    // Calculate realistic liquidation zones based on current price
-    const highRiskMin = Math.round(currentPrice * 0.95); // 5% below current
-    const highRiskMax = Math.round(currentPrice * 0.97); // 3% below current
-    const supportMin = Math.round(currentPrice * 1.01); // 1% above current
-    const supportMax = Math.round(currentPrice * 1.03); // 3% above current
+    const highRiskMin = Math.round(currentPrice * 0.95);
+    const highRiskMax = Math.round(currentPrice * 0.97);
+    const supportMin = Math.round(currentPrice * 1.01);
+    const supportMax = Math.round(currentPrice * 1.03);
 
     const liquidationData: LiquidationData = {
       liquidationLevel: 0.85,
       liquidityThreshold: 0.85,
       highRiskZone: { min: highRiskMin, max: highRiskMax },
       supportZone: { min: supportMin, max: supportMax },
-      timeframe: '24h'
+      timeframe: '24h',
     };
 
-    liquidationCache = {
-      data: liquidationData,
-      timestamp: Date.now()
-    };
-
+    liquidationCache = { data: liquidationData, timestamp: Date.now() };
     return liquidationData;
   } catch (error) {
     console.error('Error fetching liquidation data:', error);
@@ -106,55 +95,43 @@ export async function getLiquidationData(): Promise<LiquidationData> {
       liquidityThreshold: 0.85,
       highRiskZone: { min: 104000, max: 106000 },
       supportZone: { min: 108000, max: 110000 },
-      timeframe: '24h'
+      timeframe: '24h',
     };
   }
 }
 
-// Pi Cycle Top Indicator data
+// ── Pi Cycle Top Indicator — FIXED 2026-07-31 ──────────────────────────────
+// Bug (pre-fix): price350DMA was returned as `350DMA * 2`, which made the
+// cross-status comparison meaningless. The Pi Cycle trigger is
+// `(111DMA × 2) > 350DMA`. Fields are now raw averages; the trigger is
+// exposed via crossStatus.
 export async function getPiCycleData(): Promise<PiCycleData> {
-  if (isCacheValid(piCycleCache, 60 * 60 * 1000)) { // 1-hour cache
+  if (isCacheValid(piCycleCache, 60 * 60 * 1000)) {
     return piCycleCache!.data;
   }
 
   try {
-    // Fetch Bitcoin price data for calculating moving averages
-    // Using CoinGecko's market_chart endpoint for historical data
     const daysData = await axios.get('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart', {
-      params: {
-        vs_currency: 'usd',
-        days: '365', // Get enough data for 350-day MA
-        interval: 'daily'
-      }
+      params: { vs_currency: 'usd', days: '500', interval: 'daily' },
+      timeout: 12000,
     });
 
-    const prices = daysData.data.prices.map((item: [number, number]) => item[1]);
-    
-    // Calculate 111-day and 350-day moving averages
-    const calculate111DMA = (prices: number[]) => {
-      if (prices.length < 111) return prices[prices.length - 1];
-      const last111 = prices.slice(-111);
-      return last111.reduce((sum, price) => sum + price, 0) / 111;
+    const prices: number[] = (daysData.data.prices || []).map((p: [number, number]) => p[1]);
+
+    const calcMA = (period: number): number => {
+      if (prices.length < period) return prices[prices.length - 1] ?? 0;
+      const slice = prices.slice(-period);
+      return slice.reduce((s, p) => s + p, 0) / period;
     };
 
-    const calculate350DMA = (prices: number[]) => {
-      if (prices.length < 350) return prices[prices.length - 1] * 0.5; // Rough estimate
-      const last350 = prices.slice(-350);
-      return (last350.reduce((sum, price) => sum + price, 0) / 350) * 2; // Pi Cycle uses 350DMA × 2
-    };
+    const price111DMA = Math.round(calcMA(111));
+    const price350DMA = Math.round(calcMA(350));
+    const trigger111x2 = Math.round(price111DMA * 2);
 
-    const price111DMA = Math.round(calculate111DMA(prices));
-    const price350DMA = Math.round(calculate350DMA(prices));
-
-    // Determine cross status
     let crossStatus: 'Below' | 'Above' | 'Crossing' = 'Below';
-    if (price111DMA > price350DMA) {
-      crossStatus = 'Above';
-    } else if (Math.abs(price111DMA - price350DMA) / price350DMA < 0.01) {
-      crossStatus = 'Crossing';
-    }
+    if (trigger111x2 > price350DMA) crossStatus = 'Above';
+    else if (Math.abs(trigger111x2 - price350DMA) / price350DMA < 0.005) crossStatus = 'Crossing';
 
-    // Determine cycle phase based on cross status and price trends
     const cyclePhase = crossStatus === 'Above' ? 'Distribution' : 'Bullish';
 
     const piCycleData: PiCycleData = {
@@ -162,14 +139,10 @@ export async function getPiCycleData(): Promise<PiCycleData> {
       price350DMA,
       crossStatus,
       cyclePhase,
-      lastCrossDate: '2021-04-14' // Historical cross date
+      lastCrossDate: '2021-04-14',
     };
 
-    piCycleCache = {
-      data: piCycleData,
-      timestamp: Date.now()
-    };
-
+    piCycleCache = { data: piCycleData, timestamp: Date.now() };
     return piCycleData;
   } catch (error) {
     console.error('Error fetching Pi Cycle data:', error);
@@ -178,27 +151,23 @@ export async function getPiCycleData(): Promise<PiCycleData> {
       price350DMA: 52000,
       crossStatus: 'Below',
       cyclePhase: 'Bullish',
-      lastCrossDate: '2021-04-14'
+      lastCrossDate: '2021-04-14',
     };
   }
 }
 
-// Fear and Greed Index data
+// ── Fear & Greed Index — current snapshot ──────────────────────────────────
 export async function getFearGreedData(): Promise<FearGreedData> {
-  if (isCacheValid(fearGreedCache, 5 * 60 * 1000)) { // 5-minute cache for live updates
+  if (isCacheValid(fearGreedCache, 5 * 60 * 1000)) {
     return fearGreedCache!.data;
   }
 
   try {
-    // Try multiple authentic data sources for CoinMarketCap-compatible Fear & Greed Index
     console.log('Fetching authentic Fear and Greed Index from verified sources...');
-    
-    // First try alternative.me (original Fear & Greed Index)
+
     const altResponse = await axios.get('https://api.alternative.me/fng/?limit=2', {
       timeout: 5000,
-      headers: {
-        'User-Agent': 'BitcoinHub-FearGreedIndex/1.0'
-      }
+      headers: { 'User-Agent': 'BitcoinHub-FearGreedIndex/1.0' },
     });
 
     if (altResponse.data && altResponse.data.data && altResponse.data.data.length > 0) {
@@ -208,7 +177,6 @@ export async function getFearGreedData(): Promise<FearGreedData> {
       const currentValue = parseInt(currentData.value);
       const yesterdayValue = parseInt(yesterdayData.value);
 
-      // Use live API data with CMC/Binance-compatible classification system
       let classification: 'Extreme Fear' | 'Fear' | 'Neutral' | 'Greed' | 'Extreme Greed';
       if (currentValue <= 24) classification = 'Extreme Fear';
       else if (currentValue <= 49) classification = 'Fear';
@@ -220,42 +188,105 @@ export async function getFearGreedData(): Promise<FearGreedData> {
         currentValue,
         classification,
         yesterday: yesterdayValue,
-        lastWeek: Math.max(35, Math.min(65, currentValue - (Math.random() * 15 - 7))), // Realistic variation
-        yearlyHigh: { value: 88, date: '2024-11-20' }, // CMC historical data
-        yearlyLow: { value: 15, date: '2025-03-10' } // CMC historical data
+        lastWeek: Math.max(35, Math.min(65, currentValue - (Math.random() * 15 - 7))),
+        yearlyHigh: { value: 88, date: '2024-11-20' },
+        yearlyLow: { value: 15, date: '2025-03-10' },
       };
 
       console.log(`Live Fear & Greed Index: ${currentValue} (${classification}) - from alternative.me API`);
 
-      fearGreedCache = {
-        data: fearGreedData,
-        timestamp: Date.now()
-      };
-
+      fearGreedCache = { data: fearGreedData, timestamp: Date.now() };
       return fearGreedData;
     }
 
     throw new Error('Unable to fetch from alternative.me API');
-
   } catch (error) {
     console.error('Error fetching Fear and Greed Index from API:', error);
 
-    // Use CoinMarketCap verified values as fallback (67 Greed matching CMC/Binance)
-    console.log('Using CoinMarketCap verified market values as fallback...');
     const fearGreedData: FearGreedData = {
-      currentValue: 67, // Current CMC/Binance value
-      classification: 'Greed',
-      yesterday: 58, // Yesterday's CMC/Binance value
-      lastWeek: 55, // Last week's CMC/Binance value
-      yearlyHigh: { value: 88, date: '2024-11-20' }, // CMC historical high
-      yearlyLow: { value: 15, date: '2025-03-10' } // CMC historical low
+      currentValue: 50,
+      classification: 'Neutral',
+      yesterday: 50,
+      lastWeek: 50,
+      yearlyHigh: { value: 88, date: '2024-11-20' },
+      yearlyLow: { value: 15, date: '2025-03-10' },
     };
 
-    fearGreedCache = {
-      data: fearGreedData,
-      timestamp: Date.now()
-    };
-
+    fearGreedCache = { data: fearGreedData, timestamp: Date.now() };
     return fearGreedData;
   }
+}
+
+// ── Fear & Greed with 90-day history — ADDED 2026-07-31 ────────────────────
+// Free, no key. Fetches 90 days of F&G values from alternative.me plus
+// current BTC price for context. UI uses this to render a sparkline.
+export interface FearGreedHistoryPoint {
+  date: string;       // YYYY-MM-DD
+  value: number;
+  classification: string;
+}
+
+export interface FearGreedWithHistory extends FearGreedData {
+  history30d?: FearGreedHistoryPoint[];
+  history90d?: FearGreedHistoryPoint[];
+  btcPriceAtSignal?: { price: number; asOf: string };
+}
+
+let fngHistoryCache: { fetchedAt: number; data: FearGreedWithHistory } | null = null;
+const FNG_HISTORY_CACHE_MS = 15 * 60 * 1000;
+
+export async function getFearGreedWithHistory(): Promise<FearGreedWithHistory> {
+  if (fngHistoryCache && Date.now() - fngHistoryCache.fetchedAt < FNG_HISTORY_CACHE_MS) {
+    return fngHistoryCache.data;
+  }
+
+  const [current, historyRes, priceRes] = await Promise.allSettled([
+    getFearGreedData(),
+    axios.get('https://api.alternative.me/fng/?limit=90&format=json', {
+      timeout: 10000,
+      headers: { 'User-Agent': 'BitcoinHub-FNG/1.0' },
+    }),
+    axios.get('https://api.coingecko.com/api/v3/simple/price', {
+      params: { ids: 'bitcoin', vs_currencies: 'usd' },
+      timeout: 8000,
+      headers: { 'User-Agent': 'BitcoinHub-FNG/1.0' },
+    }),
+  ]);
+
+  const history: FearGreedHistoryPoint[] = [];
+  if (historyRes.status === 'fulfilled') {
+    const arr: any[] = historyRes.value.data?.data || [];
+    for (const row of arr.reverse()) {
+      history.push({
+        date: new Date(Number(row.timestamp) * 1000).toISOString().slice(0, 10),
+        value: Number(row.value),
+        classification: row.value_classification,
+      });
+    }
+  }
+
+  let btcPriceAtSignal: { price: number; asOf: string } | undefined;
+  if (priceRes.status === 'fulfilled') {
+    const p = priceRes.value.data?.bitcoin?.usd;
+    if (typeof p === 'number') btcPriceAtSignal = { price: p, asOf: new Date().toISOString() };
+  }
+
+  const fallbackCurrent: FearGreedData = {
+    currentValue: 50,
+    classification: 'Neutral',
+    yesterday: 50,
+    lastWeek: 50,
+    yearlyHigh: { value: 88, date: '2024-11-20' },
+    yearlyLow: { value: 15, date: '2025-03-10' },
+  };
+
+  const data: FearGreedWithHistory = {
+    ...(current.status === 'fulfilled' ? current.value : fallbackCurrent),
+    history30d: history.slice(-30),
+    history90d: history,
+    btcPriceAtSignal,
+  };
+
+  fngHistoryCache = { fetchedAt: Date.now(), data };
+  return data;
 }
