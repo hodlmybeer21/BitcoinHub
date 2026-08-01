@@ -402,9 +402,95 @@ function StackSatsAlert() {
 }
 
 export default function LiquidityTracker() {
-  const { data, isLoading, error } = useQuery<LiquidityData>({
+  // The /api/liquidity endpoint returns a sparse payload:
+  //   indicators: Record<string, { value, label, unit, change }>
+  //   derivedMetrics: { moneySupplyGrowth, liquidityConditions, rrpNote }
+  //   bitcoinOverlay: { m2ToBtcRatio }
+  //   anomalies: []
+  // The component below was written for a richer FRED-style payload
+  // (full LiquidityIndicator objects with historicalPeak, momChangePercent,
+  // bitcoinOverlay.btc24hChange, etc.). The select() below adapts the real
+  // API response to that expected shape so the rendering code stays as-is
+  // and doesn't throw "Cannot read properties of undefined (reading 'toFixed')".
+  const { data, isLoading, error } = useQuery<any, Error, LiquidityData>({
     queryKey: ['/api/liquidity'],
-    refetchInterval: 10 * 60 * 1000
+    refetchInterval: 10 * 60 * 1000,
+    select: (raw: any): LiquidityData => {
+      const now = new Date().toISOString();
+      const rawIndicators = (raw?.indicators && typeof raw.indicators === 'object' && !Array.isArray(raw.indicators))
+        ? raw.indicators
+        : {};
+      const indicators: LiquidityIndicator[] = Object.entries(rawIndicators).map(([key, v]: [string, any]) => {
+        const value = Number(v?.value ?? 0);
+        const change = Number(v?.change ?? 0);
+        const isCore = key === 'm2' || key === 'fedBalance';
+        const category = isCore ? 'core' : (key === 'rrp' ? 'policy' : 'velocity');
+        return {
+          seriesId: key,
+          name: v?.label || key.toUpperCase(),
+          shortName: key.toUpperCase(),
+          value,
+          displayValue: String(value),
+          previousValue: value,
+          yoyChange: change,
+          yoyChangePercent: change,
+          date: raw?.lastUpdated || now,
+          frequency: 'Daily',
+          unit: v?.unit || '',
+          rawUnit: 'billions',
+          description: v?.label || key,
+          isAnomaly: false,
+          anomalyThreshold: 0,
+          category: category as LiquidityIndicator['category'],
+        };
+      });
+      const derivedMetrics: DerivedMetric[] = (() => {
+        const list: DerivedMetric[] = [];
+        if (raw?.derivedMetrics?.moneySupplyGrowth != null) {
+          list.push({
+            id: 'm2Growth',
+            name: 'M2 Money Supply Growth',
+            shortName: 'M2 Growth',
+            value: Number(raw.derivedMetrics.moneySupplyGrowth),
+            displayValue: `${Number(raw.derivedMetrics.moneySupplyGrowth).toFixed(2)}%`,
+            description: 'Year-over-year change in M2 money supply.',
+            isAnomaly: false,
+            anomalyThreshold: 2,
+            formula: 'M2 YoY %',
+          });
+        }
+        return list;
+      })();
+      const overlay: BitcoinOverlay | null = (() => {
+        if (raw?.bitcoinOverlay?.m2ToBtcRatio == null) return null;
+        const ratio = Number(raw.bitcoinOverlay.m2ToBtcRatio);
+        return {
+          btcPrice: 0,
+          btcPriceFormatted: '—',
+          btc24hChange: 0,
+          m2BtcRatio: ratio,
+          m2BtcRatioFormatted: ratio.toExponential(2),
+          m2BtcHistoricalAvg: ratio,
+          isDebasementSignal: false,
+          debasementMessage: '',
+        };
+      })();
+      const anomalies: LiquidityIndicator[] = Array.isArray(raw?.anomalies) ? raw.anomalies : [];
+      return {
+        indicators,
+        derivedMetrics,
+        bitcoinOverlay: overlay,
+        anomalies,
+        summary: {
+          totalIndicators: indicators.length,
+          anomalyCount: anomalies.length,
+          overallSignal: (raw?.summary?.overallSignal || 'neutral') as 'bullish' | 'bearish' | 'neutral',
+          signalReasons: [],
+          stackSatsAlert: false,
+          lastUpdated: raw?.lastUpdated || now,
+        },
+      };
+    },
   });
 
   if (isLoading) {
