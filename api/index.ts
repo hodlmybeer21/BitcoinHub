@@ -3588,6 +3588,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path.startsWith('/api/bitcoin/dominance/history')) {
       return handleDominanceHistory(req, res);
     }
+    if (path === '/api/cron/refresh-btc-history' || path === '/api/cron/refresh-btc-history/') {
+      return handleCronRefreshBTCHistory(req, res);
+    }
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);
@@ -3615,24 +3618,80 @@ async function handleLiveIndicators(_req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// ── Module-level BTC daily history cache ──────────────────────────────────
+// Persists across warm Vercel invocations. Pre-warmed by cron every hour
+// (see /api/cron/refresh-btc-history + vercel.json crons). 1-hour TTL means
+// stale cache falls through to a fresh fetch.
+const BTC_HISTORY_CACHE: { closes: number[] | null; fetchedAt: number; source: string } = {
+  closes: null,
+  fetchedAt: 0,
+  source: '',
+};
+const BTC_HISTORY_TTL_MS = 60 * 60 * 1000;
+
 async function fetchDailyBTCClosesInline(days = 900): Promise<number[]> {
+  // Check module-level cache (survives warm invocations, pre-warmed by cron)
+  if (BTC_HISTORY_CACHE.closes &&
+      BTC_HISTORY_CACHE.closes.length >= 365 &&
+      Date.now() - BTC_HISTORY_CACHE.fetchedAt < BTC_HISTORY_TTL_MS) {
+    return BTC_HISTORY_CACHE.closes;
+  }
+
+  // Bumped timeout to 20s for cold-start fetches (Vercel edge → external APIs)
+  const fetchOpts: RequestInit = { signal: AbortSignal.timeout(20000) };
+
   try {
-    const r = await apiFetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=${days}&aggregate=1`);
+    const r = await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=${days}&aggregate=1`, fetchOpts);
     if (r.ok) {
       const j = await r.json();
       const closes: number[] = (j.Data?.Data || []).map((d: any) => Number(d.close)).filter((n: number) => n > 0);
-      if (closes.length >= 365) return closes;
+      if (closes.length >= 365) {
+        BTC_HISTORY_CACHE.closes = closes;
+        BTC_HISTORY_CACHE.fetchedAt = Date.now();
+        BTC_HISTORY_CACHE.source = 'CryptoCompare';
+        return closes;
+      }
     }
   } catch (_) { /* fall through */ }
+
   try {
-    const r = await apiFetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`);
+    const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`, fetchOpts);
     if (r.ok) {
       const j = await r.json();
       const closes: number[] = (j.prices || []).map((p: number[]) => p[1]).filter((n: number) => n > 0);
-      if (closes.length >= 365) return closes;
+      if (closes.length >= 365) {
+        BTC_HISTORY_CACHE.closes = closes;
+        BTC_HISTORY_CACHE.fetchedAt = Date.now();
+        BTC_HISTORY_CACHE.source = 'CoinGecko';
+        return closes;
+      }
     }
   } catch (_) { /* fall through */ }
+
   throw new Error('Unable to fetch BTC daily history from any source');
+}
+
+// ── Cron handler: refreshes BTC history cache ─────────────────────────────
+// Called by Vercel cron every hour (see vercel.json). Returns 200 even on
+// failure so cron doesn't retry-storm.
+async function handleCronRefreshBTCHistory(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const closes = await fetchDailyBTCClosesInline(900);
+    return ok(res, {
+      ok: true,
+      dataPoints: closes.length,
+      source: BTC_HISTORY_CACHE.source,
+      cachedAt: new Date(BTC_HISTORY_CACHE.fetchedAt).toISOString(),
+      ttlMs: BTC_HISTORY_TTL_MS,
+    });
+  } catch (e: any) {
+    console.error('[cron] refresh-btc-history failed:', e.message);
+    return ok(res, {
+      ok: false,
+      error: e.message,
+      cachedAt: BTC_HISTORY_CACHE.closes ? new Date(BTC_HISTORY_CACHE.fetchedAt).toISOString() : null,
+    });
+  }
 }
 
 function computeLiveIndicatorsInline(closes: number[]) {
