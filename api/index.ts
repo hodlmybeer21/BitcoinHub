@@ -3619,9 +3619,17 @@ async function handleLiveIndicators(_req: VercelRequest, res: VercelResponse) {
 }
 
 // ── Module-level BTC daily history cache ──────────────────────────────────
-// Persists across warm Vercel invocations. Pre-warmed by cron every hour
-// (see /api/cron/refresh-btc-history + vercel.json crons). 1-hour TTL means
-// stale cache falls through to a fresh fetch.
+// Persists across warm Vercel invocations. Pre-warmed by cron (see
+// /api/cron/refresh-btc-history + vercel.json crons). 1-hour TTL means stale
+// cache falls through to a fresh fetch.
+//
+// Source priority (2026-08-01 update): CryptoCompare retired its free tier ~2024
+// (now requires API key) and CoinGecko tightened its free historical range to
+// ≤365 days. Coinbase Exchange public candles is the new primary — free, no
+// key, full BTC-USD history back to ~2015. CoinGecko stays as a fallback for
+// short windows (≤365d) when Coinbase 5xxs; CryptoCompare is gated behind an
+// optional CRYPTOCOMPARE_API_KEY env var so it doesn't waste a 20s timeout on
+// a guaranteed 401.
 const BTC_HISTORY_CACHE: { closes: number[] | null; fetchedAt: number; source: string } = {
   closes: null,
   fetchedAt: 0,
@@ -3630,45 +3638,147 @@ const BTC_HISTORY_CACHE: { closes: number[] | null; fetchedAt: number; source: s
 const BTC_HISTORY_TTL_MS = 60 * 60 * 1000;
 
 async function fetchDailyBTCClosesInline(days = 900): Promise<number[]> {
-  // Check module-level cache (survives warm invocations, pre-warmed by cron)
+  // Always maintain a canonical 900-day window in the cache so callers with
+  // different `days` requirements (pi-cycle=450, bull-market=800, cron=900)
+  // get consistent results. Earlier versions only required the cache to have
+  // ≥365 closes, which let a 450-close cache satisfy an 800-day request and
+  // caused bull-market-signals to fail with "insufficient history for 730DMA"
+  // even when Coinbase pagination was working perfectly.
+  const FULL_DAYS = 900;
+
   if (BTC_HISTORY_CACHE.closes &&
-      BTC_HISTORY_CACHE.closes.length >= 365 &&
+      BTC_HISTORY_CACHE.closes.length >= FULL_DAYS &&
       Date.now() - BTC_HISTORY_CACHE.fetchedAt < BTC_HISTORY_TTL_MS) {
-    return BTC_HISTORY_CACHE.closes;
+    return BTC_HISTORY_CACHE.closes.slice(-days);
   }
 
-  // Bumped timeout to 20s for cold-start fetches (Vercel edge → external APIs)
-  const fetchOpts: RequestInit = { signal: AbortSignal.timeout(20000) };
+  // 20s timeout for cold-start fetches (Vercel edge → external APIs).
+  // User-Agent is sent defensively — some free APIs throttle/block default
+  // Node UAs (CoinGecko confirmed this in 2026-07 prod logs).
+  const fetchOpts: RequestInit = {
+    signal: AbortSignal.timeout(20000),
+    headers: { 'User-Agent': 'BitcoinHub/1.0 (+https://bitcoinhub.goodbotai.tech)' },
+  };
 
+  // Primary: Coinbase Exchange candles — free, no key, full BTC-USD history
+  // back to ~2015. Always fetch FULL_DAYS so the canonical cache stays
+  // complete regardless of which caller triggered the fetch.
   try {
-    const r = await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=${days}&aggregate=1`, fetchOpts);
-    if (r.ok) {
-      const j = await r.json();
-      const closes: number[] = (j.Data?.Data || []).map((d: any) => Number(d.close)).filter((n: number) => n > 0);
-      if (closes.length >= 365) {
-        BTC_HISTORY_CACHE.closes = closes;
-        BTC_HISTORY_CACHE.fetchedAt = Date.now();
-        BTC_HISTORY_CACHE.source = 'CryptoCompare';
-        return closes;
-      }
+    const closes = await fetchFromCoinbase(FULL_DAYS, fetchOpts);
+    if (closes.length >= FULL_DAYS * 0.95) {
+      BTC_HISTORY_CACHE.closes = closes;
+      BTC_HISTORY_CACHE.fetchedAt = Date.now();
+      BTC_HISTORY_CACHE.source = 'Coinbase Exchange';
+      return closes.slice(-days);
     }
   } catch (_) { /* fall through */ }
 
-  try {
-    const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`, fetchOpts);
-    if (r.ok) {
-      const j = await r.json();
-      const closes: number[] = (j.prices || []).map((p: number[]) => p[1]).filter((n: number) => n > 0);
-      if (closes.length >= 365) {
-        BTC_HISTORY_CACHE.closes = closes;
-        BTC_HISTORY_CACHE.fetchedAt = Date.now();
-        BTC_HISTORY_CACHE.source = 'CoinGecko';
-        return closes;
+  // Optional: CryptoCompare — only fires if CRYPTOCOMPARE_API_KEY is set in
+  // Vercel env. Free tier was retired ~2024; gated so the silent 401 path
+  // doesn't waste a 20s timeout on every cold start.
+  if (process.env.CRYPTOCOMPARE_API_KEY) {
+    try {
+      const r = await fetch(
+        `https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=${FULL_DAYS}&aggregate=1&api_key=${process.env.CRYPTOCOMPARE_API_KEY}`,
+        fetchOpts,
+      );
+      if (r.ok) {
+        const j = await r.json();
+        const closes: number[] = (j.Data?.Data || []).map((d: any) => Number(d.close)).filter((n: number) => n > 0);
+        if (closes.length >= FULL_DAYS * 0.95) {
+          BTC_HISTORY_CACHE.closes = closes;
+          BTC_HISTORY_CACHE.fetchedAt = Date.now();
+          BTC_HISTORY_CACHE.source = 'CryptoCompare';
+          return closes.slice(-days);
+        }
       }
-    }
-  } catch (_) { /* fall through */ }
+    } catch (_) { /* fall through */ }
+  }
+
+  // Fallback: CoinGecko market_chart. Free tier caps at 365 days, so this
+  // can never satisfy a 900-day request — only useful when both primary
+  // sources are completely down AND a caller needs ≤365 closes.
+  if (days <= 365) {
+    try {
+      const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`, fetchOpts);
+      if (r.ok) {
+        const j = await r.json();
+        const closes: number[] = (j.prices || []).map((p: number[]) => p[1]).filter((n: number) => n > 0);
+        if (closes.length >= 365) {
+          BTC_HISTORY_CACHE.closes = closes;
+          BTC_HISTORY_CACHE.fetchedAt = Date.now();
+          BTC_HISTORY_CACHE.source = 'CoinGecko';
+          return closes;
+        }
+      }
+    } catch (_) { /* fall through */ }
+  }
 
   throw new Error('Unable to fetch BTC daily history from any source');
+}
+
+// Coinbase Exchange candles: rows are [time, low, high, open, close, volume],
+// newest-first. Walk backwards via `end` pagination (300 candles per request,
+// 1-day granularity). BTC-USD history on this endpoint reaches back to
+// ~2015-01-01 — plenty for the 900-day window. Returns oldest-first
+// (chronological) to match what callers expect.
+async function fetchFromCoinbase(days: number, fetchOpts: RequestInit): Promise<number[]> {
+  // Coinbase Exchange candles: free, no key, full BTC-USD history.
+  //
+  // Pagination quirks discovered 2026-08-01:
+  //   1. granularity=86400 caps at 300 candles per request — exceeding that
+  //      returns HTTP 400 "granularity too small for the requested time
+  //      range". We use 290-day pages as a safety margin.
+  //   2. BOTH `start` AND `end` must be set explicitly — passing only one
+  //      silently returns the last ~350 candles, which broke an earlier
+  //      end-only pagination loop (every page fetched the same window).
+  //   3. From some edge IPs the response can be truncated (e.g. 150 candles
+  //      instead of 290) under soft throttling. We compensate by walking
+  //      based on the OLDEST returned candle's timestamp (not the requested
+  //      window boundary), so a partial response never traps the loop.
+  //   4. Coinbase occasionally returns the same window twice when paginating
+  //      fast — the no-progress guard catches that.
+  const granularity = 86400;
+  const daySec = 86400;
+  const pageSpan = 290 * daySec; // safety margin under Coinbase's 300 cap
+  const nowSec = Math.floor(Date.now() / 1000);
+  // Earliest Coinbase BTC-USD candle (Jan 1, 2015). Don't query before this.
+  const earliestSec = 1420070400;
+  const closes: number[] = [];
+  let windowStart = nowSec - pageSpan; // initial: (now - 290d) → now
+  const maxPages = Math.ceil(days / 290) + 4; // generous upper bound
+  for (let page = 0; page < maxPages && closes.length < days; page++) {
+    const windowEnd = windowStart + pageSpan - 1;
+    const url = `https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${granularity}&start=${windowStart}&end=${windowEnd}`;
+    const r = await fetch(url, fetchOpts);
+    if (!r.ok) throw new Error(`Coinbase ${r.status}`);
+    const candles: number[][] = await r.json();
+    if (!Array.isArray(candles) || candles.length === 0) break;
+    // Coinbase returns candles newest-first within each window. Push closes
+    // in arrival order (newest→oldest); final reverse() gives oldest→newest.
+    const beforeLen = closes.length;
+    for (const c of candles) {
+      const close = Number(c[4]);
+      if (close > 0) closes.push(close);
+      if (closes.length >= days) break;
+    }
+    const newestTime = candles[0][0];
+    const oldestTime = candles[candles.length - 1][0];
+    // No progress guard: if Coinbase returned the same window twice (observed
+    // when paginating without proper start/end), bail out.
+    if (oldestTime >= newestTime) break;
+    // Walk by oldest returned candle, not by requested window. This means
+    // partial responses still advance the pagination correctly.
+    const nextStart = oldestTime - daySec;
+    if (nextStart >= windowStart) break; // no forward progress
+    if (nextStart < earliestSec) {
+      windowStart = earliestSec;
+    } else {
+      windowStart = nextStart;
+    }
+    if (closes.length === beforeLen) break; // got candles but all filtered
+  }
+  return closes.reverse();
 }
 
 // ── Cron handler: refreshes BTC history cache ─────────────────────────────
