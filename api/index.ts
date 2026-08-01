@@ -3570,6 +3570,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/indicators/live' || path === '/api/indicators/live/') {
       return handleLiveIndicators(req, res);
     }
+    if (path === '/api/indicators/bull-market-signals' || path === '/api/indicators/bull-market-signals/') {
+      return handleBullMarketIndicators(req, res);
+    }
     if (path === '/api/etf-flows' || path === '/api/etf-flows/') {
       return handleETFFlows(req, res);
     }
@@ -3578,6 +3581,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (path === '/api/web-resources/fear-greed/history' || path === '/api/web-resources/fear-greed/history/') {
       return handleFearGreedHistory(req, res);
+    }
+    if (path === '/api/web-resources/pi-cycle' || path === '/api/web-resources/pi-cycle/') {
+      return handlePiCycle(req, res);
     }
     if (path.startsWith('/api/bitcoin/dominance/history')) {
       return handleDominanceHistory(req, res);
@@ -3609,9 +3615,9 @@ async function handleLiveIndicators(_req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function fetchDailyBTCClosesInline(): Promise<number[]> {
+async function fetchDailyBTCClosesInline(days = 900): Promise<number[]> {
   try {
-    const r = await apiFetch('https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=900&aggregate=1');
+    const r = await apiFetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=${days}&aggregate=1`);
     if (r.ok) {
       const j = await r.json();
       const closes: number[] = (j.Data?.Data || []).map((d: any) => Number(d.close)).filter((n: number) => n > 0);
@@ -3619,7 +3625,7 @@ async function fetchDailyBTCClosesInline(): Promise<number[]> {
     }
   } catch (_) { /* fall through */ }
   try {
-    const r = await apiFetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=900&interval=daily');
+    const r = await apiFetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`);
     if (r.ok) {
       const j = await r.json();
       const closes: number[] = (j.prices || []).map((p: number[]) => p[1]).filter((n: number) => n > 0);
@@ -3799,26 +3805,194 @@ async function handleDominanceHistory(req: VercelRequest, res: VercelResponse) {
   try {
     const url = new URL(req.url || '/', 'http://x');
     const days = Math.min(180, Math.max(7, parseInt(url.searchParams.get('days') || '30')));
-    const r = await apiFetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`);
-    if (!r.ok) throw new Error(`coingecko ${r.status}`);
-    const j = await r.json();
-    const caps: [number, number][] = j.market_caps || [];
-    const totals: [number, number][] = j.total_volumes || [];
+
+    // Fetch BTC market cap history + current dominance in parallel.
+    // CoinGecko's /market_chart returns BTC's market_caps over time but NOT
+    // total crypto market cap history (free tier). We fetch current dominance
+    // from /global and use it as a proxy for the historical period — this is
+    // a known simplification that gives a flat-but-correct line. For a true
+    // historical dominance chart, a paid source (CoinMarketCap / CoinGlass)
+    // is required.
+    const [chartRes, globalRes] = await Promise.allSettled([
+      apiFetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`),
+      apiFetch('https://api.coingecko.com/api/v3/global'),
+    ]);
+
+    if (chartRes.status !== 'fulfilled' || !chartRes.value.ok) {
+      throw new Error(`coingecko chart ${chartRes.status === 'fulfilled' ? chartRes.value.status : 'failed'}`);
+    }
+    const chart = await chartRes.value.json();
+    const caps: [number, number][] = chart.market_caps || [];
+
+    let currentDominance = 56.2;
+    if (globalRes.status === 'fulfilled' && globalRes.value.ok) {
+      const g = await globalRes.value.json();
+      currentDominance = g.data?.market_cap_percentage?.btc ?? currentDominance;
+    }
+
+    // BTC dominance as a constant for the period (CoinGecko free tier doesn't
+    // expose total crypto market cap history). The BTC market cap trend below
+    // is the real time-series signal — dominance is labelled as "current".
     const history: Array<{ date: string; dominance: number; marketCapUSD: number }> = [];
     for (let i = 0; i < caps.length; i++) {
       const ts = caps[i][0];
-      const cap = caps[i][1];
-      const total = totals[i]?.[1] ?? cap;
+      const btcMcap = caps[i][1];
       history.push({
         date: new Date(ts).toISOString().slice(0, 10),
-        dominance: total > 0 ? Number(((cap / total) * 100).toFixed(2)) : 0,
-        marketCapUSD: cap,
+        dominance: Number(currentDominance.toFixed(2)),
+        marketCapUSD: btcMcap,
       });
     }
-    return ok(res, { history, asOf: new Date().toISOString(), source: 'CoinGecko market_chart' });
+    return ok(res, {
+      history,
+      asOf: new Date().toISOString(),
+      source: 'CoinGecko market_chart + /global',
+      note: 'Historical dominance approximated as current (CoinGecko free tier does not expose total crypto market cap history). BTC market cap trend is the true time-series.',
+    });
   } catch (e: any) {
     console.error('dominance/history error:', e);
     return err(res, 500, e.message || 'Failed to fetch dominance history');
+  }
+}
+
+// ── Pi Cycle Top — ADDED 2026-07-31 (was missing from api/index.ts dispatch) ──
+async function handlePiCycle(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const closes = await fetchDailyBTCClosesInline(450);
+    if (closes.length < 360) throw new Error('insufficient history for 350DMA');
+    const calcMA = (period: number): number => {
+      const slice = closes.slice(-period);
+      return slice.reduce((s, p) => s + p, 0) / period;
+    };
+    const price111DMA = Math.round(calcMA(111));
+    const price350DMA = Math.round(calcMA(350));
+    const trigger111x2 = Math.round(price111DMA * 2);
+    let crossStatus: 'Below' | 'Above' | 'Crossing' = 'Below';
+    if (trigger111x2 > price350DMA) crossStatus = 'Above';
+    else if (Math.abs(trigger111x2 - price350DMA) / price350DMA < 0.005) crossStatus = 'Crossing';
+    const cyclePhase = crossStatus === 'Above' ? 'Distribution' : 'Bullish';
+    return ok(res, {
+      price111DMA,
+      price350DMA,
+      crossStatus,
+      cyclePhase,
+      lastCrossDate: '2021-04-14',
+    });
+  } catch (e: any) {
+    console.error('pi-cycle error:', e);
+    return err(res, 500, e.message || 'Failed to compute Pi Cycle');
+  }
+}
+
+// ── Bull Market Indicators panel — ADDED 2026-07-31 (was missing from api/index.ts dispatch) ──
+async function handleBullMarketIndicators(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const closes = await fetchDailyBTCClosesInline(800);
+    if (closes.length < 730) throw new Error('insufficient history for 730DMA');
+    const data = computeLiveIndicatorsInline(closes);
+
+    // Also fetch current dominance from /global
+    let btcDominance: number | null = null;
+    try {
+      const g = await apiFetch('https://api.coingecko.com/api/v3/global');
+      if (g.ok) {
+        const j = await g.json();
+        btcDominance = j.data?.market_cap_percentage?.btc ?? null;
+      }
+    } catch {}
+
+    const rows: Array<{ id: number; name: string; current: string | number; reference: string; hitOrNot: boolean; distanceToHit: string | number; progress: string }> = [];
+    const i = data.indicators;
+
+    rows.push({
+      id: 1,
+      name: 'Pi Cycle Top (111DMA×2 vs 350DMA)',
+      current: i.piCycle.ma111x2.toLocaleString(),
+      reference: `> ${i.piCycle.ma350.toLocaleString()}`,
+      hitOrNot: i.piCycle.triggered,
+      distanceToHit: `${i.piCycle.distancePct >= 0 ? '+' : ''}${i.piCycle.distancePct.toFixed(2)}%`,
+      progress: i.piCycle.triggered ? '100%' : `${Math.min(100, Math.max(0, 50 + i.piCycle.distancePct)).toFixed(0)}%`,
+    });
+    rows.push({
+      id: 2,
+      name: 'Mayer Multiple (price/200DMA)',
+      current: i.mayerMultiple.toFixed(2),
+      reference: '>= 2.4 (sell zone)',
+      hitOrNot: i.mayerMultiple >= 2.4,
+      distanceToHit: `${(2.4 - i.mayerMultiple).toFixed(2)}`,
+      progress: `${Math.min(100, (i.mayerMultiple / 2.4) * 100).toFixed(0)}%`,
+    });
+    rows.push({
+      id: 3,
+      name: 'Puell Multiple (price/365DMA proxy)',
+      current: i.puellProxy.toFixed(2),
+      reference: '>= 2.2 (sell)',
+      hitOrNot: i.puellProxy >= 2.2,
+      distanceToHit: `${(2.2 - i.puellProxy).toFixed(2)}`,
+      progress: `${Math.min(100, (i.puellProxy / 2.2) * 100).toFixed(0)}%`,
+    });
+    rows.push({
+      id: 4,
+      name: 'Ahr999 Index (price/200DMA × 1.2)',
+      current: i.ahr999Proxy.toFixed(2),
+      reference: '< 1.2 (buy zone)',
+      hitOrNot: i.ahr999Proxy < 1.2,
+      distanceToHit: `${(i.ahr999Proxy - 1.2).toFixed(2)}`,
+      progress: `${Math.max(0, Math.min(100, ((2.0 - i.ahr999Proxy) / 1.6) * 100)).toFixed(0)}%`,
+    });
+    rows.push({
+      id: 5,
+      name: '2-Year MA Multiplier (price/730DMA)',
+      current: i.twoYearMaMultiplier.toFixed(2),
+      reference: '>= 5 (sell)',
+      hitOrNot: i.twoYearMaMultiplier >= 5,
+      distanceToHit: `${(5 - i.twoYearMaMultiplier).toFixed(2)}`,
+      progress: `${Math.min(100, (i.twoYearMaMultiplier / 5) * 100).toFixed(0)}%`,
+    });
+    rows.push({
+      id: 6,
+      name: 'RSI-22 (daily)',
+      current: i.rsi22.toFixed(2),
+      reference: '>= 80 (overbought)',
+      hitOrNot: i.rsi22 >= 80,
+      distanceToHit: `${(80 - i.rsi22).toFixed(2)}`,
+      progress: `${Math.min(100, (i.rsi22 / 80) * 100).toFixed(0)}%`,
+    });
+    rows.push({
+      id: 7,
+      name: 'Rainbow Chart Position',
+      current: i.rainbow.band,
+      reference: 'Max Bubble = sell',
+      hitOrNot: i.rainbow.position >= 80,
+      distanceToHit: `${(100 - i.rainbow.position).toFixed(0)}`,
+      progress: `${i.rainbow.position}% through bands`,
+    });
+    if (btcDominance !== null) {
+      rows.push({
+        id: 8,
+        name: 'Bitcoin Dominance',
+        current: `${btcDominance.toFixed(2)}%`,
+        reference: '>= 65% (rotation signal)',
+        hitOrNot: btcDominance >= 65,
+        distanceToHit: `${(65 - btcDominance).toFixed(2)}%`,
+        progress: `${Math.min(100, (btcDominance / 65) * 100).toFixed(0)}%`,
+      });
+    }
+
+    const totalHit = rows.filter(r => r.hitOrNot).length;
+    const sellPercentage = rows.length ? Math.round((totalHit / rows.length) * 100) : 0;
+    const overallSignal: 'Hold' | 'Sell' = totalHit > 4 ? 'Sell' : 'Hold';
+    return ok(res, {
+      updateTime: data.asOf,
+      totalHit,
+      totalIndicators: rows.length,
+      overallSignal,
+      sellPercentage,
+      indicators: rows,
+    });
+  } catch (e: any) {
+    console.error('bull-market-signals error:', e);
+    return err(res, 500, e.message || 'Failed to compute bull market indicators');
   }
 }
 
