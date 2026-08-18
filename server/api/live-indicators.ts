@@ -53,7 +53,7 @@ async function fetchDailyCloses(days = 900): Promise<{ closes: number[]; timesta
     const prices: [number, number][] = res.data?.prices || [];
     if (prices.length >= 365) {
       const closes = prices.map(([, p]) => p);
-      const timestamps = prices.map(([t]) = Math.floor(t / 1000));
+      const timestamps = prices.map(([t]) => Math.floor(t / 1000));
       historyCache = { fetchedAt: Date.now(), closes, timestamps };
       return { closes, timestamps };
     }
