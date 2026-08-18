@@ -306,18 +306,133 @@ async function fetchBlockchainHashrate(start: Date, end: Date): Promise<Series[]
     .filter(s => s.date >= startDay && s.date <= endDay);
 }
 
+// --- Phase 2 new fetchers ---
+
+async function fetchCoinGeckoGlobal(field: 'btc_dominance' | 'stablecoin_mcap', start: Date, end: Date): Promise<Series[]> {
+  // CoinGecko /global returns a snapshot — no historical time-series for dominance/stablecoin supply.
+  // For Phase 2 MVP: hit /global on a single recent day and synthesize a a one-point series.
+  // If we need history later, switch to CoinGecko Pro or DefiLlama historicals.
+  const { default: axios } = await import('axios');
+  const res = await axios.get('https://api.coingecko.com/api/v3/global', { timeout: 15000 });
+  const data = res.data?.data;
+  if (!data) throw new Error('No CoinGecko /global data');
+  const today = new Date().toISOString().split('T')[0];
+  let value: number | undefined;
+  if (field === 'btc_dominance') {
+    value = data.market_cap_percentage?.bitcoin;
+  } else if (field === 'stablecoin_mcap') {
+    value = data.total_market_cap?.usd ? data.total_market_cap.usd - (data.market_cap_percentage?.bitcoin ?? 0) * (data.total_market_cap.usd / 100) : undefined;
+    // Fallback: use stablecoin_market_cap directly if present
+    if (value === undefined || value === 0) value = data.stablecoin_market_cap?.usd;
+  }
+  if (value === undefined) return [];
+  return [{ date: today, value }];
+}
+
+async function fetchEtfVolumeProxy(start: Date, end: Date): Promise<Series[]> {
+  // ETF volume proxy: sum of Yahoo Finance daily volume for major BTC spot ETFs.
+  // This is a sentiment signal, not net flow — label is honest on the block registry.
+  const { default: axios } = await import('axios');
+  const symbols = ['IBIT', 'FBTC', 'ARKB', 'HODL'];
+  const period1 = Math.floor(start.getTime() / 1000);
+  const period2 = Math.floor(end.getTime() / 1000);
+
+  const fetches = await Promise.allSettled(symbols.map(async (sym) => {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${period1}&period2=${period2}&interval=1d`;
+    const res = await axios.get(url, {
+      timeout: 15000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BitcoinHub/1.0)' },
+    });
+    const result = res.data?.chart?.result?.[0];
+    if (!result) throw new Error(`No Yahoo data for ${sym}`);
+    const timestamps: number[] = result.timestamp || [];
+    const volumes: (number | null)[] = result.indicators?.quote?.[0]?.volume || [];
+    return timestamps.map((ts, i) => ({
+      date: new Date(ts * 1000).toISOString().split('T')[0],
+      value: volumes[i] ?? 0,
+    })).filter(p => p.value !== null && p.value !== undefined && !Number.isNaN(p.value));
+  }));
+
+  const seriesByDate = new Map<string, number>();
+  for (const f of fetches) {
+    if (f.status !== 'fulfilled') continue;
+    for (const p of f.value) {
+      seriesByDate.set(p.date, (seriesByDate.get(p.date) ?? 0) + (p.value || 0));
+    }
+  }
+  const startDay = start.toISOString().split('T')[0];
+  const endDay = end.toISOString().split('T')[0];
+  return Array.from(seriesByDate.entries())
+    .map(([date, value]) => ({ date, value }))
+    .filter(s => s.date >= startDay && s.date <= endDay)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function fetchStablecoinSupplyHistory(start: Date, end: Date): Promise<Series[]> {
+  // DefiLlama stablecoin supply history (USD), all stablecoins combined.
+  const { default: axios } = await import('axios');
+  const res = await axios.get('https://stablecoins.llama.fi/stablecoincharts/all', { timeout: 15000 });
+  const points: { date: number; totalCirculatingUSD: { peggedUSD: number } }[] = res.data || [];
+  const startTs = Math.floor(start.getTime() / 1000);
+  const endTs = Math.floor(end.getTime() / 1000);
+  return points
+    .filter(p => p.date >= startTs && p.date <= endTs)
+    .map(p => ({
+      date: new Date(p.date * 1000).toISOString().split('T')[0],
+      value: p.totalCirculatingUSD?.peggedUSD ?? 0,
+    }));
+}
+
+async function fetchDeribitPutCallRatio(start: Date, end: Date): Promise<Series[]> {
+  // Deribit public API: compute put/call ratio from book summary (open interest).
+  const { default: axios } = await import('axios');
+  const res = await axios.get('https://www.deribit.com/api/v2/public/get_book_summary_by_currency', {
+    params: { currency: 'BTC', kind: 'option' },
+    timeout: 20000,
+  });
+  const items: { stats?: { type?: 'put' | 'call' }; open_interest?: number }[] = res.data?.result || [];
+  let putOI = 0;
+  let callOI = 0;
+  for (const it of items) {
+    const oi = it.open_interest ?? 0;
+    if (it.stats?.type === 'put') putOI += oi;
+    else if (it.stats?.type === 'call') callOI += oi;
+  }
+  if (callOI === 0) return [];
+  const ratio = putOI / callOI;
+  // Single-point series for today (Deribit doesn't expose historical put/call OI without DB)
+  const today = new Date().toISOString().split('T')[0];
+  return [{ date: today, value: ratio }];
+}
+
+async function fetchBlockchainActiveAddresses(start: Date, end: Date): Promise<Series[]> {
+  const data = await fetchJson<{ values: [string, number][] }>(
+    'https://api.blockchain.info/charts/active-addresses',
+    { timespan: '1year', rollingAverage: '1day', format: 'json' }
+  );
+  const startDay = start.toISOString().split('T')[0];
+  const endDay = end.toISOString().split('T')[0];
+  return (data?.values || [])
+    .map(([ts, v]) => ({ date: new Date(parseInt(ts) * 1000).toISOString().split('T')[0], value: v }))
+    .filter(s => s.date >= startDay && s.date <= endDay);
+}
+
 // Block registry: id → fetcher
 const BLOCK_FETCHERS: Record<string, (start: Date, end: Date) => Promise<Series[]>> = {
-  'btc.price':         (s, e) => fetchYahooDaily('BTC-USD', s, e),
-  'fear_greed.value':  (s, e) => fetchAlternativeMeFng(s, e),
-  'funding.bybit':     (s, e) => fetchBybitFunding(s, e),
-  'options.put_call':  async () => [], // stub for MVP
-  'onchain.hashrate':  (s, e) => fetchBlockchainHashrate(s, e),
-  'macro.dxy':         (s, e) => fetchYahooDaily('DX-Y.NYB', s, e),
-  'macro.sp500':       (s, e) => fetchYahooDaily('^GSPC', s, e),
-  'macro.ust10y':      (s, e) => fetchYahooDaily('^TNX', s, e),
-  'macro.vix':         (s, e) => fetchYahooDaily('^VIX', s, e),
-  'macro.gold':        (s, e) => fetchYahooDaily('GC=F', s, e),
+  'btc.price':              (s, e) => fetchYahooDaily('BTC-USD', s, e),
+  'btc.dominance':          (s, e) => fetchCoinGeckoGlobal('btc_dominance', s, e),
+  'fear_greed.value':       (s, e) => fetchAlternativeMeFng(s, e),
+  'funding.bybit':          (s, e) => fetchBybitFunding(s, e),
+  'etf.volume':             (s, e) => fetchEtfVolumeProxy(s, e),
+  'stablecoin.total_supply':(s, e) => fetchStablecoinSupplyHistory(s, e),
+  'options.put_call':       (s, e) => fetchDeribitPutCallRatio(s, e),
+  'onchain.hashrate':       (s, e) => fetchBlockchainHashrate(s, e),
+  'onchain.active_addresses':(s, e) => fetchBlockchainActiveAddresses(s, e),
+  'macro.dxy':              (s, e) => fetchYahooDaily('DX-Y.NYB', s, e),
+  'macro.sp500':            (s, e) => fetchYahooDaily('^GSPC', s, e),
+  'macro.ust10y':           (s, e) => fetchYahooDaily('^TNX', s, e),
+  'macro.vix':              (s, e) => fetchYahooDaily('^VIX', s, e),
+  'macro.gold':             (s, e) => fetchYahooDaily('GC=F', s, e),
   'time.day_of_week':  (s, e) => {
     const out: Series[] = [];
     const cur = new Date(s);

@@ -13,17 +13,21 @@ interface BlockMeta {
 }
 
 const BLOCKS: BlockMeta[] = [
-  { id: 'btc.price',         label: 'BTC Price',              category: 'price',    description: 'BTC close price in USD',                          unit: 'USD' },
-  { id: 'fear_greed.value',  label: 'Fear & Greed Index',     category: 'sentiment',description: 'Daily Fear & Greed Index (0-100)',                unit: '0-100' },
-  { id: 'funding.bybit',     label: 'Bybit Funding Rate',     category: 'funding',  description: 'BTCUSDT perp funding rate (per 8h)',             unit: 'rate' },
-  { id: 'options.put_call',  label: 'Options Put/Call Ratio', category: 'options',  description: 'BTC options put/call ratio (Deribit)',            unit: 'ratio' },
-  { id: 'onchain.hashrate',  label: 'On-Chain Hashrate',      category: 'onchain',  description: 'Network hashrate (H/s)',                          unit: 'H/s' },
-  { id: 'macro.dxy',         label: 'Dollar Index (DXY)',     category: 'macro',    description: 'US Dollar Index',                                  unit: 'index' },
-  { id: 'macro.sp500',       label: 'S&P 500',                category: 'macro',    description: 'S&P 500 Index',                                    unit: 'index' },
-  { id: 'macro.ust10y',      label: '10Y Treasury Yield',     category: 'macro',    description: 'US 10-Year Treasury yield (%)',                    unit: '%' },
-  { id: 'macro.vix',         label: 'VIX',                    category: 'macro',    description: 'CBOE Volatility Index',                            unit: 'index' },
-  { id: 'macro.gold',        label: 'Gold',                   category: 'macro',    description: 'Gold spot price (USD/oz)',                         unit: 'USD' },
-  { id: 'time.day_of_week',  label: 'Day of Week',            category: 'time',     description: '0=Sunday, 6=Saturday',                            unit: '0-6' },
+  { id: 'btc.price',              label: 'BTC Price',              category: 'price',    description: 'BTC close price in USD',                          unit: 'USD' },
+  { id: 'btc.dominance',          label: 'BTC Dominance',          category: 'price',    description: 'BTC share of total crypto market cap (%)',        unit: '%' },
+  { id: 'fear_greed.value',       label: 'Fear & Greed Index',     category: 'sentiment',description: 'Daily Fear & Greed Index (0-100)',                unit: '0-100' },
+  { id: 'funding.bybit',          label: 'Bybit Funding Rate',     category: 'funding',  description: 'BTCUSDT perp funding rate (per 8h)',             unit: 'rate' },
+  { id: 'etf.volume',             label: 'Spot ETF Volume (proxy)',category: 'currency', description: 'Sum daily volume of IBIT+FBTC+ARKB+HODL',         unit: 'shares' },
+  { id: 'stablecoin.total_supply',label: 'Stablecoin Supply',     category: 'liquidity',description: 'Total stablecoin USD supply (DefiLlama)',        unit: 'USD' },
+  { id: 'options.put_call',       label: 'Options Put/Call Ratio', category: 'options',  description: 'BTC options put/call OI ratio (Deribit)',        unit: 'ratio' },
+  { id: 'onchain.hashrate',       label: 'On-Chain Hashrate',      category: 'onchain',  description: 'Network hashrate (H/s)',                          unit: 'H/s' },
+  { id: 'onchain.active_addresses',label:'Active Addresses',       category: 'onchain',  description: 'Unique senders per day',                          unit: 'addresses' },
+  { id: 'macro.dxy',              label: 'Dollar Index (DXY)',     category: 'macro',    description: 'US Dollar Index',                                  unit: 'index' },
+  { id: 'macro.sp500',            label: 'S&P 500',                category: 'macro',    description: 'S&P 500 Index',                                    unit: 'index' },
+  { id: 'macro.ust10y',           label: '10Y Treasury Yield',     category: 'macro',    description: 'US 10-Year Treasury yield (%)',                    unit: '%' },
+  { id: 'macro.vix',              label: 'VIX',                    category: 'macro',    description: 'CBOE Volatility Index',                            unit: 'index' },
+  { id: 'macro.gold',             label: 'Gold',                   category: 'macro',    description: 'Gold spot price (USD/oz)',                         unit: 'USD' },
+  { id: 'time.day_of_week',       label: 'Day of Week',            category: 'time',     description: '0=Sunday, 6=Saturday',                            unit: '0-6' },
 ];
 
 function ok(res: VercelResponse, data: unknown) {
