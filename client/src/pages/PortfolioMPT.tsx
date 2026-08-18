@@ -26,9 +26,11 @@ import {
 import {
   AlertCircle, TrendingUp, TrendingDown, Plus, Trash2, RefreshCw,
   Wallet, Target, Activity, BarChart3, Sparkles, ArrowRight,
+  Save, FolderOpen,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
+import { useEffect } from "react";
 
 // --- Types (mirrors server/mpt/index.ts) ---
 
@@ -110,6 +112,33 @@ interface MPTResult {
     fetchMs: number;
     computeMs: number;
   };
+}
+
+// --- Saved portfolios (anonymous localStorage, MPT Phase 2 B1) ---
+
+interface SavedPortfolio {
+  id: string;
+  name: string;
+  holdings: Holding[];
+  cycleId: string;
+  riskFreeRate: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const STORAGE_KEY = 'bitcoinhub_mpt_portfolios_v1';
+
+function loadSavedPortfolios(): SavedPortfolio[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch { return []; }
+}
+
+function persistSavedPortfolios(items: SavedPortfolio[]) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
+  catch (e) { console.warn('[mpt] localStorage write failed:', e); }
 }
 
 // --- Helpers ---
@@ -288,6 +317,10 @@ export default function PortfolioMPT() {
   const [holdings, setHoldings] = useState(DEFAULT_PORTFOLIO);
   const [cycleId, setCycleId] = useState('cycle3');
   const [riskFreeRate, setRiskFreeRate] = useState(0.045);
+  const [saved, setSaved] = useState<SavedPortfolio[]>([]);
+  const [saveDialog, setSaveDialog] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
+
+  useEffect(() => { setSaved(loadSavedPortfolios()); }, []);
 
   // Fetch config (cycles + universe)
   const configQuery = useQuery<MPTConfig>({
@@ -326,6 +359,40 @@ export default function PortfolioMPT() {
     setHoldings(next);
   };
 
+  // --- Saved portfolios (MPT Phase 2 B1) ---
+
+  function savePortfolio() {
+    if (!saveDialog.name.trim()) return;
+    const valid = holdings.filter(h => h.symbol && h.quantity > 0);
+    if (valid.length < 2) return;
+    const now = new Date().toISOString();
+    const item: SavedPortfolio = {
+      id: `pf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      name: saveDialog.name.trim(),
+      holdings: valid,
+      cycleId,
+      riskFreeRate,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const next = [...saved, item].slice(-50); // cap at 50
+    setSaved(next);
+    persistSavedPortfolios(next);
+    setSaveDialog({ open: false, name: '' });
+  }
+
+  function loadPortfolio(p: SavedPortfolio) {
+    setHoldings(p.holdings);
+    setCycleId(p.cycleId);
+    setRiskFreeRate(p.riskFreeRate);
+  }
+
+  function deletePortfolio(id: string) {
+    const next = saved.filter(s => s.id !== id);
+    setSaved(next);
+    persistSavedPortfolios(next);
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -340,6 +407,42 @@ export default function PortfolioMPT() {
             your distance from optimal, and what to buy or sell to fix it.
           </p>
         </div>
+
+        {/* Saved portfolios (MPT Phase 2 B1) */}
+        {saved.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" />
+                Saved Portfolios ({saved.length})
+              </CardTitle>
+              <CardDescription>
+                Stored locally in your browser. Cap at 50.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {saved.map(p => {
+                const total = p.holdings.reduce((s, h) => s + h.quantity, 0);
+                return (
+                  <div key={p.id} className="flex items-start gap-1 p-2 rounded bg-muted/30 border border-border/30">
+                    <button onClick={() => loadPortfolio(p)} className="flex-1 text-left">
+                      <div className="font-semibold text-xs">{p.name}</div>
+                      <div className="text-[10px] font-mono text-muted-foreground">
+                        {p.holdings.length} assets · cycle {p.cycleId.replace('cycle', '')} · rF {(p.riskFreeRate * 100).toFixed(1)}%
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {new Date(p.updatedAt).toLocaleDateString()}
+                      </div>
+                    </button>
+                    <Button variant="ghost" size="sm" onClick={() => deletePortfolio(p.id)} className="h-6 w-6 p-0">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Input panel */}
         <Card>
@@ -390,6 +493,14 @@ export default function PortfolioMPT() {
                 ) : (
                   <><Sparkles className="h-4 w-4 mr-2" /> Compute</>
                 )}
+              </Button>
+
+              <Button
+                variant="outline"
+                disabled={holdings.filter(h => h.symbol && h.quantity > 0).length < 2}
+                onClick={() => setSaveDialog({ open: true, name: '' })}
+              >
+                <Save className="h-4 w-4 mr-2" /> Save Portfolio
               </Button>
             </div>
 
@@ -678,6 +789,29 @@ export default function PortfolioMPT() {
         {/* Empty state when config still loading */}
         {configQuery.isLoading && !result && (
           <Skeleton className="h-96 w-full" />
+        )}
+
+        {/* Save portfolio dialog (MPT Phase 2 B1) */}
+        {saveDialog.open && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setSaveDialog({ open: false, name: '' })}>
+            <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+              <div className="text-lg font-bold mb-3">Save portfolio</div>
+              <Input
+                value={saveDialog.name}
+                onChange={e => setSaveDialog(d => ({ ...d, name: e.target.value }))}
+                placeholder="Portfolio name (e.g. Retirement BTC-heavy)"
+                autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') savePortfolio(); }}
+              />
+              <div className="text-xs text-muted-foreground mt-2">
+                Saves {holdings.filter(h => h.symbol && h.quantity > 0).length} assets · cycle {cycleId} · rF {(riskFreeRate * 100).toFixed(1)}%
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setSaveDialog({ open: false, name: '' })}>Cancel</Button>
+                <Button onClick={savePortfolio} disabled={!saveDialog.name.trim()}>Save</Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
