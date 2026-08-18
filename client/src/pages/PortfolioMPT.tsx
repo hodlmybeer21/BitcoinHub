@@ -26,11 +26,12 @@ import {
 import {
   AlertCircle, TrendingUp, TrendingDown, Plus, Trash2, RefreshCw,
   Wallet, Target, Activity, BarChart3, Sparkles, ArrowRight,
-  Save, FolderOpen,
+  Save, FolderOpen, CalendarClock,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 // --- Types (mirrors server/mpt/index.ts) ---
 
@@ -127,6 +128,31 @@ interface SavedPortfolio {
 }
 
 const STORAGE_KEY = 'bitcoinhub_mpt_portfolios_v1';
+
+// Plan persisted to localStorage so DCA page can hydrate after refresh
+// (wouter's location.state does not survive page reloads).
+export interface MPTDcaPlan {
+  source: 'maxSharpe' | 'minVol';
+  sourceLabel: string;
+  sharpe: number;
+  expectedReturn: number;
+  volatility: number;
+  weights: Record<string, number>;
+  monthly: number;
+  durationMonths: number;
+  startYear: number;
+  cycleId: string;
+  cycleLabel: string;
+  totalValue?: number;
+  createdAt: string;
+}
+
+const DCA_PLAN_STORAGE_KEY = 'bitcoinhub_dca_mpt_plan_v1';
+
+function persistDcaPlan(plan: MPTDcaPlan) {
+  try { localStorage.setItem(DCA_PLAN_STORAGE_KEY, JSON.stringify(plan)); }
+  catch (e) { console.warn('[mpt] DCA plan localStorage write failed:', e); }
+}
 
 function loadSavedPortfolios(): SavedPortfolio[] {
   try {
@@ -319,6 +345,13 @@ export default function PortfolioMPT() {
   const [riskFreeRate, setRiskFreeRate] = useState(0.045);
   const [saved, setSaved] = useState<SavedPortfolio[]>([]);
   const [saveDialog, setSaveDialog] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
+  const [migrateDialog, setMigrateDialog] = useState<{
+    open: boolean;
+    monthly: number;
+    durationMonths: number;
+    useMinVol: boolean;
+  }>({ open: false, monthly: 500, durationMonths: 48, useMinVol: false });
+  const [, navigate] = useLocation();
 
   useEffect(() => { setSaved(loadSavedPortfolios()); }, []);
 
@@ -404,6 +437,46 @@ export default function PortfolioMPT() {
     const next = saved.filter(s => s.id !== id);
     setSaved(next);
     persistSavedPortfolios(next);
+  }
+
+  // --- Migrate to DCA (MPT Phase 2 B3) ---
+
+  function migrateToDCA() {
+    if (!result) return;
+    const valid = holdings.filter(h => h.symbol && h.quantity > 0);
+    if (valid.length < 2) return;
+    const opt = migrateDialog.useMinVol ? result.minVol : result.maxSharpe;
+    const sourceLabel = migrateDialog.useMinVol ? 'Min Volatility' : 'Optimal (Max Sharpe)';
+
+    // Filter near-zero weights, then renormalize so the per-asset dollars sum to total.
+    const weights: Record<string, number> = {};
+    for (const s of result.symbols) {
+      const w = opt.weights[s] ?? 0;
+      if (w > 0.001) weights[s] = w;
+    }
+    // Renormalize in case we dropped any zero/near-zero weights.
+    const total = Object.values(weights).reduce((a, b) => a + b, 0);
+    if (total > 0) for (const k of Object.keys(weights)) weights[k] = weights[k] / total;
+
+    const now = new Date();
+    const startYear = now.getFullYear(); // DCA from current year forward
+    const plan: MPTDcaPlan = {
+      source: migrateDialog.useMinVol ? 'minVol' : 'maxSharpe',
+      sourceLabel,
+      sharpe: opt.sharpe,
+      expectedReturn: opt.expectedReturn,
+      volatility: opt.volatility,
+      weights,
+      monthly: migrateDialog.monthly,
+      durationMonths: migrateDialog.durationMonths,
+      startYear,
+      cycleId: result.cycle.id,
+      cycleLabel: result.cycle.label,
+      totalValue: opt.totalValue,
+      createdAt: now.toISOString(),
+    };
+    persistDcaPlan(plan);
+    navigate('/dca-simulator', { state: { fromMpt: true, plan } });
   }
 
   return (
@@ -845,6 +918,16 @@ export default function PortfolioMPT() {
                   Buys (positive $) and sells (negative $) to migrate from current to Max-Sharpe.
                   Shown in USD relative to current portfolio total.
                 </CardDescription>
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setMigrateDialog(d => ({ ...d, open: true }))}
+                    className="border-orange-500/40 hover:bg-orange-500/10"
+                  >
+                    <CalendarClock className="h-4 w-4 mr-2" />
+                    Migrate to DCA
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -905,6 +988,91 @@ export default function PortfolioMPT() {
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => setSaveDialog({ open: false, name: '' })}>Cancel</Button>
                 <Button onClick={savePortfolio} disabled={!saveDialog.name.trim()}>Save</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Migrate to DCA dialog (MPT Phase 2 B3) */}
+        {migrateDialog.open && result && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setMigrateDialog(d => ({ ...d, open: false }))}>
+            <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+              <div className="text-lg font-bold mb-1">Migrate to DCA Simulator</div>
+              <div className="text-xs text-muted-foreground mb-4">
+                Hand your MPT-recommended weights to the DCA simulator. Pre-fills the BTC
+                portion with monthly DCA and shows a multi-asset allocation table.
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Total monthly DCA ($)</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      type="number"
+                      min={10}
+                      max={10000}
+                      step={10}
+                      value={migrateDialog.monthly}
+                      onChange={e => setMigrateDialog(d => ({ ...d, monthly: parseInt(e.target.value) || 10 }))}
+                      className="font-mono w-32"
+                      autoFocus
+                    />
+                    <span className="text-sm text-muted-foreground">/month</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground">Duration</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={120}
+                      step={1}
+                      value={migrateDialog.durationMonths}
+                      onChange={e => setMigrateDialog(d => ({ ...d, durationMonths: parseInt(e.target.value) || 1 }))}
+                      className="font-mono w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">months ({(migrateDialog.durationMonths / 12).toFixed(1)} yr)</span>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={migrateDialog.useMinVol}
+                    onChange={e => setMigrateDialog(d => ({ ...d, useMinVol: e.target.checked }))}
+                    className="accent-orange-500"
+                  />
+                  Use Min Volatility instead of Max Sharpe
+                </label>
+
+                <div className="text-xs text-muted-foreground bg-muted/30 border border-border/40 rounded p-2">
+                  <div className="font-semibold text-foreground mb-1">Allocation preview</div>
+                  {Object.entries(migrateDialog.useMinVol ? result.minVol.weights : result.maxSharpe.weights)
+                    .filter(([, w]) => (w ?? 0) > 0.001)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([sym, w]) => (
+                      <div key={sym} className="flex items-center justify-between font-mono">
+                        <span>{sym}</span>
+                        <span className="text-foreground">
+                          {(w * 100).toFixed(1)}% · ${Math.round(w * migrateDialog.monthly)}/mo
+                        </span>
+                      </div>
+                    ))}
+                  <div className="border-t border-border/40 mt-1 pt-1 flex items-center justify-between font-mono font-semibold">
+                    <span>Total</span>
+                    <span>${migrateDialog.monthly}/mo · ${migrateDialog.monthly * migrateDialog.durationMonths} over {migrateDialog.durationMonths}mo</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-5">
+                <Button variant="outline" onClick={() => setMigrateDialog(d => ({ ...d, open: false }))}>Cancel</Button>
+                <Button onClick={migrateToDCA} disabled={!result}>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Open in DCA Simulator
+                </Button>
               </div>
             </div>
           </div>

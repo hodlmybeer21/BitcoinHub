@@ -3,6 +3,22 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import type { MPTDcaPlan } from "./PortfolioMPT";
+
+const DCA_PLAN_STORAGE_KEY = 'bitcoinhub_dca_mpt_plan_v1';
+
+function loadDcaPlan(): MPTDcaPlan | null {
+  try {
+    const raw = localStorage.getItem(DCA_PLAN_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as MPTDcaPlan;
+  } catch { return null; }
+}
+
+function dismissDcaPlan() {
+  try { localStorage.removeItem(DCA_PLAN_STORAGE_KEY); }
+  catch { /* ignore */ }
+}
 import { motion } from "framer-motion";
 import {
   AreaChart,
@@ -35,7 +51,16 @@ import {
   ArrowRight,
   Mail,
   Loader2,
+  BarChart3,
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface DCAResult {
   totalInvested: number;
@@ -101,6 +126,18 @@ export default function DCASimulator() {
   const [monthlyAmount, setMonthlyAmount] = useState(50);
   const [startYear, setStartYear] = useState(2020);
   const [copied, setCopied] = useState(false);
+  const [mptPlan, setMptPlan] = useState<MPTDcaPlan | null>(null);
+
+  // Hydrate MPT plan from localStorage on mount (MPT Phase 2 B3 bridge).
+  useEffect(() => {
+    const plan = loadDcaPlan();
+    if (plan) {
+      setMptPlan(plan);
+      const btcWeight = plan.weights?.BTC ?? 0;
+      if (btcWeight > 0) setMonthlyAmount(Math.max(10, Math.min(1000, Math.round(plan.monthly * btcWeight))));
+      if (plan.startYear) setStartYear(plan.startYear);
+    }
+  }, []);
 
   const { data, isLoading, error } = useQuery<DCAResult>({
     queryKey: ["/api/dca-simulator", monthlyAmount, startYear],
@@ -195,6 +232,79 @@ export default function DCASimulator() {
       {/* Calculator Section */}
       <div className="relative flex-1 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* MPT Migration Plan (MPT Phase 2 B3) */}
+          {mptPlan && (
+            <Card className="border-orange-500/40 bg-gradient-to-r from-orange-500/10 to-transparent mb-6 overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-orange-500 to-orange-300" />
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <BarChart3 className="h-5 w-5 text-orange-400" />
+                      MPT Migration Plan
+                    </CardTitle>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Source: <span className="text-foreground font-semibold">{mptPlan.sourceLabel}</span>
+                      {' · '}Sharpe <span className="font-mono text-foreground">{mptPlan.sharpe.toFixed(2)}</span>
+                      {' · '}{(mptPlan.expectedReturn * 100).toFixed(1)}% return / {(mptPlan.volatility * 100).toFixed(1)}% vol
+                      {' · '}{mptPlan.cycleLabel}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { dismissDcaPlan(); setMptPlan(null); }}
+                    aria-label="Dismiss MPT plan"
+                    className="h-7 w-7 p-0"
+                  >
+                    <span className="text-lg leading-none">×</span>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-xs text-muted-foreground">
+                  ${mptPlan.monthly}/mo × {mptPlan.durationMonths} months from {mptPlan.startYear}
+                  {' = '}
+                  <span className="text-foreground font-semibold">
+                    ${mptPlan.monthly * mptPlan.durationMonths} total
+                  </span>
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset</TableHead>
+                      <TableHead className="text-right">Weight</TableHead>
+                      <TableHead className="text-right">Monthly</TableHead>
+                      <TableHead className="text-right">Period Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(mptPlan.weights)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([sym, w]) => (
+                        <TableRow key={sym}>
+                          <TableCell className="font-mono font-semibold">{sym}</TableCell>
+                          <TableCell className="text-right font-mono">{(w * 100).toFixed(1)}%</TableCell>
+                          <TableCell className="text-right font-mono">${Math.round(w * mptPlan.monthly)}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${Math.round(w * mptPlan.monthly * mptPlan.durationMonths).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+
+                <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border/40 rounded p-2">
+                  Below: the BTC DCA chart runs at ${Math.round((mptPlan.weights?.BTC ?? 0) * mptPlan.monthly)}/mo
+                  (your MPT-recommended BTC allocation × total monthly) starting {mptPlan.startYear}.
+                  Non-BTC DCA is not backtested (no historical data for IBIT/FBTC/MSTR/COIN/MARA/RIOT);
+                  this table shows your forward monthly allocation plan at current prices.
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left Column - Controls */}
             <motion.div
