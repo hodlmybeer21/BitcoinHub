@@ -33,6 +33,7 @@ import {
   Download, Share2, Upload, Link as LinkIcon,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useSyncedStorage } from "@/lib/persistence/client";
 
 // --- Types ---
 
@@ -75,18 +76,11 @@ interface SavedIndicator {
 
 const STORAGE_KEY = 'bitcoinhub_workbench_indicators_v1';
 
-function loadSaved(): SavedIndicator[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch { return []; }
-}
-
-function persistSaved(items: SavedIndicator[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
-  catch (e) { console.warn('[workbench] localStorage write failed:', e); }
-}
+// localStorage keys retained for fast first-paint + offline fallback inside
+// the useSyncedStorage hook. Writes go through the hook (which schedules a
+// debounced server sync via /api/persistence/sync).
+const STORAGE_KEY = 'bitcoinhub_workbench_indicators_v1';
+const CANVAS_POS_KEY = 'bitcoinhub_workbench_canvas_v1';
 
 // Canvas node positions persist independently of saved indicators so users can
 // arrange their drag-drop canvas and have it survive reloads.
@@ -692,15 +686,26 @@ export default function Workbench() {
     start: daysAgoISO(365),
     end: todayISO(),
   });
-  const [saved, setSaved] = useState<SavedIndicator[]>([]);
+  const [saved, setSaved] = useSyncedStorage<SavedIndicator[]>('workbench_indicators', [], STORAGE_KEY);
   const [saveDialog, setSaveDialog] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
   const [showBlocks, setShowBlocks] = useState(true);
   const [editorMode, setEditorMode] = useState<'formula' | 'visual' | 'canvas'>('formula');
-  const [canvasPositions, setCanvasPositions] = useState<PositionMap>({});
+  const [canvasPositions, setCanvasPositions] = useSyncedStorage<PositionMap>('workbench_canvas_positions', {}, CANVAS_POS_KEY);
 
   useEffect(() => {
-    setSaved(loadSaved());
-    setCanvasPositions(loadCanvasPositions());
+    // Backfill: also push the localStorage value to server on first load
+    // (covers users who had data before persistence shipped). useSyncedStorage
+    // already handles the read; this is purely the initial migration write.
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as SavedIndicator[];
+        if (Array.isArray(parsed) && parsed.length > 0 && saved.length === 0) {
+          setSaved(parsed);
+        }
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Read ?formula= and ?import= on mount (Workbench portability slice).
@@ -738,8 +743,7 @@ export default function Workbench() {
 
   const onCanvasPositionsChange = useCallback((next: PositionMap) => {
     setCanvasPositions(next);
-    persistCanvasPositions(next);
-  }, []);
+  }, [setCanvasPositions]);
 
   const blocksQuery = useQuery<{ blocks: BlockMeta[] }>({
     queryKey: ['/api/workbench/blocks'],

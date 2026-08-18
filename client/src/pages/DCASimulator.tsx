@@ -4,10 +4,13 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { MPTDcaPlan } from "./PortfolioMPT";
+import { useSyncedStorage } from "@/lib/persistence/client";
 
 const DCA_PLAN_STORAGE_KEY = 'bitcoinhub_dca_mpt_plan_v1';
 
-function loadDcaPlan(): MPTDcaPlan | null {
+// localStorage fallback path (only used if persistence server is unavailable).
+// Primary path is useSyncedStorage which syncs through /api/persistence/sync.
+function loadDcaPlanFromLocal(): MPTDcaPlan | null {
   try {
     const raw = localStorage.getItem(DCA_PLAN_STORAGE_KEY);
     if (!raw) return null;
@@ -15,7 +18,7 @@ function loadDcaPlan(): MPTDcaPlan | null {
   } catch { return null; }
 }
 
-function dismissDcaPlan() {
+function dismissDcaPlanFromLocal() {
   try { localStorage.removeItem(DCA_PLAN_STORAGE_KEY); }
   catch { /* ignore */ }
 }
@@ -126,18 +129,20 @@ export default function DCASimulator() {
   const [monthlyAmount, setMonthlyAmount] = useState(50);
   const [startYear, setStartYear] = useState(2020);
   const [copied, setCopied] = useState(false);
-  const [mptPlan, setMptPlan] = useState<MPTDcaPlan | null>(null);
+  const [mptPlan, setMptPlanRaw, mptPlanLoaded] = useSyncedStorage<MPTDcaPlan | null>('mpt_dca_plan', null, DCA_PLAN_STORAGE_KEY);
 
-  // Hydrate MPT plan from localStorage on mount (MPT Phase 2 B3 bridge).
+  // Hydrate MPT plan on mount + pre-fill DCA inputs from it (MPT Phase 2 B3 bridge).
+  // useSyncedStorage handles the read + sync; we just react to the loaded value.
   useEffect(() => {
-    const plan = loadDcaPlan();
+    const plan = mptPlan ?? loadDcaPlanFromLocal();
     if (plan) {
-      setMptPlan(plan);
+      setMptPlanRaw(plan); // ensure server has it (backfill on first device)
       const btcWeight = plan.weights?.BTC ?? 0;
       if (btcWeight > 0) setMonthlyAmount(Math.max(10, Math.min(1000, Math.round(plan.monthly * btcWeight))));
       if (plan.startYear) setStartYear(plan.startYear);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mptPlanLoaded]);
 
   const { data, isLoading, error } = useQuery<DCAResult>({
     queryKey: ["/api/dca-simulator", monthlyAmount, startYear],
@@ -253,7 +258,7 @@ export default function DCASimulator() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => { dismissDcaPlan(); setMptPlan(null); }}
+                    onClick={() => { dismissDcaPlanFromLocal(); setMptPlanRaw(null); }}
                     aria-label="Dismiss MPT plan"
                     className="h-7 w-7 p-0"
                   >

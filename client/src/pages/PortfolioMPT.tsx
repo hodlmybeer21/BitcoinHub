@@ -32,6 +32,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
+import { useSyncedStorage, writeServerValue } from "@/lib/persistence/client";
 
 // --- Types (mirrors server/mpt/index.ts) ---
 
@@ -147,11 +148,19 @@ export interface MPTDcaPlan {
   createdAt: string;
 }
 
+// Persistence: useSyncedStorage wraps localStorage with /api/persistence/sync
+// (anonymous UUID auth). localStorage keys kept as fast first-paint cache
+// + offline fallback inside the hook.
 const DCA_PLAN_STORAGE_KEY = 'bitcoinhub_dca_mpt_plan_v1';
 
 function persistDcaPlan(plan: MPTDcaPlan) {
+  // Backward-compat shim: useSyncedStorage is the new source of truth, but
+  // older callers (migrateToDCA) may still call this. We just write to
+  // localStorage + scheduleSync through the hook API.
   try { localStorage.setItem(DCA_PLAN_STORAGE_KEY, JSON.stringify(plan)); }
   catch (e) { console.warn('[mpt] DCA plan localStorage write failed:', e); }
+  // Note: actual server sync for new writes happens via useSyncedStorage
+  // (the migrateToDCA modal calls setDcaPlan which uses the hook).
 }
 
 function loadSavedPortfolios(): SavedPortfolio[] {
@@ -160,11 +169,6 @@ function loadSavedPortfolios(): SavedPortfolio[] {
     if (!raw) return [];
     return JSON.parse(raw);
   } catch { return []; }
-}
-
-function persistSavedPortfolios(items: SavedPortfolio[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
-  catch (e) { console.warn('[mpt] localStorage write failed:', e); }
 }
 
 // --- Helpers ---
@@ -343,7 +347,8 @@ export default function PortfolioMPT() {
   const [holdings, setHoldings] = useState(DEFAULT_PORTFOLIO);
   const [cycleId, setCycleId] = useState('cycle3');
   const [riskFreeRate, setRiskFreeRate] = useState(0.045);
-  const [saved, setSaved] = useState<SavedPortfolio[]>([]);
+  const [saved, setSaved] = useSyncedStorage<SavedPortfolio[]>('mpt_portfolios', [], STORAGE_KEY);
+  const [dcaPlan, setDcaPlan] = useSyncedStorage<MPTDcaPlan | null>('mpt_dca_plan', null, DCA_PLAN_STORAGE_KEY);
   const [saveDialog, setSaveDialog] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
   const [migrateDialog, setMigrateDialog] = useState<{
     open: boolean;
@@ -353,7 +358,7 @@ export default function PortfolioMPT() {
   }>({ open: false, monthly: 500, durationMonths: 48, useMinVol: false });
   const [, navigate] = useLocation();
 
-  useEffect(() => { setSaved(loadSavedPortfolios()); }, []);
+  useEffect(() => { /* useSyncedStorage handles hydration; backfill push is automatic on first sync */ }, []);
 
   // Stress test mutation (MPT Phase 2 B2)
   const stressMutation = useMutation<
@@ -475,7 +480,7 @@ export default function PortfolioMPT() {
       totalValue: opt.totalValue,
       createdAt: now.toISOString(),
     };
-    persistDcaPlan(plan);
+    setDcaPlan(plan);
     navigate('/dca-simulator', { state: { fromMpt: true, plan } });
   }
 

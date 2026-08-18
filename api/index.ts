@@ -275,6 +275,50 @@ async function handleNotifications(_: VercelRequest, res: VercelResponse) {
   ok(res, []);
 }
 
+// ─── Persistence (anonymous UUID MVP) ───────────────────────────────────────────
+// Lazy-imports lib/persistence/server.js so neon + ws aren't in the cold-start
+// bundle. Self-healing CREATE TABLE IF NOT EXISTS runs on first call, so the
+// endpoint works the moment the deploy hits Vercel — no manual migration
+// step required. userId is an anonymous client-generated UUID; no login needed.
+
+async function handlePersistenceSync(req: VercelRequest, res: VercelResponse) {
+  try {
+    if (!process.env.DATABASE_URL) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    const { upsertAnonData, getAnonData } = await import('../lib/persistence/server.js');
+
+    if (req.method === 'POST') {
+      const { userId, dataKey, dataValue } = req.body ?? {};
+      if (!userId || typeof userId !== 'string' || !dataKey || typeof dataKey !== 'string'
+          || typeof dataValue !== 'string') {
+        return err(res, 400, 'userId (string), dataKey (string), and dataValue (string) are required');
+      }
+      if (dataValue.length > 1_000_000) {
+        return err(res, 413, 'dataValue too large (max 1MB per key)');
+      }
+      await upsertAnonData(userId, dataKey, dataValue);
+      return ok(res, { ok: true, dataKey, updatedAt: new Date().toISOString() });
+    }
+
+    if (req.method === 'GET') {
+      const userId = (req.query.userId as string) || '';
+      if (!userId) return err(res, 400, 'userId query param required');
+      const dataKey = req.query.dataKey as string | undefined;
+      const result = await getAnonData(userId, dataKey);
+      return ok(res, result);
+    }
+
+    return err(res, 405, 'GET or POST required');
+  } catch (e: any) {
+    console.error('[persistence] error:', e?.message || e);
+    if (e?.message?.includes('DATABASE_URL')) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    return err(res, 500, e?.message || 'Persistence error');
+  }
+}
+
 // ─── Bitcoin Market Data ───────────────────────────────────────────────────────
 
 async function handleMarketData(_: VercelRequest, res: VercelResponse) {
@@ -3521,6 +3565,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/auth/register' || path === '/api/auth/register/') return handleAuthDisabled('register')(req, res);
     if (path === '/api/auth/logout' || path === '/api/auth/logout/') return handleAuthDisabled('logout')(req, res);
     if (path === '/api/notifications' || path === '/api/notifications/') return handleNotifications(req, res);
+    if (path === '/api/persistence/sync' || path === '/api/persistence/sync/') return handlePersistenceSync(req, res);
     if (path === '/api/bitcoin/market-data' || path === '/api/bitcoin/market-data/') return handleMarketData(req, res);
     if (path.startsWith('/api/bitcoin/chart')) return handleChart(req, res);
     if (path === '/api/web-resources/fear-greed' || path === '/api/web-resources/fear-greed/') return handleFearGreed(req, res);

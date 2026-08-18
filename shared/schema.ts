@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -186,3 +186,26 @@ export type InsertDailyTip = z.infer<typeof insertDailyTipSchema>;
 
 export type LearningProgress = typeof learningProgress.$inferSelect;
 export type InsertLearningProgress = z.infer<typeof insertLearningProgressSchema>;
+
+// Anonymous user data (no auth required for MVP persistence).
+// Each user is identified by a UUID generated client-side and stored in
+// their localStorage. Server uses the UUID as the user identifier — no
+// login needed. dataKey is a string like 'workbench_indicators' /
+// 'mpt_portfolios' / 'dca_plan' / 'canvas_positions'. dataValue is a
+// JSON-stringified blob (saved portfolios, indicators, etc.).
+//
+// Self-healing: the /api/persistence/sync handler runs CREATE TABLE IF
+// NOT EXISTS on cold-start so a missing migration step doesn't 500.
+// Real Google OAuth (replacing the UUID with a users.id FK) is a follow-up
+// once Tyler picks an auth provider.
+export const anonymousData = pgTable("anonymous_data", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  dataKey: text("data_key").notNull(),
+  dataValue: text("data_value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqUserKey: uniqueIndex("anon_data_user_key_idx").on(table.userId, table.dataKey),
+}));
+
+export type AnonymousData = typeof anonymousData.$inferSelect;
