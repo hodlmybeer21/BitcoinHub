@@ -2,20 +2,6 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import {
-  listCycles as mptListCycles,
-  computeHandler as mptCompute,
-  quoteHandler as mptQuote,
-} from './mpt-handlers';
-import {
-  listBlocks as wbListBlocks,
-  listTemplates as wbListTemplates,
-  parseHandler as wbParse,
-  evaluateHandler as wbEvaluate,
-} from './workbench-handlers';
-// MPT + Workbench handlers import their math from ./api/_mpt/* and
-// ./api/_workbench/*, so all dep trees are inside ./api/ and Vercel's
-// bundler follows the whole graph into the serverless function output.
 // --- inlined from api/cycle.ts ---
 /**
  * Live state for the 4-Year Cycle page.
@@ -3558,13 +3544,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 
 
-    if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') return mptListCycles(req, res);
-    if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') return mptCompute(req, res);
-    if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') return mptQuote(req, res);
-    if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') return wbListBlocks(req, res);
-    if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') return wbListTemplates(req, res);
-    if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') return wbParse(req, res);
-    if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') return wbEvaluate(req, res);
+    
 
     if (path === '/api/cycle/state' || path === '/api/cycle/state/') {
       try {
