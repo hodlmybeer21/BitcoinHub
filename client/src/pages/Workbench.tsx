@@ -1,7 +1,7 @@
 // BitcoinHub Workbench — No-Code Indicator Builder
 // /workbench — main page
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ReactFlow, Background, Controls, MiniMap,
@@ -125,11 +125,17 @@ function BlockChip({ block, onClick }: { block: BlockMeta; onClick?: () => void 
     liquidity: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
     time: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
   };
+  const handleDragStart = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.dataTransfer.setData('application/bitcoinhub-block', block.id);
+    e.dataTransfer.effectAllowed = 'copyMove';
+  };
   return (
     <button
       type="button"
+      draggable
+      onDragStart={handleDragStart}
       onClick={onClick}
-      className={`text-left p-2 rounded border font-mono text-xs hover:opacity-80 transition ${categoryColors[block.category] || 'bg-muted'}`}
+      className={`text-left p-2 rounded border font-mono text-xs hover:opacity-80 transition cursor-grab active:cursor-grabbing ${categoryColors[block.category] || 'bg-muted'}`}
       title={block.description}
     >
       <div className="font-semibold">{block.id}</div>
@@ -378,11 +384,13 @@ function astToGraph(
   ast: ASTNode | null,
   blocks: BlockMeta[],
   positions: PositionMap,
+  dropQueue: { x: number; y: number }[] = [],
 ): { nodes: RFNode[]; edges: Edge[] } {
   if (!ast) return { nodes: [], edges: [] };
   const nodes: RFNode[] = [];
   const edges: Edge[] = [];
   let idSeq = 0;
+  let dropIdx = 0;
 
   const blockCategory = (id: string): string =>
     blocks.find(b => b.id === id)?.category ?? 'unknown';
@@ -412,7 +420,11 @@ function astToGraph(
     // Auto-layout: column = depth, row = sibling index in a separate counter map.
     const col = depth;
     const row = (siblingCount[depth] = (siblingCount[depth] || 0) + 1) - 1;
-    const saved = positions[id] ?? { x: 60 + col * 220, y: 40 + row * 110 };
+    // For data nodes only, consume the next dropQueue position (if any) so the
+    // user-dropped block appears where they dropped it instead of at auto-layout.
+    const isData = node.type === 'data';
+    const dropPos = isData && dropIdx < dropQueue.length ? dropQueue[dropIdx++] : null;
+    const saved = positions[id] ?? dropPos ?? { x: 60 + col * 220, y: 40 + row * 110 };
     nodes.push({
       id,
       type: 'block',
@@ -537,6 +549,9 @@ function CanvasEditor({
   const [tree, setTree] = useState<ASTNode | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [rfInstance, setRfInstance] = useState<any>(null);
+  const [dropQueue, setDropQueue] = useState<{ x: number; y: number }[]>([]);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!formula.trim()) { setTree(null); setParseError(null); return; }
@@ -556,9 +571,16 @@ function CanvasEditor({
   }, [formula]);
 
   const { nodes, edges } = useMemo(
-    () => astToGraph(tree, blocks, positions),
-    [tree, blocks, positions],
+    () => astToGraph(tree, blocks, positions, dropQueue),
+    [tree, blocks, positions, dropQueue],
   );
+
+  // Clear dropQueue once astToGraph has consumed it (every DataNode visited gets
+  // its position from the queue in order). After this effect runs the queue is
+  // empty so re-parses without new drops use auto-layout + saved positions only.
+  useEffect(() => {
+    if (dropQueue.length > 0) setDropQueue([]);
+  }, [nodes]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -574,6 +596,24 @@ function CanvasEditor({
     [positions, onPositionsChange],
   );
 
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (!rfInstance) return;
+    const blockId = e.dataTransfer.getData('application/bitcoinhub-block');
+    if (!blockId) return;
+    const position = rfInstance.screenToFlowPosition({
+      x: e.clientX,
+      y: e.clientY,
+    });
+    setDropQueue(q => [...q, position]);
+    onInsertRequest(blockId);
+  }, [rfInstance, onInsertRequest]);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs">
@@ -588,7 +628,12 @@ function CanvasEditor({
           )}
         </div>
       </div>
-      <div className="h-[440px] rounded border border-border/50 bg-muted/20 overflow-hidden">
+      <div
+        ref={wrapperRef}
+        className="h-[440px] rounded border border-border/50 bg-muted/20 overflow-hidden"
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
         {parseError ? (
           <div className="h-full flex items-center justify-center p-4">
             <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2 max-w-md">
@@ -601,7 +646,7 @@ function CanvasEditor({
             <Plus className="h-6 w-6" />
             <div className="text-center">
               <div className="font-semibold text-foreground">Empty canvas</div>
-              <div className="text-xs">Click any block in the palette to add it as a node.</div>
+              <div className="text-xs">Click or drag any block in the palette to add it as a node.</div>
             </div>
           </div>
         ) : (
@@ -610,6 +655,7 @@ function CanvasEditor({
             edges={edges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
+            onInit={setRfInstance}
             fitView
             proOptions={{ hideAttribution: true }}
             minZoom={0.2}
