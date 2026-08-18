@@ -4,7 +4,7 @@
 // Mirrors the api/dca-simulator.ts bundling pattern.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import axios from 'axios';
+// axios is lazy-imported inside fetchYahooPrices to avoid cold-start bundle crash
 
 // ============================================================================
 // Types
@@ -374,6 +374,9 @@ async function fetchYahooPrices(yahooSymbol: string, start: string, end: string)
   const period1 = Math.floor(new Date(start).getTime() / 1000);
   const period2 = end ? Math.floor(new Date(end).getTime() / 1000) : Math.floor(Date.now() / 1000);
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?period1=${period1}&period2=${period2}&interval=1d&events=history`;
+
+  // Lazy-import axios to avoid pulling it into Vercel's cold-start bundle.
+  const { default: axios } = await import('axios');
 
   const res = await axios.get(url, {
     timeout: 30000,

@@ -3,7 +3,7 @@
 // Returns current portfolio value + per-asset mark without full optimization.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import axios from 'axios';
+// axios is lazy-imported inside fetchYahooLastPrice to avoid cold-start bundle crash
 
 interface Holding { symbol: string; quantity: number; }
 interface PricePoint { date: string; price: number; }
@@ -25,6 +25,10 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 async function fetchYahooLastPrice(yahooSymbol: string): Promise<number> {
   const hit = priceCache.get(yahooSymbol);
   if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.price;
+
+  // Lazy-import axios to avoid pulling it into Vercel's cold-start bundle.
+  // esbuild still bundles this file but defers axios load to first request.
+  const { default: axios } = await import('axios');
 
   // Fetch a 5-day window to get a recent close.
   const period2 = Math.floor(Date.now() / 1000);

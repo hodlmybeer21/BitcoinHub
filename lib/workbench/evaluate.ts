@@ -4,7 +4,7 @@
 // Inlines the parser + evaluator + block fetchers. No shared imports except axios + types.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import axios from 'axios';
+// axios is lazy-imported inside fetchJson to avoid cold-start bundle crash
 
 // ============================================================================
 // Types
@@ -231,6 +231,8 @@ function parse(formula: string): ASTNode {
 const fetchCache = new Map<string, Promise<Series[]>>();
 
 async function fetchJson(url: string, params: Record<string, any> = {}, headers: Record<string, string> = {}): Promise<any> {
+  // Lazy-import axios to avoid pulling it into Vercel's cold-start bundle.
+  const { default: axios } = await import('axios');
   const res = await axios.get(url, { params, headers, timeout: 30000 });
   return res.data;
 }
