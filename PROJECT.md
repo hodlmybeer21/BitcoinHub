@@ -41,6 +41,7 @@ verify with a curl before relying on it.
 
 | Commit | What |
 |---|---|
+| `296408f` | **feat(mpt)**: migrate-to-DCA bridge (MPT Phase 2 B3). MPT results → modal captures monthly/duration/MinVol-vs-MaxSharpe → plan persisted to localStorage + location.state → DCA page hydrates, pre-fills BTC portion (monthly = total × BTC weight, startYear = plan.startYear), renders 'MPT Migration Plan' card above the existing 2-col grid with per-asset weight/monthly/period-total + source attribution + dismiss button. localStorage key: `bitcoinhub_dca_mpt_plan_v1`. |
 | `cbaa902` | **feat(mpt)**: stress test panel (4 historical crashes: COVID, China ban, Luna/UST, FTX). Per-event portfolio drawdown + recovery. |
 | `86ceaff` | **feat(mpt)**: portfolio persistence (localStorage save/load for named portfolios). Save button + Saved Portfolios card + save dialog modal. |
 | `27f83db` | **feat(workbench)**: visual editing mode (Visual ⇆ Formula toggle, structured AST cards with color-coded chips). |
@@ -58,7 +59,7 @@ verify with a curl before relying on it.
 |---|---|---|
 | **B1 — Portfolio persistence** | ✅ Live | `86ceaff` |
 | **B2 — Stress test panel** | ✅ Live | `cbaa902` |
-| **B3 — DCA migration bridge** | ❌ Not started | — |
+| **B3 — DCA migration bridge** | ✅ Live | `296408f` |
 
 ### Workbench Phase 2 status
 
@@ -335,6 +336,6 @@ BitcoinHub/
 
 ---
 
-_Last updated: 2026-08-18 18:27 UTC, by `goodbot`._
+_Last updated: 2026-08-18 19:02 UTC, by `goodbot`._
 _Update trigger: any shipping decision, scope change, or new architecture
 invariant._
