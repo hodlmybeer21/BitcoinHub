@@ -2,12 +2,20 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// NOTE: MPT + Workbench route handlers are LAZY-IMPORTED inside the switch
-// below (await import(...)) — do NOT add top-level imports. Static imports
-// cause module-level init (axios client setup, ml-matrix, etc.) to crash
-// Vercel's Node cold start with FUNCTION_INVOCATION_FAILED. Lazy import
-// keeps the cold start lean and matches the existing inline-handler pattern
-// for all other routes in this file.
+import {
+  listCycles as mptListCycles,
+  computeHandler as mptCompute,
+  quoteHandler as mptQuote,
+} from './mpt-handlers';
+import {
+  listBlocks as wbListBlocks,
+  listTemplates as wbListTemplates,
+  parseHandler as wbParse,
+  evaluateHandler as wbEvaluate,
+} from './workbench-handlers';
+// MPT + Workbench handlers import their math from ./api/_mpt/* and
+// ./api/_workbench/*, so all dep trees are inside ./api/ and Vercel's
+// bundler follows the whole graph into the serverless function output.
 // --- inlined from api/cycle.ts ---
 /**
  * Live state for the 4-Year Cycle page.
@@ -3550,34 +3558,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 
 
-    if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') {
-      const { listCycles } = await import('../server/api/mpt');
-      return (listCycles as any)(req, res);
-    }
-    if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') {
-      const { computeHandler } = await import('../server/api/mpt');
-      return (computeHandler as any)(req, res);
-    }
-    if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') {
-      const { quoteHandler } = await import('../server/api/mpt');
-      return (quoteHandler as any)(req, res);
-    }
-    if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') {
-      const { listBlocks } = await import('../server/api/workbench');
-      return (listBlocks as any)(req, res);
-    }
-    if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') {
-      const { listTemplates } = await import('../server/api/workbench');
-      return (listTemplates as any)(req, res);
-    }
-    if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') {
-      const { parseHandler } = await import('../server/api/workbench');
-      return (parseHandler as any)(req, res);
-    }
-    if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') {
-      const { evaluateHandler } = await import('../server/api/workbench');
-      return (evaluateHandler as any)(req, res);
-    }
+    if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') return mptListCycles(req, res);
+    if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') return mptCompute(req, res);
+    if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') return mptQuote(req, res);
+    if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') return wbListBlocks(req, res);
+    if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') return wbListTemplates(req, res);
+    if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') return wbParse(req, res);
+    if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') return wbEvaluate(req, res);
 
     if (path === '/api/cycle/state' || path === '/api/cycle/state/') {
       try {
