@@ -21,6 +21,7 @@ import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Portfolio from "@/pages/Portfolio";
+import PortfolioMPT from "@/pages/PortfolioMPT";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -45,6 +46,7 @@ function Router() {
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
         <Route path="/portfolio" component={Portfolio} />
+        <Route path="/portfolio/mpt" component={PortfolioMPT} />
         <Route path="/forgot-password" component={() => (
           <div className="min-h-[60vh] flex items-center justify-center px-4">
             <div className="max-w-md w-full text-center space-y-3">

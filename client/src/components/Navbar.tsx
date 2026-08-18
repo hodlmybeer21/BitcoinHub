@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins } from "lucide-react";
+import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins, PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -72,15 +72,22 @@ const Navbar = () => {
   ];
 
   const toolsLinks = [
-    { 
-      href: "/dca-simulator", 
-      label: "DCA Simulator", 
+    {
+      href: "/dca-simulator",
+      label: "DCA Simulator",
       description: "Simulate dollar-cost averaging strategies",
       icon: Coins,
       comingSoon: false
     },
-    { 
-      href: "https://tracker.goodbotai.tech", 
+    {
+      href: "/portfolio/mpt",
+      label: "MPT Optimizer",
+      description: "Modern Portfolio Theory across halving cycles",
+      icon: PieChart,
+      comingSoon: false
+    },
+    {
+      href: "https://tracker.goodbotai.tech",
       label: "Value Tracker", 
       description: "Track purchasing power over time",
       icon: TrendingUp,

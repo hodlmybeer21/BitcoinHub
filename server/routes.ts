@@ -229,6 +229,7 @@ import { getCachedWhaleAlerts } from "./api/whale-alerts";
 import { getCachedOptionsFlow } from "./api/options-flow";
 import { getLiquidityData } from "./api/liquidity";
 import dcaSimulatorRouter from "./api/dca-simulator";
+import { listCycles as mptListCycles, computeHandler as mptCompute, quoteHandler as mptQuote } from "./api/mpt";
 import { z } from "zod";
 import { insertForumPostSchema, insertPortfolioEntrySchema, insertUserSchema, loginSchema, registerSchema } from "../shared/schema";
 import { hashPassword, verifyPassword, generateToken, getTokenExpiry, sendVerificationEmail, sendPasswordResetEmail } from "./auth";
@@ -718,6 +719,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // DCA Simulator
   app.use(dcaSimulatorRouter);
+
+  // MPT — Modern Portfolio Theory for crypto (cycles + universe + compute)
+  app.get(`${apiPrefix}/mpt/cycles`, mptListCycles);
+  app.post(`${apiPrefix}/mpt/compute`, mptCompute);
+  app.post(`${apiPrefix}/mpt/quote`, mptQuote);
 
   // News — RSS-backed list. Still consumed by the notifications feed
   // (in-app alerts); not exposed via a public page since the /news page was
