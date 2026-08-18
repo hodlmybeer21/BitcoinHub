@@ -78,6 +78,7 @@ verify with a curl before relying on it.
 | **Persistence — backend (schema + endpoint + hook)** | ✅ Live (code) | `665b7c8` |
 | **Persistence — deploy fix** | ✅ Live | `481683e` |
 | **Persistence — runtime verification** | ✅ Live on prod (postgres `ep-icy-star-autojvnu-pooler.c-10.us-east-1.aws.neon.tech/neondb`) | — |
+| **Persistence hardening (rate limit + CORS + audit)** | ✅ Live on prod — all 6 smoke tests pass (OPTIONS 204 + CORS headers, POST 200, GET 200, GET no-param 400, CORS rejection on bad origin, rate limit 429 on request #60) | `0bd891b` |
 
 ---
 
@@ -346,6 +347,6 @@ BitcoinHub/
 
 ---
 
-_Last updated: 2026-08-18 23:26 UTC, by `goodbot`._
+_Last updated: 2026-08-18 23:44 UTC, by `goodbot`._
 _Update trigger: any shipping decision, scope change, or new architecture
 invariant._
