@@ -200,21 +200,22 @@ export default function Workbench() {
 
   useEffect(() => { setSaved(loadSaved()); }, []);
 
-  const blocksQuery = useQuery<BlockMeta[]>({
+  const blocksQuery = useQuery<{ blocks: BlockMeta[] }>({
     queryKey: ['/api/workbench/blocks'],
-    queryFn: () => apiRequest('GET', '/api/workbench/blocks').then(d => d.blocks),
+    queryFn: () => fetch('/api/workbench/blocks').then(r => r.json()),
     staleTime: 24 * 60 * 60 * 1000,
   });
 
-  const templatesQuery = useQuery<Template[]>({
+  const templatesQuery = useQuery<{ templates: Template[] }>({
     queryKey: ['/api/workbench/templates'],
-    queryFn: () => apiRequest('GET', '/api/workbench/templates').then(d => d.templates),
+    queryFn: () => fetch('/api/workbench/templates').then(r => r.json()),
     staleTime: 24 * 60 * 60 * 1000,
   });
 
   const evaluateMutation = useMutation<EvalResult, Error, void>({
     mutationFn: async () => {
-      return apiRequest('POST', '/api/workbench/evaluate', { formula, range });
+      const res = await apiRequest('POST', '/api/workbench/evaluate', { formula, range });
+      return res.json();
     },
   });
 
@@ -258,8 +259,8 @@ export default function Workbench() {
     setFormula(prev => prev ? `${prev} ${blockId}` : blockId);
   }
 
-  const blocks = blocksQuery.data || [];
-  const templates = templatesQuery.data || [];
+  const blocks = blocksQuery.data?.blocks || [];
+  const templates = templatesQuery.data?.templates || [];
   const result = evaluateMutation.data;
 
   const blocksByCategory = useMemo(() => {

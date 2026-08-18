@@ -292,7 +292,7 @@ export default function PortfolioMPT() {
   // Fetch config (cycles + universe)
   const configQuery = useQuery<MPTConfig>({
     queryKey: ['/api/mpt/cycles'],
-    queryFn: () => apiRequest('GET', '/api/mpt/cycles'),
+    queryFn: () => fetch('/api/mpt/cycles').then(r => r.json()),
     staleTime: 24 * 60 * 60 * 1000,
   });
 
@@ -301,11 +301,12 @@ export default function PortfolioMPT() {
     mutationFn: async () => {
       const valid = holdings.filter(h => h.symbol && h.quantity > 0);
       if (valid.length < 2) throw new Error('Need at least 2 valid holdings');
-      return apiRequest('POST', '/api/mpt/compute', {
+      const res = await apiRequest('POST', '/api/mpt/compute', {
         holdings: valid,
         cycleId,
         riskFreeRate,
       });
+      return res.json();
     },
   });
 
