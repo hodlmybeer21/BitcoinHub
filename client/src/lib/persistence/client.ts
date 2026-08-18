@@ -4,6 +4,8 @@
 // as the offline fallback + fast first-paint cache. Server is the source of
 // truth once a value is hydrated from the network.
 
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 const USER_ID_KEY = 'bitcoinhub_user_id_v1';
 const SYNC_DEBOUNCE_MS = 800;
 const SYNC_TIMEOUT_MS = 5000;
@@ -100,8 +102,6 @@ export function scheduleSync<T>(dataKey: string, value: T, onLocal?: (v: T) => v
 
 // --- React hook ---
 
-import { useEffect, useRef, useState } from 'react';
-
 export function useSyncedStorage<T>(
   dataKey: string,
   initialValue: T,
@@ -151,6 +151,3 @@ export function useSyncedStorage<T>(
 
   return [value, setValue, loaded];
 }
-
-// useCallback shim so we don't pull it in twice
-import { useCallback } from 'react';

@@ -74,29 +74,11 @@ interface SavedIndicator {
 
 // --- Local persistence (anonymous, MVP) ---
 
-const STORAGE_KEY = 'bitcoinhub_workbench_indicators_v1';
-
-// localStorage keys retained for fast first-paint + offline fallback inside
+// localStorage keys used as fast first-paint cache + offline fallback inside
 // the useSyncedStorage hook. Writes go through the hook (which schedules a
 // debounced server sync via /api/persistence/sync).
 const STORAGE_KEY = 'bitcoinhub_workbench_indicators_v1';
 const CANVAS_POS_KEY = 'bitcoinhub_workbench_canvas_v1';
-
-// Canvas node positions persist independently of saved indicators so users can
-// arrange their drag-drop canvas and have it survive reloads.
-const CANVAS_POS_KEY = 'bitcoinhub_workbench_canvas_v1';
-
-function loadCanvasPositions(): PositionMap {
-  try {
-    const raw = localStorage.getItem(CANVAS_POS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
-
-function persistCanvasPositions(p: PositionMap) {
-  try { localStorage.setItem(CANVAS_POS_KEY, JSON.stringify(p)); }
-  catch (e) { console.warn('[workbench] canvas positions localStorage write failed:', e); }
-}
 
 // --- Helpers ---
 
