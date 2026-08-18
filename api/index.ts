@@ -2,6 +2,8 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { listCycles as mptListCycles, computeHandler as mptCompute, quoteHandler as mptQuote } from '../server/api/mpt';
+import { listBlocks as wbListBlocks, listTemplates as wbListTemplates, parseHandler as wbParse, evaluateHandler as wbEvaluate } from '../server/api/workbench';
 // --- inlined from api/cycle.ts ---
 /**
  * Live state for the 4-Year Cycle page.
@@ -3543,6 +3545,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/financial/inflation' || path === '/api/financial/inflation/') return handleFinancialInflation(req, res);
 
 
+
+    if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') return (mptListCycles as any)(req, res);
+    if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') return (mptCompute as any)(req, res);
+    if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') return (mptQuote as any)(req, res);
+    if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') return (wbListBlocks as any)(req, res);
+    if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') return (wbListTemplates as any)(req, res);
+    if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') return (wbParse as any)(req, res);
+    if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') return (wbEvaluate as any)(req, res);
 
     if (path === '/api/cycle/state' || path === '/api/cycle/state/') {
       try {
