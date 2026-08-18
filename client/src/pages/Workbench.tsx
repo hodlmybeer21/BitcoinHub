@@ -1,8 +1,14 @@
 // BitcoinHub Workbench — No-Code Indicator Builder
 // /workbench — main page
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import {
+  ReactFlow, Background, Controls, MiniMap,
+  applyNodeChanges, applyEdgeChanges, addEdge,
+  Handle, Position, type Node as RFNode, type Edge, type NodeChange, type EdgeChange, type Connection,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -22,7 +28,7 @@ import {
 } from "recharts";
 import {
   AlertCircle, Hammer, Sparkles, Save, FolderOpen, Trash2, Play,
-  RefreshCw, Copy, BookOpen,
+  RefreshCw, Copy, BookOpen, Plus, MousePointerClick,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -78,6 +84,22 @@ function loadSaved(): SavedIndicator[] {
 function persistSaved(items: SavedIndicator[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
   catch (e) { console.warn('[workbench] localStorage write failed:', e); }
+}
+
+// Canvas node positions persist independently of saved indicators so users can
+// arrange their drag-drop canvas and have it survive reloads.
+const CANVAS_POS_KEY = 'bitcoinhub_workbench_canvas_v1';
+
+function loadCanvasPositions(): PositionMap {
+  try {
+    const raw = localStorage.getItem(CANVAS_POS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function persistCanvasPositions(p: PositionMap) {
+  try { localStorage.setItem(CANVAS_POS_KEY, JSON.stringify(p)); }
+  catch (e) { console.warn('[workbench] canvas positions localStorage write failed:', e); }
 }
 
 // --- Helpers ---
@@ -342,6 +364,269 @@ function VisualFormulaEditor({ formula, blocks }: { formula: string; blocks: Blo
   );
 }
 
+// --- Canvas editor (Workbench Phase 3) ---
+
+// Lightweight AST → ReactFlow graph.  Each AST node becomes one RF node; each
+// parent→child link becomes one RF edge.  Node positioning uses a simple
+// auto-layout (column per AST depth, row per sibling).  The graph is rebuilt
+// every time the formula changes, but node positions are preserved by id so
+// users don't lose their drag-arrangement.
+
+interface PositionMap { [nodeId: string]: { x: number; y: number }; }
+
+function astToGraph(
+  ast: ASTNode | null,
+  blocks: BlockMeta[],
+  positions: PositionMap,
+): { nodes: RFNode[]; edges: Edge[] } {
+  if (!ast) return { nodes: [], edges: [] };
+  const nodes: RFNode[] = [];
+  const edges: Edge[] = [];
+  let idSeq = 0;
+
+  const blockCategory = (id: string): string =>
+    blocks.find(b => b.id === id)?.category ?? 'unknown';
+
+  function push(node: ASTNode, depth: number): string {
+    const id = `n${idSeq++}`;
+    const label = (() => {
+      switch (node.type) {
+        case 'data': return node.id;
+        case 'const': return String(node.value);
+        case 'neg': return '−';
+        case 'add': return '+';
+        case 'sub': return '−';
+        case 'mul': return '×';
+        case 'div': return '÷';
+        case 'cmp': return node.op;
+        case 'and': return 'AND';
+        case 'or': return 'OR';
+        case 'not': return 'NOT';
+        case 'series': return `${node.op}(${node.period})`;
+        case 'cross': return node.op.replace('_', ' ');
+        case 'between': return 'between';
+      }
+    })();
+    const category = node.type === 'data' ? blockCategory((node as any).id) : node.type;
+
+    // Auto-layout: column = depth, row = sibling index in a separate counter map.
+    const col = depth;
+    const row = (siblingCount[depth] = (siblingCount[depth] || 0) + 1) - 1;
+    const saved = positions[id] ?? { x: 60 + col * 220, y: 40 + row * 110 };
+    nodes.push({
+      id,
+      type: 'block',
+      position: saved,
+      data: { label, category, kind: node.type, payload: node },
+    });
+
+    function linkChild(childId: string, handle: string) {
+      edges.push({
+        id: `e${childId}->${id}`,
+        source: childId,
+        target: id,
+        sourceHandle: 'out',
+        targetHandle: handle,
+        animated: false,
+      });
+    }
+
+    if (node.type === 'neg') {
+      linkChild(push(node.input, depth + 1), 'in');
+    } else if (node.type === 'add' || node.type === 'sub' || node.type === 'mul' || node.type === 'div') {
+      linkChild(push(node.left, depth + 1), 'left');
+      linkChild(push(node.right, depth + 1), 'right');
+    } else if (node.type === 'cmp') {
+      linkChild(push(node.left, depth + 1), 'left');
+      linkChild(push(node.right, depth + 1), 'right');
+    } else if (node.type === 'and' || node.type === 'or') {
+      node.inputs.forEach((child, i) => {
+        linkChild(push(child, depth + 1), `in${i}`);
+      });
+    } else if (node.type === 'not') {
+      linkChild(push(node.input, depth + 1), 'in');
+    } else if (node.type === 'series') {
+      linkChild(push(node.input, depth + 1), 'in');
+    } else if (node.type === 'cross') {
+      linkChild(push(node.left, depth + 1), 'left');
+      linkChild(push(node.right, depth + 1), 'right');
+    } else if (node.type === 'between') {
+      linkChild(push(node.input, depth + 1), 'in');
+      linkChild(push(node.lo, depth + 1), 'lo');
+      linkChild(push(node.hi, depth + 1), 'hi');
+    }
+    return id;
+  }
+
+  // siblingCount is a closure-local counter; reset per call.
+  const siblingCount: Record<number, number> = {};
+  void push(ast, 0);
+  return { nodes, edges };
+}
+
+// Custom node renderer for ReactFlow.
+const CATEGORY_COLORS: Record<string, string> = {
+  price: '#fb923c', sentiment: '#facc15', funding: '#60a5fa', whales: '#c084fc',
+  options: '#f472b6', onchain: '#4ade80', macro: '#f87171', liquidity: '#22d3ee',
+  time: '#94a3b8', unknown: '#9ca3af',
+  data: '#fb923c', const: '#60a5fa', neg: '#c084fc',
+  add: '#facc15', sub: '#facc15', mul: '#facc15', div: '#facc15',
+  cmp: '#facc15', and: '#f472b6', or: '#f472b6', not: '#f472b6',
+  series: '#22d3ee', cross: '#22d3ee', between: '#22d3ee',
+};
+
+function BlockNode({ data }: { data: { label: string; category: string; kind: string } }) {
+  const color = CATEGORY_COLORS[data.category] ?? CATEGORY_COLORS[data.kind] ?? CATEGORY_COLORS.unknown;
+  // Determine which input handles this node has based on AST kind.
+  const inputs: { id: string; label: string }[] = (() => {
+    switch (data.kind) {
+      case 'neg':
+      case 'not':
+      case 'series':
+        return [{ id: 'in', label: 'in' }];
+      case 'add': case 'sub': case 'mul': case 'div':
+      case 'cmp':
+      case 'cross':
+        return [{ id: 'left', label: 'L' }, { id: 'right', label: 'R' }];
+      case 'between':
+        return [{ id: 'in', label: 'x' }, { id: 'lo', label: 'lo' }, { id: 'hi', label: 'hi' }];
+      case 'and': case 'or':
+        // AND/OR can take 2..N inputs.  Show 3 slots for the common case.
+        return [{ id: 'in0', label: 'A' }, { id: 'in1', label: 'B' }, { id: 'in2', label: 'C' }];
+      default:
+        return [];
+    }
+  })();
+  return (
+    <div
+      className="px-3 py-2 rounded-md border-2 bg-card shadow-md min-w-[110px] text-center font-mono text-xs"
+      style={{ borderColor: color, color }}
+    >
+      {inputs.map((p, i) => (
+        <Handle
+          key={p.id}
+          id={p.id}
+          type="target"
+          position={Position.Left}
+          style={{ background: color, top: `${30 + i * 24}px` }}
+        />
+      ))}
+      <div className="font-semibold text-foreground">{data.label}</div>
+      <div className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wide">{data.kind}</div>
+      <Handle
+        id="out"
+        type="source"
+        position={Position.Right}
+        style={{ background: color, top: '50%' }}
+      />
+    </div>
+  );
+}
+
+const nodeTypes = { block: BlockNode };
+
+function CanvasEditor({
+  formula, blocks, positions, onPositionsChange, onInsertRequest,
+}: {
+  formula: string;
+  blocks: BlockMeta[];
+  positions: PositionMap;
+  onPositionsChange: (next: PositionMap) => void;
+  onInsertRequest: (blockId: string) => void;
+}) {
+  const [tree, setTree] = useState<ASTNode | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!formula.trim()) { setTree(null); setParseError(null); return; }
+    setLoading(true);
+    fetch('/api/workbench/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formula }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ast) { setTree(data.ast); setParseError(null); }
+        else { setParseError(data.error || 'Parse error'); setTree(null); }
+      })
+      .catch(e => { setParseError(String(e)); setTree(null); })
+      .finally(() => setLoading(false));
+  }, [formula]);
+
+  const { nodes, edges } = useMemo(
+    () => astToGraph(tree, blocks, positions),
+    [tree, blocks, positions],
+  );
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      // Persist position changes so the user-arranged layout survives formula edits.
+      let nextPositions = positions;
+      for (const change of changes) {
+        if (change.type === 'position' && change.position && change.id) {
+          nextPositions = { ...nextPositions, [change.id]: change.position };
+        }
+      }
+      if (nextPositions !== positions) onPositionsChange(nextPositions);
+    },
+    [positions, onPositionsChange],
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs">
+        <div className="text-muted-foreground">
+          <MousePointerClick className="h-3 w-3 inline mr-1" />
+          Drag from palette to add a block. Drag nodes to rearrange.
+          Edges show how each formula term composes.
+        </div>
+        <div className="flex items-center gap-2 font-mono text-muted-foreground">
+          {loading ? 'parsing…' : (
+            <>{nodes.length} nodes · {edges.length} edges</>
+          )}
+        </div>
+      </div>
+      <div className="h-[440px] rounded border border-border/50 bg-muted/20 overflow-hidden">
+        {parseError ? (
+          <div className="h-full flex items-center justify-center p-4">
+            <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2 max-w-md">
+              <AlertCircle className="h-3 w-3 inline mr-1" />
+              {parseError}
+            </div>
+          </div>
+        ) : nodes.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm gap-2 p-4">
+            <Plus className="h-6 w-6" />
+            <div className="text-center">
+              <div className="font-semibold text-foreground">Empty canvas</div>
+              <div className="text-xs">Click any block in the palette to add it as a node.</div>
+            </div>
+          </div>
+        ) : (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            fitView
+            proOptions={{ hideAttribution: true }}
+            minZoom={0.2}
+            maxZoom={2}
+            nodesDraggable
+            nodesConnectable={false}
+            elementsSelectable
+          >
+            <Background gap={16} color="rgba(255,255,255,0.05)" />
+            <Controls showInteractive={false} className="!bg-card !border-border/50" />
+          </ReactFlow>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- Main page ---
 
 const RANGE_PRESETS: { label: string; days: number }[] = [
@@ -362,9 +647,18 @@ export default function Workbench() {
   const [saved, setSaved] = useState<SavedIndicator[]>([]);
   const [saveDialog, setSaveDialog] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
   const [showBlocks, setShowBlocks] = useState(true);
-  const [editorMode, setEditorMode] = useState<'formula' | 'visual'>('formula');
+  const [editorMode, setEditorMode] = useState<'formula' | 'visual' | 'canvas'>('formula');
+  const [canvasPositions, setCanvasPositions] = useState<PositionMap>({});
 
-  useEffect(() => { setSaved(loadSaved()); }, []);
+  useEffect(() => {
+    setSaved(loadSaved());
+    setCanvasPositions(loadCanvasPositions());
+  }, []);
+
+  const onCanvasPositionsChange = useCallback((next: PositionMap) => {
+    setCanvasPositions(next);
+    persistCanvasPositions(next);
+  }, []);
 
   const blocksQuery = useQuery<{ blocks: BlockMeta[] }>({
     queryKey: ['/api/workbench/blocks'],
@@ -558,10 +852,11 @@ export default function Workbench() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">Formula</CardTitle>
-                  <Tabs value={editorMode} onValueChange={(v) => setEditorMode(v as 'formula' | 'visual')}>
+                  <Tabs value={editorMode} onValueChange={(v) => setEditorMode(v as 'formula' | 'visual' | 'canvas')}>
                     <TabsList className="h-7">
                       <TabsTrigger value="formula" className="text-xs h-6 px-2">Formula</TabsTrigger>
                       <TabsTrigger value="visual" className="text-xs h-6 px-2">Visual</TabsTrigger>
+                      <TabsTrigger value="canvas" className="text-xs h-6 px-2">Canvas</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 </div>
@@ -579,8 +874,15 @@ export default function Workbench() {
                     className="w-full font-mono text-sm p-3 rounded bg-muted/40 border border-border/50 focus:outline-none focus:border-orange-500/50"
                     placeholder="e.g. fear_greed.value < 30 AND btc.price.change(7) < -10"
                   />
-                ) : (
+                ) : editorMode === 'visual' ? (
                   <VisualFormulaEditor formula={formula} blocks={blocks} />
+                ) : (
+                  <CanvasEditor
+                    formula={formula}
+                    blocks={blocks}
+                    positions={canvasPositions}
+                    onPositionsChange={onCanvasPositionsChange}
+                  />
                 )}
 
                 <div className="flex flex-wrap items-center gap-2">
