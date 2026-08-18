@@ -322,6 +322,19 @@ export default function PortfolioMPT() {
 
   useEffect(() => { setSaved(loadSavedPortfolios()); }, []);
 
+  // Stress test mutation (MPT Phase 2 B2)
+  const stressMutation = useMutation<
+    { events: Array<{ event: { id: string; label: string; description: string; start: string; end: string }; portfolioValueBefore: number; portfolioValueLow: number; portfolioValueAfter: number; portfolioDrawdownPct: number; recoveryPct: number; assets: Array<{ symbol: string; quantity: number; priceBefore: number; priceLow: number; priceAfter: number; drawdownPct: number; valueLost: number }> }>; summary: { worstDrawdown: number; eventsRun: number } },
+    Error, void
+  >({
+    mutationFn: async () => {
+      const valid = holdings.filter(h => h.symbol && h.quantity > 0);
+      if (valid.length < 1) throw new Error('Need at least 1 valid holding');
+      const res = await apiRequest('POST', '/api/mpt/stress-test', { holdings: valid, cycleId });
+      return res.json();
+    },
+  });
+
   // Fetch config (cycles + universe)
   const configQuery = useQuery<MPTConfig>({
     queryKey: ['/api/mpt/cycles'],
@@ -502,6 +515,18 @@ export default function PortfolioMPT() {
               >
                 <Save className="h-4 w-4 mr-2" /> Save Portfolio
               </Button>
+
+              <Button
+                variant="outline"
+                disabled={holdings.filter(h => h.symbol && h.quantity > 0).length < 1}
+                onClick={() => stressMutation.mutate()}
+              >
+                {stressMutation.isPending ? (
+                  <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Stress testing…</>
+                ) : (
+                  <><AlertCircle className="h-4 w-4 mr-2" /> Stress Test</>
+                )}
+              </Button>
             </div>
 
             {/* Holdings table */}
@@ -580,6 +605,77 @@ export default function PortfolioMPT() {
                 <div className="font-semibold text-red-400">Compute failed</div>
                 <div className="text-sm text-muted-foreground">{computeMutation.error.message}</div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stress test results (MPT Phase 2 B2) */}
+        {(stressMutation.data || stressMutation.error) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Stress Test Results
+              </CardTitle>
+              <CardDescription>
+                Historical crashes — what your current portfolio would have lost.
+                {stressMutation.data?.summary && (
+                  <span className="ml-1">
+                    Worst drawdown across {stressMutation.data.summary.eventsRun} events:{' '}
+                    <span className={pctColor(-stressMutation.data.summary.worstDrawdown)}>
+                      -{(stressMutation.data.summary.worstDrawdown * 100).toFixed(1)}%
+                    </span>
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {stressMutation.error && (
+                <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2">
+                  <AlertCircle className="h-3 w-3 inline mr-1" />
+                  {stressMutation.error.message}
+                </div>
+              )}
+              {stressMutation.data && stressMutation.data.events.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Window</TableHead>
+                      <TableHead className="text-right">Value Before</TableHead>
+                      <TableHead className="text-right">Drawdown Low</TableHead>
+                      <TableHead className="text-right">Drawdown</TableHead>
+                      <TableHead className="text-right">Recovery</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stressMutation.data.events.map(e => (
+                      <TableRow key={e.event.id}>
+                        <TableCell>
+                          <div className="font-semibold text-xs">{e.event.label}</div>
+                          <div className="text-[10px] text-muted-foreground line-clamp-2">{e.event.description}</div>
+                        </TableCell>
+                        <TableCell className="text-[10px] font-mono text-muted-foreground">{e.event.start} → {e.event.end}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(e.portfolioValueBefore)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(e.portfolioValueLow)}</TableCell>
+                        <TableCell className={`text-right font-mono font-semibold ${pctColor(-e.portfolioDrawdownPct)}`}>
+                          -{(e.portfolioDrawdownPct * 100).toFixed(1)}%
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          {(e.recoveryPct * 100).toFixed(0)}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {stressMutation.isPending && (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

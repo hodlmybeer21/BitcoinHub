@@ -3616,6 +3616,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: h } = await import('../lib/mpt/quote.js');
       return h(req, res);
     }
+    if (path === '/api/mpt/stress-test' || path === '/api/mpt/stress-test/') {
+      const { default: h } = await import('../lib/mpt/stress.js');
+      return h(req, res);
+    }
     if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') {
       const { default: h } = await import('../lib/workbench/blocks.js');
       return h(req, res);
