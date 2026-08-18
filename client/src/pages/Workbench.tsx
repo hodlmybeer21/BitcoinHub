@@ -177,6 +177,171 @@ function PreviewChart({ series, range }: { series: SeriesPoint[]; range: { start
   );
 }
 
+// --- Visual formula editor (Phase 2) ---
+
+type ASTNode =
+  | { type: 'data'; id: string }
+  | { type: 'const'; value: number }
+  | { type: 'neg'; input: ASTNode }
+  | { type: 'add' | 'sub' | 'mul' | 'div'; left: ASTNode; right: ASTNode }
+  | { type: 'cmp'; op: '>' | '<' | '>=' | '<=' | '==' | '!='; left: ASTNode; right: ASTNode }
+  | { type: 'and' | 'or'; inputs: ASTNode[] }
+  | { type: 'not'; input: ASTNode }
+  | { type: 'series'; op: 'sma' | 'ema' | 'change' | 'stddev'; input: ASTNode; period: number }
+  | { type: 'cross'; op: 'crosses_above' | 'crosses_below'; left: ASTNode; right: ASTNode }
+  | { type: 'between'; input: ASTNode; lo: ASTNode; hi: ASTNode };
+
+function NodeRenderer({ node, blocks, depth }: { node: ASTNode; blocks: BlockMeta[]; depth: number }) {
+  const indent = depth * 14;
+  const wrap = (children: React.ReactNode, key?: string) => (
+    <div key={key} style={{ marginLeft: indent }} className="my-0.5 flex flex-wrap items-center gap-1">
+      {children}
+    </div>
+  );
+  const Chip = ({ children, color }: { children: React.ReactNode; color: string }) => (
+    <span className={`font-mono text-xs px-2 py-0.5 rounded border ${color}`}>{children}</span>
+  );
+  const opColor = 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
+  const dataColor = 'bg-orange-500/15 text-orange-300 border-orange-500/30';
+  const constColor = 'bg-blue-500/15 text-blue-300 border-blue-500/30';
+  const fnColor = 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+  const logicColor = 'bg-pink-500/15 text-pink-300 border-pink-500/30';
+
+  switch (node.type) {
+    case 'data': {
+      const block = blocks.find(b => b.id === node.id);
+      return wrap(
+        <>
+          <Chip color={dataColor}>{node.id}</Chip>
+          {block && <span className="text-[10px] text-muted-foreground">({block.label})</span>}
+        </>
+      );
+    }
+    case 'const':
+      return wrap(<Chip color={constColor}>{String(node.value)}</Chip>);
+    case 'neg':
+      return wrap(
+        <>
+          <span className="font-mono text-xs text-purple-300 px-1">−</span>
+          <NodeRenderer node={node.input} blocks={blocks} depth={depth} />
+        </>
+      );
+    case 'add': case 'sub': case 'mul': case 'div': {
+      const sym = node.type === 'add' ? '+' : node.type === 'sub' ? '−' : node.type === 'mul' ? '×' : '÷';
+      return wrap(
+        <>
+          <NodeRenderer node={node.left} blocks={blocks} depth={depth} />
+          <Chip color={opColor}>{sym}</Chip>
+          <NodeRenderer node={node.right} blocks={blocks} depth={depth} />
+        </>
+      );
+    }
+    case 'cmp':
+      return wrap(
+        <>
+          <NodeRenderer node={node.left} blocks={blocks} depth={depth} />
+          <Chip color={opColor}>{node.op}</Chip>
+          <NodeRenderer node={node.right} blocks={blocks} depth={depth} />
+        </>
+      );
+    case 'and': case 'or':
+      return (
+        <div style={{ marginLeft: indent }} className="my-0.5">
+          {node.inputs.map((input, i) => (
+            <div key={i} className="my-1">
+              <NodeRenderer node={input} blocks={blocks} depth={depth} />
+              {i < node.inputs.length - 1 && (
+                <div style={{ marginLeft: indent + 14 }}>
+                  <Chip color={logicColor}>{node.type.toUpperCase()}</Chip>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    case 'not':
+      return wrap(
+        <>
+          <Chip color={logicColor}>NOT</Chip>
+          <NodeRenderer node={node.input} blocks={blocks} depth={depth} />
+        </>
+      );
+    case 'series':
+      return wrap(
+        <>
+          <Chip color={fnColor}>{node.op}</Chip>
+          <span className="text-muted-foreground text-xs">(</span>
+          <NodeRenderer node={node.input} blocks={blocks} depth={depth} />
+          <span className="text-muted-foreground text-xs">,</span>
+          <Chip color={constColor}>{node.period}</Chip>
+          <span className="text-muted-foreground text-xs">)</span>
+        </>
+      );
+    case 'cross':
+      return wrap(
+        <>
+          <Chip color={fnColor}>{node.op}</Chip>
+          <span className="text-muted-foreground text-xs">(</span>
+          <NodeRenderer node={node.left} blocks={blocks} depth={depth} />
+          <span className="text-muted-foreground text-xs">,</span>
+          <NodeRenderer node={node.right} blocks={blocks} depth={depth} />
+          <span className="text-muted-foreground text-xs">)</span>
+        </>
+      );
+    case 'between':
+      return wrap(
+        <>
+          <Chip color={fnColor}>between</Chip>
+          <span className="text-muted-foreground text-xs">(</span>
+          <NodeRenderer node={node.input} blocks={blocks} depth={depth} />
+          <span className="text-muted-foreground text-xs">,</span>
+          <NodeRenderer node={node.lo} blocks={blocks} depth={depth} />
+          <span className="text-muted-foreground text-xs">,</span>
+          <NodeRenderer node={node.hi} blocks={blocks} depth={depth} />
+          <span className="text-muted-foreground text-xs">)</span>
+        </>
+      );
+  }
+}
+
+function VisualFormulaEditor({ formula, blocks }: { formula: string; blocks: BlockMeta[] }) {
+  const [tree, setTree] = useState<ASTNode | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!formula.trim()) { setTree(null); setError(null); return; }
+    setLoading(true);
+    fetch('/api/workbench/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formula }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ast) { setTree(data.ast); setError(null); }
+        else { setError(data.error || 'Parse error'); setTree(null); }
+      })
+      .catch(e => { setError(String(e)); setTree(null); })
+      .finally(() => setLoading(false));
+  }, [formula]);
+
+  if (loading) return <Skeleton className="h-24 w-full" />;
+  if (error) return (
+    <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2">
+      <AlertCircle className="h-3 w-3 inline mr-1" />
+      {error}
+    </div>
+  );
+  if (!tree) return <div className="text-xs text-muted-foreground p-3 bg-muted/20 rounded border border-border/30 min-h-[80px] flex items-center justify-center">Enter a formula to see the structured view.</div>;
+
+  return (
+    <div className="p-3 rounded bg-muted/40 border border-border/50 min-h-[80px]">
+      <NodeRenderer node={tree} blocks={blocks} depth={0} />
+    </div>
+  );
+}
+
 // --- Main page ---
 
 const RANGE_PRESETS: { label: string; days: number }[] = [
@@ -197,6 +362,7 @@ export default function Workbench() {
   const [saved, setSaved] = useState<SavedIndicator[]>([]);
   const [saveDialog, setSaveDialog] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
   const [showBlocks, setShowBlocks] = useState(true);
+  const [editorMode, setEditorMode] = useState<'formula' | 'visual'>('formula');
 
   useEffect(() => { setSaved(loadSaved()); }, []);
 
@@ -390,20 +556,32 @@ export default function Workbench() {
             {/* Formula input */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Formula</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Formula</CardTitle>
+                  <Tabs value={editorMode} onValueChange={(v) => setEditorMode(v as 'formula' | 'visual')}>
+                    <TabsList className="h-7">
+                      <TabsTrigger value="formula" className="text-xs h-6 px-2">Formula</TabsTrigger>
+                      <TabsTrigger value="visual" className="text-xs h-6 px-2">Visual</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
                 <CardDescription>
                   Operators: <code className="font-mono text-xs">+ - * /</code> · comparisons <code className="font-mono text-xs">{`> < >= <= == !=`}</code> · logic <code className="font-mono text-xs">AND OR NOT</code> · series <code className="font-mono text-xs">sma(X,n) ema(X,n) change(X,n) stddev(X,n)</code> · cross <code className="font-mono text-xs">crosses_above(a,b)</code> · range <code className="font-mono text-xs">between(x,lo,hi)</code>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <textarea
-                  value={formula}
-                  onChange={e => setFormula(e.target.value)}
-                  rows={3}
-                  spellCheck={false}
-                  className="w-full font-mono text-sm p-3 rounded bg-muted/40 border border-border/50 focus:outline-none focus:border-orange-500/50"
-                  placeholder="e.g. fear_greed.value < 30 AND btc.price.change(7) < -10"
-                />
+                {editorMode === 'formula' ? (
+                  <textarea
+                    value={formula}
+                    onChange={e => setFormula(e.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    className="w-full font-mono text-sm p-3 rounded bg-muted/40 border border-border/50 focus:outline-none focus:border-orange-500/50"
+                    placeholder="e.g. fear_greed.value < 30 AND btc.price.change(7) < -10"
+                  />
+                ) : (
+                  <VisualFormulaEditor formula={formula} blocks={blocks} />
+                )}
 
                 <div className="flex flex-wrap items-center gap-2">
                   <Select value={String(rangeDays)} onValueChange={v => applyRange(parseInt(v))}>
