@@ -2,6 +2,13 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import mptListCycles from '../lib/mpt/cycles';
+import mptCompute from '../lib/mpt/compute';
+import mptQuote from '../lib/mpt/quote';
+import wbListBlocks from '../lib/workbench/blocks';
+import wbListTemplates from '../lib/workbench/templates';
+import wbParse from '../lib/workbench/parse';
+import wbEvaluate from '../lib/workbench/evaluate';
 // --- inlined from api/cycle.ts ---
 /**
  * Live state for the 4-Year Cycle page.
@@ -3593,6 +3600,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/cron/refresh-btc-history' || path === '/api/cron/refresh-btc-history/') {
       return handleCronRefreshBTCHistory(req, res);
     }
+
+    // MPT + Workbench routes — handlers live in lib/mpt/* and lib/workbench/*
+    // (out of api/ so Vercel doesn't count them as separate serverless
+    // functions; the 12-function Hobby limit is the binding constraint).
+    if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') return mptListCycles(req, res);
+    if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') return mptCompute(req, res);
+    if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') return mptQuote(req, res);
+    if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') return wbListBlocks(req, res);
+    if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') return wbListTemplates(req, res);
+    if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') return wbParse(req, res);
+    if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') return wbEvaluate(req, res);
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);

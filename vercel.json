@@ -17,62 +17,6 @@
       "dest": "/api/dca-simulator"
     },
     {
-      "src": "/api/mpt/cycles",
-      "dest": "/api/mpt-cycles"
-    },
-    {
-      "src": "/api/mpt/cycles/",
-      "dest": "/api/mpt-cycles"
-    },
-    {
-      "src": "/api/mpt/compute",
-      "dest": "/api/mpt-compute"
-    },
-    {
-      "src": "/api/mpt/compute/",
-      "dest": "/api/mpt-compute"
-    },
-    {
-      "src": "/api/mpt/quote",
-      "dest": "/api/mpt-quote"
-    },
-    {
-      "src": "/api/mpt/quote/",
-      "dest": "/api/mpt-quote"
-    },
-    {
-      "src": "/api/workbench/blocks",
-      "dest": "/api/workbench-blocks"
-    },
-    {
-      "src": "/api/workbench/blocks/",
-      "dest": "/api/workbench-blocks"
-    },
-    {
-      "src": "/api/workbench/templates",
-      "dest": "/api/workbench-templates"
-    },
-    {
-      "src": "/api/workbench/templates/",
-      "dest": "/api/workbench-templates"
-    },
-    {
-      "src": "/api/workbench/parse",
-      "dest": "/api/workbench-parse"
-    },
-    {
-      "src": "/api/workbench/parse/",
-      "dest": "/api/workbench-parse"
-    },
-    {
-      "src": "/api/workbench/evaluate",
-      "dest": "/api/workbench-evaluate"
-    },
-    {
-      "src": "/api/workbench/evaluate/",
-      "dest": "/api/workbench-evaluate"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "/api/index"
     },
