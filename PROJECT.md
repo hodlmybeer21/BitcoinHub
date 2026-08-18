@@ -41,6 +41,8 @@ verify with a curl before relying on it.
 
 | Commit | What |
 |---|---|
+| `665b7c8` | **feat(persistence)**: anonymous UUID sync layer (foundation for paid tiers + public gallery). Backend: `anonymous_data` table with composite unique index, `lib/persistence/server.ts` (self-healing CREATE TABLE + lazy-imported Neon pool + upsert/get helpers), `api/index.ts` `handlePersistenceSync` handler (POST upsert / GET single key / GET all keys, 1MB per key cap), `lib/persistence/client.ts` later moved to `client/src/lib/persistence/client.ts`. Frontend: `useSyncedStorage<T>(dataKey, initialValue, localKey)` hook (local first-paint + debounced server sync + offline fallback) + `getUserId` UUID helper. Page integrations: Workbench.tsx (`workbench_indicators` + `workbench_canvas_positions`), PortfolioMPT.tsx (`mpt_portfolios` + `mpt_dca_plan`), DCASimulator.tsx (`mpt_dca_plan`). |
+| `481683e` | **fix(persistence)**: dedupe Workbench STORAGE_KEY + move client.ts to client/src/. Two deploy bugs found: Workbench.tsx had duplicate const STORAGE_KEY / const CANVAS_POS_KEY + dead loadCanvasPositions / persistCanvasPositions helpers (esbuild rejected at parse → silently dropped the whole module). Also: `@/lib/persistence/client` import resolved to `client/src/...` but file was at project root (Vite looked for client/src/lib/persistence/client, didn't find it → build failed for any page importing useSyncedStorage). Moved file to `client/src/lib/persistence/client.ts` with consolidated React imports. |
 | `7ef64f2` | **feat(workbench)**: templates gallery + portability MVP (Phase 3 slice 3). New `/workbench/templates` page lists all 8 built-in templates with category filter (Sentiment/Price/Funding/Macro/Other — derived client-side). Each card has 'Use this template' button that navigates to `/workbench?formula=<encoded>`. Workbench.tsx reads `?formula=` (pre-fills formula) and `?import=` (opens fork dialog with base64-decoded indicator) on mount, clearing the query string after consume. Each saved indicator gets Share button (copies base64-encoded `?import=` URL to clipboard) and Export button (downloads `<name>.workbench.json`). '+ Import' button in Saved card opens paste-JSON dialog. Import dialog has two modes: fork-from-shared-URL (preview + Fork & Save) and paste-JSON (textarea + Import). Fixed bottom-right toast for feedback. No new deps. |
 | `c25c5b4` | **feat(workbench)**: drag-from-palette onto canvas (Phase 3 slice 2). BlockChip is HTML5-draggable with `application/bitcoinhub-block` mime; canvas wrapper has onDragOver/onDrop; on drop, `rfInstance.screenToFlowPosition` converts cursor coords to flow coords and pushes the position onto a dropQueue. `astToGraph` consumes one queue position per DataNode in DFS order so the dropped block appears exactly where the user dropped it. `useEffect` clears the queue after consumption so re-parses without new drops fall back to auto-layout + saved positions. |
 | `2601ad1` | **feat(workbench)**: drag-drop canvas editor (Workbench Phase 3 slice). New 'Canvas' tab alongside Formula / Visual. Renders parsed AST as a @xyflow/react node graph — each AST node becomes a styled ReactFlow node (color-coded by block category + AST kind) with input/output handles showing how the formula composes. Custom BlockNode component handles 1-input (neg/not/series), 2-input (add/sub/mul/div/cmp/cross), 3-input (between), and N-input (and/or) shapes. Node positions persist to localStorage (`bitcoinhub_workbench_canvas_v1`) and survive reloads + formula edits. Formula string remains source of truth; canvas is the visualization. Future slices: drag-from-palette-onto-canvas, manual edge creation, graph→formula bidirectional editing. |
@@ -73,6 +75,9 @@ verify with a curl before relying on it.
 | **Drag-drop canvas (Phase 3)** | ✅ Live | `2601ad1` |
 | **Drag-from-palette (Phase 3 slice 2)** | ✅ Live | `c25c5b4` |
 | **Templates gallery + portability (Phase 3 slice 3)** | ✅ Live | `7ef64f2` |
+| **Persistence — backend (schema + endpoint + hook)** | ✅ Live (code) | `665b7c8` |
+| **Persistence — deploy fix** | ✅ Live | `481683e` |
+| **Persistence — runtime verification** | ✅ Live on prod (postgres `ep-icy-star-autojvnu-pooler.c-10.us-east-1.aws.neon.tech/neondb`) | — |
 
 ---
 
@@ -341,6 +346,6 @@ BitcoinHub/
 
 ---
 
-_Last updated: 2026-08-18 20:32 UTC, by `goodbot`._
+_Last updated: 2026-08-18 23:26 UTC, by `goodbot`._
 _Update trigger: any shipping decision, scope change, or new architecture
 invariant._
