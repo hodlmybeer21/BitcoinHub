@@ -230,6 +230,12 @@ import { getCachedOptionsFlow } from "./api/options-flow";
 import { getLiquidityData } from "./api/liquidity";
 import dcaSimulatorRouter from "./api/dca-simulator";
 import { listCycles as mptListCycles, computeHandler as mptCompute, quoteHandler as mptQuote } from "./api/mpt";
+import {
+  listBlocks as wbListBlocks,
+  listTemplates as wbListTemplates,
+  parseHandler as wbParse,
+  evaluateHandler as wbEvaluate,
+} from "./api/workbench";
 import { z } from "zod";
 import { insertForumPostSchema, insertPortfolioEntrySchema, insertUserSchema, loginSchema, registerSchema } from "../shared/schema";
 import { hashPassword, verifyPassword, generateToken, getTokenExpiry, sendVerificationEmail, sendPasswordResetEmail } from "./auth";
@@ -724,6 +730,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(`${apiPrefix}/mpt/cycles`, mptListCycles);
   app.post(`${apiPrefix}/mpt/compute`, mptCompute);
   app.post(`${apiPrefix}/mpt/quote`, mptQuote);
+
+  // Workbench — no-code indicator builder (block registry + templates + evaluate)
+  app.get(`${apiPrefix}/workbench/blocks`, wbListBlocks);
+  app.get(`${apiPrefix}/workbench/templates`, wbListTemplates);
+  app.post(`${apiPrefix}/workbench/parse`, wbParse);
+  app.post(`${apiPrefix}/workbench/evaluate`, wbEvaluate);
 
   // News — RSS-backed list. Still consumed by the notifications feed
   // (in-app alerts); not exposed via a public page since the /news page was

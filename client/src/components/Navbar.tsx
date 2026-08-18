@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins, PieChart } from "lucide-react";
+import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins, PieChart, Hammer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -84,6 +84,13 @@ const Navbar = () => {
       label: "MPT Optimizer",
       description: "Modern Portfolio Theory across halving cycles",
       icon: PieChart,
+      comingSoon: false
+    },
+    {
+      href: "/workbench",
+      label: "Workbench",
+      description: "Build custom indicators — no code",
+      icon: Hammer,
       comingSoon: false
     },
     {
