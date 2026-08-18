@@ -281,14 +281,67 @@ async function handleNotifications(_: VercelRequest, res: VercelResponse) {
 // endpoint works the moment the deploy hits Vercel — no manual migration
 // step required. userId is an anonymous client-generated UUID; no login needed.
 
+// ─── Persistence (anonymous UUID MVP) ───────────────────────────────────────────
+// Lazy-imports lib/persistence/server.js so neon + ws aren't in the cold-start
+// bundle. Self-healing CREATE TABLE IF NOT EXISTS runs on first call, so the
+// endpoint works the moment the deploy hits Vercel — no manual migration
+// step required. userId is an anonymous client-generated UUID; no login needed.
+//
+// Phase 4 hardening: CORS allowlist (no wildcard), per-IP rate limiting (60
+// writes/min, 300 reads/min), OPTIONS preflight handling, hashed audit logging.
+
+const PERSISTENCE_ALLOWED_ORIGIN = 'https://bitcoinhub.goodbotai.tech';
+
+function setPersistenceCorsHeaders(res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', PERSISTENCE_ALLOWED_ORIGIN);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+}
+
+function getClientIp(req: VercelRequest): string {
+  // Vercel/Cloudflare both forward the original client IP.
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) {
+    const first = String(xff).split(',')[0]?.trim();
+    if (first) return first;
+  }
+  const cf = req.headers['cf-connecting-ip'];
+  if (cf) {
+    const v = String(cf).trim();
+    if (v) return v;
+  }
+  const real = req.headers['x-real-ip'];
+  if (real) {
+    const v = String(real).trim();
+    if (v) return v;
+  }
+  return 'unknown';
+}
+
 async function handlePersistenceSync(req: VercelRequest, res: VercelResponse) {
+  // CORS preflight — short-circuit with 204 + allowlist headers.
+  if (req.method === 'OPTIONS') {
+    setPersistenceCorsHeaders(res);
+    return res.status(204).end();
+  }
+
+  setPersistenceCorsHeaders(res);
+
   try {
     if (!process.env.DATABASE_URL) {
       return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
     }
-    const { upsertAnonData, getAnonData } = await import('../lib/persistence/server.js');
+    const { upsertAnonData, getAnonData, checkRateLimit } = await import('../lib/persistence/server.js');
+
+    const ip = getClientIp(req);
 
     if (req.method === 'POST') {
+      if (!checkRateLimit(ip, 'write')) {
+        return err(res, 429, 'Rate limit exceeded: max 60 writes/min per IP. Slow down.');
+      }
       const { userId, dataKey, dataValue } = req.body ?? {};
       if (!userId || typeof userId !== 'string' || !dataKey || typeof dataKey !== 'string'
           || typeof dataValue !== 'string') {
@@ -297,15 +350,18 @@ async function handlePersistenceSync(req: VercelRequest, res: VercelResponse) {
       if (dataValue.length > 1_000_000) {
         return err(res, 413, 'dataValue too large (max 1MB per key)');
       }
-      await upsertAnonData(userId, dataKey, dataValue);
+      await upsertAnonData(userId, dataKey, dataValue, ip);
       return ok(res, { ok: true, dataKey, updatedAt: new Date().toISOString() });
     }
 
     if (req.method === 'GET') {
+      if (!checkRateLimit(ip, 'read')) {
+        return err(res, 429, 'Rate limit exceeded: max 300 reads/min per IP. Slow down.');
+      }
       const userId = (req.query.userId as string) || '';
       if (!userId) return err(res, 400, 'userId query param required');
       const dataKey = req.query.dataKey as string | undefined;
-      const result = await getAnonData(userId, dataKey);
+      const result = await getAnonData(userId, dataKey, ip);
       return ok(res, result);
     }
 

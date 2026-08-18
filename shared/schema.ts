@@ -209,3 +209,19 @@ export const anonymousData = pgTable("anonymous_data", {
 }));
 
 export type AnonymousData = typeof anonymousData.$inferSelect;
+
+// Persistence audit log (BitcoinHub Phase 4 hardening).
+// Stores HASHED user IDs + HASHED IPs only — no plaintext PII, no plaintext UUIDs.
+// action: 'read' | 'write' | 'list'. data_key is null for 'list'. byte_size tracks
+// per-row storage cost (helps detect abuse patterns).
+export const persistenceAudit = pgTable("persistence_audit", {
+  id: serial("id").primaryKey(),
+  userIdHash: text("user_id_hash").notNull(),
+  action: text("action").notNull(),
+  dataKey: text("data_key"),
+  byteSize: integer("byte_size"),
+  ipHash: text("ip_hash").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PersistenceAudit = typeof persistenceAudit.$inferSelect;
