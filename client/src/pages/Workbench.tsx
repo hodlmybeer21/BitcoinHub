@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link, useSearch } from "wouter";
 import {
   ReactFlow, Background, Controls, MiniMap,
   applyNodeChanges, applyEdgeChanges, addEdge,
@@ -29,6 +30,7 @@ import {
 import {
   AlertCircle, Hammer, Sparkles, Save, FolderOpen, Trash2, Play,
   RefreshCw, Copy, BookOpen, Plus, MousePointerClick,
+  Download, Share2, Upload, Link as LinkIcon,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -701,6 +703,39 @@ export default function Workbench() {
     setCanvasPositions(loadCanvasPositions());
   }, []);
 
+  // Read ?formula= and ?import= on mount (Workbench portability slice).
+  // ?formula=  pre-fills the formula — used by /workbench/templates "Use this template"
+  // ?import=   base64-encoded JSON of an indicator; opens the import dialog so the user
+  //            can fork (save to localStorage) or cancel.
+  const [importDialog, setImportDialog] = useState<{ open: boolean; indicator: any | null }>({ open: false, indicator: null });
+  const [importText, setImportText] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+  const search = useSearch();
+  useEffect(() => {
+    if (!search) return;
+    const params = new URLSearchParams(search);
+    const formulaParam = params.get('formula');
+    if (formulaParam) {
+      try { setFormula(decodeURIComponent(formulaParam)); }
+      catch { setFormula(formulaParam); }
+    }
+    const importParam = params.get('import');
+    if (importParam) {
+      try {
+        const decoded = JSON.parse(atob(decodeURIComponent(importParam)));
+        setImportDialog({ open: true, indicator: decoded });
+      } catch (e) {
+        console.warn('[workbench] invalid import data:', e);
+      }
+    }
+    if (formulaParam || importParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('formula');
+      url.searchParams.delete('import');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [search]);
+
   const onCanvasPositionsChange = useCallback((next: PositionMap) => {
     setCanvasPositions(next);
     persistCanvasPositions(next);
@@ -765,6 +800,92 @@ export default function Workbench() {
     setFormula(prev => prev ? `${prev} ${blockId}` : blockId);
   }
 
+  // --- Portability: JSON export / URL share / paste-import ---
+
+  function buildIndicatorPayload(ind: SavedIndicator) {
+    return { name: ind.name, formula: ind.formula, range: ind.range, savedAt: ind.savedAt };
+  }
+
+  function exportIndicatorJson(ind: SavedIndicator) {
+    try {
+      const json = JSON.stringify(buildIndicatorPayload(ind), null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(ind.name || 'indicator').replace(/[^a-zA-Z0-9_-]/g, '_')}.workbench.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setToast(`Exported "${ind.name}" as JSON.`);
+      setTimeout(() => setToast(null), 2500);
+    } catch (e) {
+      setToast(`Export failed: ${String(e)}`);
+      setTimeout(() => setToast(null), 3000);
+    }
+  }
+
+  function shareIndicatorUrl(ind: SavedIndicator) {
+    try {
+      const payload = encodeURIComponent(btoa(JSON.stringify(buildIndicatorPayload(ind))));
+      const url = `${window.location.origin}/workbench?import=${payload}`;
+      navigator.clipboard?.writeText(url);
+      setToast(`Share URL copied — paste anywhere to share "${ind.name}".`);
+      setTimeout(() => setToast(null), 2500);
+    } catch (e) {
+      setToast(`Share failed: ${String(e)}`);
+      setTimeout(() => setToast(null), 3000);
+    }
+  }
+
+  function importIndicatorFromJson(parsed: any): boolean {
+    if (!parsed || typeof parsed.formula !== 'string' || !parsed.formula.trim()) return false;
+    const item: SavedIndicator = {
+      id: `ind_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      name: (typeof parsed.name === 'string' && parsed.name.trim()) ? parsed.name.trim() : 'Imported indicator',
+      formula: parsed.formula,
+      range: parsed.range && typeof parsed.range.start === 'string' && typeof parsed.range.end === 'string'
+        ? parsed.range
+        : { start: daysAgoISO(365), end: todayISO() },
+      savedAt: new Date().toISOString(),
+    };
+    const next = [...saved, item].slice(-50);
+    setSaved(next);
+    persistSaved(next);
+    setFormula(item.formula);
+    if (item.range) {
+      setRange(item.range);
+      setRangeDays(Math.max(1, Math.round((new Date(item.range.end).getTime() - new Date(item.range.start).getTime()) / 86400000)));
+    }
+    setToast(`Imported "${item.name}".`);
+    setTimeout(() => setToast(null), 2500);
+    return true;
+  }
+
+  function forkImportedIndicator() {
+    if (!importDialog.indicator) return;
+    if (importIndicatorFromJson(importDialog.indicator)) {
+      setImportDialog({ open: false, indicator: null });
+    }
+  }
+
+  function importFromText() {
+    try {
+      const parsed = JSON.parse(importText);
+      if (importIndicatorFromJson(parsed)) {
+        setImportText('');
+        setImportDialog({ open: false, indicator: null });
+      } else {
+        setToast('JSON missing required "formula" field.');
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch (e) {
+      setToast('Invalid JSON. Paste the full exported payload.');
+      setTimeout(() => setToast(null), 3000);
+    }
+  }
+
   const blocks = blocksQuery.data?.blocks || [];
   const templates = templatesQuery.data?.templates || [];
   const result = evaluateMutation.data;
@@ -809,6 +930,9 @@ export default function Workbench() {
                 <CardTitle className="text-sm flex items-center gap-2">
                   <BookOpen className="h-4 w-4" />
                   Templates
+                  <Link href="/workbench/templates" className="ml-auto text-[10px] text-orange-400 hover:underline font-normal normal-case tracking-normal">
+                    Browse all →
+                  </Link>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-1.5">
@@ -836,6 +960,14 @@ export default function Workbench() {
                 <CardTitle className="text-sm flex items-center gap-2">
                   <FolderOpen className="h-4 w-4" />
                   Saved ({saved.length})
+                  <button
+                    type="button"
+                    onClick={() => setImportDialog({ open: true, indicator: null })}
+                    className="ml-auto text-[10px] text-orange-400 hover:underline font-normal normal-case tracking-normal"
+                    title="Import indicator from JSON"
+                  >
+                    + Import
+                  </button>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-1.5">
@@ -848,7 +980,13 @@ export default function Workbench() {
                         <div className="font-semibold text-xs">{ind.name}</div>
                         <div className="text-[10px] font-mono text-muted-foreground line-clamp-1">{ind.formula}</div>
                       </button>
-                      <Button variant="ghost" size="sm" onClick={() => deleteIndicator(ind.id)} className="h-6 w-6 p-0">
+                      <Button variant="ghost" size="sm" onClick={() => shareIndicatorUrl(ind)} className="h-6 w-6 p-0" title="Copy share URL">
+                        <Share2 className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => exportIndicatorJson(ind)} className="h-6 w-6 p-0" title="Download JSON">
+                        <Download className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteIndicator(ind.id)} className="h-6 w-6 p-0" title="Delete">
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -1047,6 +1185,59 @@ export default function Workbench() {
                 <Button onClick={saveIndicator}>Save</Button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Import dialog — fork from shared URL or paste exported JSON */}
+        {importDialog.open && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setImportDialog({ open: false, indicator: null })}>
+            <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+              {importDialog.indicator ? (
+                <>
+                  <div className="text-lg font-bold mb-1">Fork shared indicator</div>
+                  <div className="text-sm text-muted-foreground mb-3">
+                    <span className="text-foreground font-semibold">"{importDialog.indicator.name}"</span> loaded from a shared URL.
+                    Save it to your library?
+                  </div>
+                  <div className="bg-muted/30 border border-border/40 rounded p-2 font-mono text-xs mb-3 break-all">
+                    {importDialog.indicator.formula}
+                  </div>
+                  {importDialog.indicator.range && (
+                    <div className="text-[10px] text-muted-foreground font-mono mb-3">
+                      Range: {importDialog.indicator.range.start} → {importDialog.indicator.range.end}
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setImportDialog({ open: false, indicator: null })}>Cancel</Button>
+                    <Button onClick={forkImportedIndicator}>Fork &amp; Save</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-lg font-bold mb-1">Import indicator</div>
+                  <div className="text-sm text-muted-foreground mb-3">
+                    Paste exported JSON below to load an indicator into your library.
+                  </div>
+                  <textarea
+                    value={importText}
+                    onChange={e => setImportText(e.target.value)}
+                    className="w-full font-mono text-xs p-2 rounded bg-muted/40 border border-border/50 h-32"
+                    placeholder='{"name": "BTC Fear Signal", "formula": "fear_greed.value < 30", "range": {...}}'
+                  />
+                  <div className="flex justify-end gap-2 mt-3">
+                    <Button variant="outline" onClick={() => setImportDialog({ open: false, indicator: null })}>Cancel</Button>
+                    <Button onClick={importFromText}>Import</Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Toast (workbench portability slice feedback) */}
+        {toast && (
+          <div className="fixed bottom-4 right-4 bg-card border border-orange-500/50 rounded-lg px-4 py-2 shadow-lg text-sm font-medium z-50 max-w-sm">
+            {toast}
           </div>
         )}
       </div>
