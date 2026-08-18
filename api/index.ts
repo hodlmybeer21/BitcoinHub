@@ -3605,31 +3605,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // any axios-using module that throws at init took down the whole
     // dispatcher (legacy routes too). Lazy import isolates each load.
     if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') {
-      const { default: h } = await import('../lib/mpt/cycles');
+      const { default: h } = await import('../lib/mpt/cycles.js');
       return h(req, res);
     }
     if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') {
-      const { default: h } = await import('../lib/mpt/compute');
+      const { default: h } = await import('../lib/mpt/compute.js');
       return h(req, res);
     }
     if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') {
-      const { default: h } = await import('../lib/mpt/quote');
+      const { default: h } = await import('../lib/mpt/quote.js');
       return h(req, res);
     }
     if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') {
-      const { default: h } = await import('../lib/workbench/blocks');
+      const { default: h } = await import('../lib/workbench/blocks.js');
       return h(req, res);
     }
     if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') {
-      const { default: h } = await import('../lib/workbench/templates');
+      const { default: h } = await import('../lib/workbench/templates.js');
       return h(req, res);
     }
     if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') {
-      const { default: h } = await import('../lib/workbench/parse');
+      const { default: h } = await import('../lib/workbench/parse.js');
       return h(req, res);
     }
     if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') {
-      const { default: h } = await import('../lib/workbench/evaluate');
+      const { default: h } = await import('../lib/workbench/evaluate.js');
       return h(req, res);
     }
 
