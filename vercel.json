@@ -17,6 +17,22 @@
       "dest": "/api/dca-simulator"
     },
     {
+      "src": "/api/mpt",
+      "dest": "/api/mpt"
+    },
+    {
+      "src": "/api/mpt/",
+      "dest": "/api/mpt"
+    },
+    {
+      "src": "/api/workbench",
+      "dest": "/api/workbench"
+    },
+    {
+      "src": "/api/workbench/",
+      "dest": "/api/workbench"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index"
     },
