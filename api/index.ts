@@ -2,13 +2,11 @@
 // Replaces old Express bundle. All routes inline, no module-level init.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import mptListCycles from '../lib/mpt/cycles';
-import mptCompute from '../lib/mpt/compute';
-import mptQuote from '../lib/mpt/quote';
-import wbListBlocks from '../lib/workbench/blocks';
-import wbListTemplates from '../lib/workbench/templates';
-import wbParse from '../lib/workbench/parse';
-import wbEvaluate from '../lib/workbench/evaluate';
+// MPT + Workbench handlers are lazy-imported per-route below. Static
+// imports at module top pull all 7 files into the api/index.ts cold-start
+// bundle — any axios-using module that throws at init takes down the
+// entire dispatcher (legacy routes too). Lazy import per-route isolates
+// each handler's load to its own request.
 // --- inlined from api/cycle.ts ---
 /**
  * Live state for the 4-Year Cycle page.
@@ -3601,16 +3599,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleCronRefreshBTCHistory(req, res);
     }
 
-    // MPT + Workbench routes — handlers live in lib/mpt/* and lib/workbench/*
-    // (out of api/ so Vercel doesn't count them as separate serverless
-    // functions; the 12-function Hobby limit is the binding constraint).
-    if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') return mptListCycles(req, res);
-    if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') return mptCompute(req, res);
-    if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') return mptQuote(req, res);
-    if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') return wbListBlocks(req, res);
-    if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') return wbListTemplates(req, res);
-    if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') return wbParse(req, res);
-    if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') return wbEvaluate(req, res);
+    // MPT + Workbench routes — lazy-imported per-route so each lib/* module
+    // is loaded only when its route is hit. Static imports at top of file
+    // pulled all 7 lib/* modules into the api/index.ts cold-start bundle;
+    // any axios-using module that throws at init took down the whole
+    // dispatcher (legacy routes too). Lazy import isolates each load.
+    if (path === '/api/mpt/cycles' || path === '/api/mpt/cycles/') {
+      const { default: h } = await import('../lib/mpt/cycles');
+      return h(req, res);
+    }
+    if (path === '/api/mpt/compute' || path === '/api/mpt/compute/') {
+      const { default: h } = await import('../lib/mpt/compute');
+      return h(req, res);
+    }
+    if (path === '/api/mpt/quote' || path === '/api/mpt/quote/') {
+      const { default: h } = await import('../lib/mpt/quote');
+      return h(req, res);
+    }
+    if (path === '/api/workbench/blocks' || path === '/api/workbench/blocks/') {
+      const { default: h } = await import('../lib/workbench/blocks');
+      return h(req, res);
+    }
+    if (path === '/api/workbench/templates' || path === '/api/workbench/templates/') {
+      const { default: h } = await import('../lib/workbench/templates');
+      return h(req, res);
+    }
+    if (path === '/api/workbench/parse' || path === '/api/workbench/parse/') {
+      const { default: h } = await import('../lib/workbench/parse');
+      return h(req, res);
+    }
+    if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') {
+      const { default: h } = await import('../lib/workbench/evaluate');
+      return h(req, res);
+    }
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);
