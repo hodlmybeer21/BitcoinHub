@@ -375,6 +375,70 @@ async function handlePersistenceSync(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// ─── Persistence Gallery (Phase 5: public indicator browser + fork) ──────
+// List published indicators (GET) or publish/unpublish a user's own (POST).
+// Rate-limited + CORS-allowlisted + audited identically to /api/persistence/sync.
+
+async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'OPTIONS') {
+    setPersistenceCorsHeaders(res);
+    return res.status(204).end();
+  }
+
+  setPersistenceCorsHeaders(res);
+
+  try {
+    if (!process.env.DATABASE_URL) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    const { listPublicIndicators, publishIndicator, unpublishIndicator, checkRateLimit } = await import('../lib/persistence/server.js');
+    const ip = getClientIp(req);
+
+    if (req.method === 'GET') {
+      if (!checkRateLimit(ip, 'read')) {
+        return err(res, 429, 'Rate limit exceeded: max 300 reads/min per IP. Slow down.');
+      }
+      const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = Math.max(0, parseInt((req.query.offset as string) || '0', 10) || 0);
+      const items = await listPublicIndicators(limit, offset, ip);
+      return ok(res, { items, limit, offset, count: items.length });
+    }
+
+    if (req.method === 'POST') {
+      if (!checkRateLimit(ip, 'write')) {
+        return err(res, 429, 'Rate limit exceeded: max 60 writes/min per IP. Slow down.');
+      }
+      const { userId, dataKey, title, description, action } = req.body ?? {};
+      if (!userId || typeof userId !== 'string' || !dataKey || typeof dataKey !== 'string') {
+        return err(res, 400, 'userId (string) and dataKey (string) are required');
+      }
+      if (action === 'unpublish') {
+        await unpublishIndicator(userId, dataKey, ip);
+        return ok(res, { ok: true, action: 'unpublished' });
+      }
+      if (typeof title !== 'string' || title.length === 0 || title.length > 100) {
+        return err(res, 400, 'title (1-100 chars) is required to publish');
+      }
+      if (typeof description !== 'string' || description.length > 500) {
+        return err(res, 400, 'description (max 500 chars) is required to publish');
+      }
+      const result = await publishIndicator(userId, dataKey, title, description, ip);
+      return ok(res, result);
+    }
+
+    return err(res, 405, 'GET or POST required');
+  } catch (e: any) {
+    console.error('[persistence-gallery] error:', e?.message || e);
+    if (e?.message?.includes('DATABASE_URL')) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    if (e?.message?.includes('not found')) {
+      return err(res, 404, e.message);
+    }
+    return err(res, 500, e?.message || 'Gallery error');
+  }
+}
+
 // ─── Bitcoin Market Data ───────────────────────────────────────────────────────
 
 async function handleMarketData(_: VercelRequest, res: VercelResponse) {
@@ -3622,6 +3686,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/auth/logout' || path === '/api/auth/logout/') return handleAuthDisabled('logout')(req, res);
     if (path === '/api/notifications' || path === '/api/notifications/') return handleNotifications(req, res);
     if (path === '/api/persistence/sync' || path === '/api/persistence/sync/') return handlePersistenceSync(req, res);
+    if (path === '/api/persistence/gallery' || path === '/api/persistence/gallery/') return handlePersistenceGallery(req, res);
     if (path === '/api/bitcoin/market-data' || path === '/api/bitcoin/market-data/') return handleMarketData(req, res);
     if (path.startsWith('/api/bitcoin/chart')) return handleChart(req, res);
     if (path === '/api/web-resources/fear-greed' || path === '/api/web-resources/fear-greed/') return handleFearGreed(req, res);

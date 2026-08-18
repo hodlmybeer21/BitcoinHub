@@ -24,6 +24,7 @@ import Portfolio from "@/pages/Portfolio";
 import PortfolioMPT from "@/pages/PortfolioMPT";
 import Workbench from "@/pages/Workbench";
 import WorkbenchTemplates from "@/pages/WorkbenchTemplates";
+import WorkbenchGallery from "@/pages/WorkbenchGallery";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -51,6 +52,7 @@ function Router() {
         <Route path="/portfolio/mpt" component={PortfolioMPT} />
         <Route path="/workbench" component={Workbench} />
         <Route path="/workbench/templates" component={WorkbenchTemplates} />
+        <Route path="/workbench/gallery" component={WorkbenchGallery} />
         <Route path="/forgot-password" component={() => (
           <div className="min-h-[60vh] flex items-center justify-center px-4">
             <div className="max-w-md w-full text-center space-y-3">

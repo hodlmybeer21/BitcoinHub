@@ -69,6 +69,7 @@ async function ensureTable(): Promise<void> {
   if (tableEnsured) return tableEnsured;
   tableEnsured = (async () => {
     const pool = await getPool();
+    // Base table (legacy schema). Idempotent.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS anonymous_data (
         id SERIAL PRIMARY KEY,
@@ -79,6 +80,14 @@ async function ensureTable(): Promise<void> {
         CONSTRAINT anon_data_user_key_unique UNIQUE (user_id, data_key)
       );
     `);
+    // Gallery columns (Phase 5). Idempotent — safe to re-run on every cold start.
+    // Postgres 9.6+ supports ADD COLUMN IF NOT EXISTS.
+    await pool.query(`ALTER TABLE anonymous_data ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private'`);
+    await pool.query(`ALTER TABLE anonymous_data ADD COLUMN IF NOT EXISTS gallery_title TEXT`);
+    await pool.query(`ALTER TABLE anonymous_data ADD COLUMN IF NOT EXISTS gallery_description TEXT`);
+    await pool.query(`ALTER TABLE anonymous_data ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE anonymous_data ADD COLUMN IF NOT EXISTS fork_count INTEGER NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE anonymous_data ADD COLUMN IF NOT EXISTS published_at TIMESTAMP`);
   })();
   return tableEnsured;
 }
@@ -182,4 +191,88 @@ export async function getAnonData(
 
 export function isPersistenceConfigured(): boolean {
   return !!process.env.DATABASE_URL;
+}
+
+// --- Gallery (Phase 5: public indicator browser + fork) ---
+
+export interface PublicIndicatorListItem {
+  id: number;
+  authorUuidPrefix: string;
+  dataKey: string;
+  title: string;
+  description: string;
+  excerpt: string;
+  viewCount: number;
+  forkCount: number;
+  publishedAt: string;
+}
+
+export async function publishIndicator(
+  userId: string,
+  dataKey: string,
+  galleryTitle: string,
+  galleryDescription: string,
+  ip: string = 'unknown',
+): Promise<{ ok: true; publishedAt: string }> {
+  await ensureTable();
+  const pool = await getPool();
+  const result = await pool.query(
+    `UPDATE anonymous_data
+     SET visibility = 'public', gallery_title = $3, gallery_description = $4, published_at = NOW()
+     WHERE user_id = $1 AND data_key = $2
+     RETURNING published_at`,
+    [userId, dataKey, galleryTitle, galleryDescription],
+  );
+  if (result.rows.length === 0) {
+    throw new Error('Indicator not found. Save it first before publishing.');
+  }
+  await logAudit(userId, 'publish', dataKey, galleryTitle.length, ip);
+  return { ok: true, publishedAt: result.rows[0].published_at as string };
+}
+
+export async function unpublishIndicator(
+  userId: string,
+  dataKey: string,
+  ip: string = 'unknown',
+): Promise<{ ok: true }> {
+  await ensureTable();
+  const pool = await getPool();
+  await pool.query(
+    `UPDATE anonymous_data
+     SET visibility = 'private', gallery_title = NULL, gallery_description = NULL, published_at = NULL
+     WHERE user_id = $1 AND data_key = $2`,
+    [userId, dataKey],
+  );
+  await logAudit(userId, 'unpublish', dataKey, 0, ip);
+  return { ok: true };
+}
+
+export async function listPublicIndicators(
+  limit: number = 50,
+  offset: number = 0,
+  ip: string = 'unknown',
+): Promise<PublicIndicatorListItem[]> {
+  await ensureTable();
+  const pool = await getPool();
+  const result = await pool.query(
+    `SELECT id, user_id, data_key, gallery_title, gallery_description, data_value,
+            view_count, fork_count, published_at
+     FROM anonymous_data
+     WHERE visibility = 'public'
+     ORDER BY published_at DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset],
+  );
+  await logAudit('anonymous', 'list_public', null, result.rows.length, ip);
+  return result.rows.map((row: any) => ({
+    id: row.id as number,
+    authorUuidPrefix: String(row.user_id).slice(0, 8),
+    dataKey: row.data_key as string,
+    title: (row.gallery_title as string) || (row.data_key as string),
+    description: (row.gallery_description as string) || '',
+    excerpt: String(row.data_value).slice(0, 200),
+    viewCount: row.view_count as number,
+    forkCount: row.fork_count as number,
+    publishedAt: row.published_at as string,
+  }));
 }

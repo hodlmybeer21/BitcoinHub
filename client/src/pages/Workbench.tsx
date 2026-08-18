@@ -696,6 +696,7 @@ export default function Workbench() {
   //            can fork (save to localStorage) or cancel.
   const [importDialog, setImportDialog] = useState<{ open: boolean; indicator: any | null }>({ open: false, indicator: null });
   const [importText, setImportText] = useState('');
+  const [publishDialog, setPublishDialog] = useState<{ open: boolean; dataKey: string; name: string; title: string; description: string }>({ open: false, dataKey: '', name: '', title: '', description: '' });
   const [toast, setToast] = useState<string | null>(null);
   const search = useSearch();
   useEffect(() => {
@@ -872,6 +873,37 @@ export default function Workbench() {
     }
   }
 
+  // --- Gallery publish (Phase 5) ---
+
+  async function publishToGallery() {
+    if (!publishDialog.title.trim() || !publishDialog.dataKey) return;
+    const userId = getUserId();
+    try {
+      const res = await fetch('/api/persistence/gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          dataKey: publishDialog.dataKey,
+          title: publishDialog.title.trim(),
+          description: publishDialog.description.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setToast(`Published "${publishDialog.title.trim()}" to the community gallery.`);
+        setTimeout(() => setToast(null), 3000);
+        setPublishDialog({ open: false, dataKey: '', name: '', title: '', description: '' });
+      } else {
+        setToast(`Publish failed: ${json.error || res.statusText}`);
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch (e) {
+      setToast(`Publish failed: ${String(e)}`);
+      setTimeout(() => setToast(null), 3000);
+    }
+  }
+
   const blocks = blocksQuery.data?.blocks || [];
   const templates = templatesQuery.data?.templates || [];
   const result = evaluateMutation.data;
@@ -966,6 +998,9 @@ export default function Workbench() {
                         <div className="font-semibold text-xs">{ind.name}</div>
                         <div className="text-[10px] font-mono text-muted-foreground line-clamp-1">{ind.formula}</div>
                       </button>
+                      <Button variant="ghost" size="sm" onClick={() => setPublishDialog({ open: true, dataKey: ind.id, name: ind.name, title: ind.name, description: '' })} className="h-6 w-6 p-0" title="Publish to community gallery">
+                        <Sparkles className="h-3 w-3" />
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => shareIndicatorUrl(ind)} className="h-6 w-6 p-0" title="Copy share URL">
                         <Share2 className="h-3 w-3" />
                       </Button>
@@ -1216,6 +1251,51 @@ export default function Workbench() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Publish to Gallery dialog (Phase 5) */}
+        {publishDialog.open && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setPublishDialog({ open: false, dataKey: '', name: '', title: '', description: '' })}>
+            <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+              <div className="text-lg font-bold mb-1">Publish to community gallery</div>
+              <div className="text-xs text-muted-foreground mb-4">
+                Share <span className="text-foreground font-semibold">"{publishDialog.name}"</span> publicly. Anyone can fork it to their own library.
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Title (1–100 chars)</label>
+                  <Input
+                    value={publishDialog.title}
+                    onChange={e => setPublishDialog(d => ({ ...d, title: e.target.value.slice(0, 100) }))}
+                    placeholder="e.g. BTC Fear Buy Signal"
+                    autoFocus
+                    maxLength={100}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Description (max 500 chars)</label>
+                  <textarea
+                    value={publishDialog.description}
+                    onChange={e => setPublishDialog(d => ({ ...d, description: e.target.value.slice(0, 500) }))}
+                    placeholder="Briefly describe what this indicator does and when to use it."
+                    maxLength={500}
+                    className="w-full font-sans text-sm p-2 rounded bg-muted/40 border border-border/50 h-24 mt-1"
+                  />
+                  <div className="text-[10px] text-muted-foreground text-right font-mono mt-0.5">
+                    {publishDialog.description.length}/500
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setPublishDialog({ open: false, dataKey: '', name: '', title: '', description: '' })}>Cancel</Button>
+                <Button onClick={publishToGallery} disabled={!publishDialog.title.trim()}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Publish
+                </Button>
+              </div>
             </div>
           </div>
         )}

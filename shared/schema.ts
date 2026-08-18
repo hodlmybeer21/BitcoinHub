@@ -204,6 +204,12 @@ export const anonymousData = pgTable("anonymous_data", {
   dataKey: text("data_key").notNull(),
   dataValue: text("data_value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  visibility: text("visibility").notNull().default('private'),
+  galleryTitle: text("gallery_title"),
+  galleryDescription: text("gallery_description"),
+  viewCount: integer("view_count").notNull().default(0),
+  forkCount: integer("fork_count").notNull().default(0),
+  publishedAt: timestamp("published_at"),
 }, (table) => ({
   uniqUserKey: uniqueIndex("anon_data_user_key_idx").on(table.userId, table.dataKey),
 }));
