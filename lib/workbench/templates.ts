@@ -171,6 +171,28 @@ const TEMPLATES: Template[] = [
     formula: 'premium.whale_activity',
     range: { start: '2026-08-01', end: '2026-08-31' },
   },
+  // ─── Valuation templates (Puell / MVRV / DXY corr) ──────────────────
+  {
+    id: 'puell_top_signal',
+    name: 'Puell Multiple Top Signal',
+    description: 'Days when Puell Multiple > 4 — historically a major top signal (per PlanB). Backtest this to see if "sell when Puell > 4" beats buy-and-hold.',
+    formula: 'valuation.puell > 4',
+    range: { start: '2016-01-01', end: '2026-08-31' },
+  },
+  {
+    id: 'mvrv_top_signal',
+    name: 'MVRV Z-Score Top Signal',
+    description: 'Days when MVRV-Z > 7 — historically a major top signal (2017, 2021). Combine with Puell > 4 for confirmation: valuation.puell > 4 and valuation.mvrv_z > 7.',
+    formula: 'valuation.mvrv_z > 7',
+    range: { start: '2016-01-01', end: '2026-08-31' },
+  },
+  {
+    id: 'dxy_btc_inverse',
+    name: 'BTC/DXY Strong Inverse Correlation',
+    description: 'Days when 30d BTC/DXY correlation < -0.5 — strong risk-off regime. Historically precedes major BTC upside moves. Combine with valuation.mvrv_z < 0 for "buy the inverse-correlation dip" signal.',
+    formula: 'valuation.dxy_corr < -0.5',
+    range: { start: '2016-01-01', end: '2026-08-31' },
+  },
 ];
 
 function ok(res: VercelResponse, data: unknown) {

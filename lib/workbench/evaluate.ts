@@ -546,6 +546,20 @@ function cachedFetch(blockId: string, start: Date, end: Date): Promise<Series[]>
         fetchCache.delete(key);
         throw e;
       });
+    } else if (blockId.startsWith('valuation.')) {
+      // Valuation indicator blocks (Puell / MVRV-Z / DXY corr / NVT).
+      // All derive from BTC-USD + DXY via Yahoo Finance; one shared 1h
+      // price cache per series. Same lazy-import pattern as risk/macro/
+      // premium.
+      p = (async () => {
+        const { VALUATION_BLOCK_FETCHERS } = await import('./valuation-blocks.js');
+        const fetcher = VALUATION_BLOCK_FETCHERS[blockId];
+        if (!fetcher) throw new Error(`Unknown valuation block: ${blockId}`);
+        return fetcher();
+      })().catch(e => {
+        fetchCache.delete(key);
+        throw e;
+      });
     } else {
       return Promise.reject(new Error(`Unknown block: ${blockId}`));
     }
