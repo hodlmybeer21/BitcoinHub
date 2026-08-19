@@ -456,9 +456,12 @@ export default function RiskMetric() {
                     tickFormatter={(v: string) => v.slice(0, 7)}
                     interval={Math.floor(ts.data.points.length / 8)}
                   />
-                  <YAxis domain={[0, 1]} stroke="#888" fontSize={11} />
+                  <YAxis yAxisId="risk" domain={[0, 1]} stroke="#888" fontSize={11} />
+                  <YAxis yAxisId="price" orientation="right" stroke="#888" fontSize={11}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
                   <RTooltip content={<RiskTooltip />} />
                   <Area
+                    yAxisId="risk"
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
