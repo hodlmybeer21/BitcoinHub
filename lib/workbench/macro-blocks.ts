@@ -13,7 +13,11 @@ async function fetchMacroSeries(seriesId: string, days: number = DEFAULT_DAYS): 
   const today = new Date().toISOString().split('T')[0];
   const { default: axios } = await import('axios');
   const res = await axios.get(`${BASE}/api/fred/data`, {
-    params: { series_id: seriesId, days, maxPoints: 1 },
+    // Don't pass maxPoints: downsampleObservations is start-anchored, so
+    // maxPoints:1 returns only the first 2 obs (likely 2016 data, not today's
+    // latest). We just want the latest observation; ask for the full range
+    // and read pts[pts.length - 1].
+    params: { series_id: seriesId, days },
     timeout: 25000,
   });
   const pts = res.data?.points;

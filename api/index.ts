@@ -239,6 +239,38 @@ function err(res: VercelResponse, status: number, message: string) {
   res.status(status).json({ error: message });
 }
 
+// Detect upstream-failure conditions so handlers can return 503 (service
+// unavailable / retryable transient) instead of 500 (our bug). Covers
+// axios network errors + node-fetch AbortError / DNS failures + upstream
+// 5xx responses. Used by upstreamOr500() below to wrap any handler that
+// talks to external APIs.
+function isUpstreamFailure(e: any): boolean {
+  if (!e) return false;
+  const code = e.code || e?.cause?.code;
+  if (typeof code === 'string' && /^(ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|EPIPE|ERR_NETWORK|UND_ERR_SOCKET|UND_ERR_CONNECT_TIMEOUT)$/i.test(code)) return true;
+  if (typeof e.message === 'string' && e.message.includes('timeout')) return true;
+  if (e.name === 'AbortError') return true;
+  if (e.name === 'TypeError' && /fetch failed/i.test(e.message || '')) return true;
+  const status = e.response?.status;
+  if (typeof status === 'number' && status >= 500 && status < 600) return true;
+  return false;
+}
+
+// Wraps a handler so upstream-failure errors surface as 503 (retryable
+// transient) and anything else falls through to the caller's error
+// handling. Use: `return upstreamOr500(res, async () => { ... });`
+async function upstreamOr500<T>(res: VercelResponse, fn: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await fn();
+  } catch (e: any) {
+    if (isUpstreamFailure(e)) {
+      console.warn('[upstream]', e?.message || e);
+      return err(res, 503, `Upstream unavailable: ${e?.message || 'unknown'}`);
+    }
+    throw e;
+  }
+}
+
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 async function handleHealth(_: VercelRequest, res: VercelResponse) {

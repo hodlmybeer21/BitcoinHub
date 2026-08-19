@@ -60,6 +60,17 @@ async function dataHandler(req: VercelRequest, res: VercelResponse) {
 
     const downsampled = downsampleObservations(transformed, maxPoints);
 
+    // Monthly-lag UX (Phase 9 audit polish, 2026-08-19): surface how stale the
+    // latest observation is so the UI can show "as of YYYY-MM" instead of
+    // misleading "today" data. Daily/weekly series report ~0 lag; monthly
+    // series are typically 30–60 days behind. Computed against the last
+    // observation's date (not NOW()) so FRED's publication-lag semantics
+    // surface honestly.
+    const lastObs = downsampled[downsampled.length - 1];
+    const todayMs = Date.now();
+    const lastMs = lastObs ? new Date(lastObs.date).getTime() : todayMs;
+    const dataLagDays = Math.max(0, Math.round((todayMs - lastMs) / 86400000));
+
     return res.status(200).json({
       seriesId,
       definition: def,
@@ -67,6 +78,7 @@ async function dataHandler(req: VercelRequest, res: VercelResponse) {
       originalCount: observations.length,
       points: downsampled,
       meta,
+      dataLagDays,
     });
   } catch (e: any) {
     console.error('[fred-data] error:', e);
