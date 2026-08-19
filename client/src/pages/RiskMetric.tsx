@@ -440,13 +440,6 @@ export default function RiskMetric() {
               <ErrorBoundary label="Risk time series chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={ts.data.points} margin={{ top: 5, right: 60, left: 0, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ea580c" stopOpacity={0.5} />
-                      <stop offset="50%" stopColor="#eab308" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="#16a34a" stopOpacity={0.5} />
-                    </linearGradient>
-                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis
                     dataKey="date"
@@ -471,22 +464,17 @@ export default function RiskMetric() {
                   <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" label={{ value: 'Neutral', position: 'right', fill: '#888', fontSize: 10 }} />
                   <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" label={{ value: 'Extreme Greed', position: 'right', fill: '#dc2626', fontSize: 10 }} />
                   <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" label={{ value: 'Extreme Fear', position: 'right', fill: '#16a34a', fontSize: 10 }} />
-                  {/* Price bars colored by band — gives the chart its 'green/red' visual */}
-                  <Bar yAxisId="price" dataKey="price" maxBarSize={6}>
-                    {ts.data.points.map((p, idx) => (
-                      // Defensive fallback: if any point is ever missing bandColor,
-                      // Cell throws 'Invariant failed' (Recharts 2.15.x requires a
-                      // valid CSS color string). Current data is all valid; this
-                      // is belt-and-suspenders alongside the RiskTooltip guard.
-                      <Cell key={idx} fill={p.bandColor || '#666'} fillOpacity={0.35} />
-                    ))}
-                  </Bar>
+                  {/* Price bars (single fill — per-band Cell mapping was throwing
+                      'Invariant failed' in Recharts 2.15.x; revisit if confirmed
+                      safe) */}
+                  <Bar yAxisId="price" dataKey="price" fill="#475569" maxBarSize={6} />
                   <Area
                     yAxisId="risk"
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
-                    fill="url(#riskGradient)"
+                    fill="#ea580c"
+                    fillOpacity={0.2}
                     strokeWidth={1.5}
                   />
                 </ComposedChart>
