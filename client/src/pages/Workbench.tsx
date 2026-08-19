@@ -30,7 +30,7 @@ import {
 import {
   AlertCircle, Hammer, Sparkles, Save, FolderOpen, Trash2, Play,
   RefreshCw, Copy, BookOpen, Plus, MousePointerClick,
-  Download, Share2, Upload, Link as LinkIcon,
+  Download, Share2, Upload, Link as LinkIcon, LineChart as LineChartIcon, TrendingUp, X,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useSyncedStorage } from "@/lib/persistence/client";
@@ -670,6 +670,36 @@ export default function Workbench() {
   });
   const [saved, setSaved] = useSyncedStorage<SavedIndicator[]>('workbench_indicators', [], STORAGE_KEY);
   const [saveDialog, setSaveDialog] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
+  // Backtest state (Phase 8, 2026-08-19)
+  const [backtestOpen, setBacktestOpen] = useState(false);
+  const [backtestStart, setBacktestStart] = useState('2016-01-01');
+  const [backtestEnd, setBacktestEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const [backtestResult, setBacktestResult] = useState<any | null>(null);
+  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
+
+  // Backtest run — POSTs the formula + range, gets stats + equity curve.
+  async function runBacktest() {
+    setBacktestLoading(true);
+    setBacktestError(null);
+    setBacktestResult(null);
+    try {
+      const res = await apiRequest('POST', '/api/workbench/backtest', {
+        formula,
+        range: { start: backtestStart, end: backtestEnd },
+      });
+      const json = await res.json();
+      if (json.error) {
+        setBacktestError(json.error);
+      } else {
+        setBacktestResult(json);
+      }
+    } catch (e: any) {
+      setBacktestError(e?.message ?? 'Backtest failed');
+    } finally {
+      setBacktestLoading(false);
+    }
+  }
   const [showBlocks, setShowBlocks] = useState(true);
   const [editorMode, setEditorMode] = useState<'formula' | 'visual' | 'canvas'>('formula');
   const [canvasPositions, setCanvasPositions] = useSyncedStorage<PositionMap>('workbench_canvas_positions', {}, CANVAS_POS_KEY);
@@ -933,10 +963,16 @@ export default function Workbench() {
               apply series operators like <code className="text-orange-400 font-mono">sma(X, 30)</code>, combine with logic.
             </p>
           </div>
-          <Button onClick={() => setSaveDialog({ open: true, name: formula.slice(0, 40) })} variant="outline" disabled={!formula}>
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => { setBacktestResult(null); setBacktestOpen(true); }} variant="outline" disabled={!formula} title="Run this formula as a strategy over historical BTC-USD daily data">
+              <LineChartIcon className="h-4 w-4 mr-2" />
+              Backtest
+            </Button>
+            <Button onClick={() => setSaveDialog({ open: true, name: formula.slice(0, 40) })} variant="outline" disabled={!formula}>
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-[280px_1fr] gap-4">
@@ -1306,7 +1342,171 @@ export default function Workbench() {
             {toast}
           </div>
         )}
+
+        {/* Backtest modal (Phase 8, 2026-08-19) */}
+        {backtestOpen && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setBacktestOpen(false)}>
+            <div className="bg-card border border-border rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <LineChartIcon className="h-5 w-5 text-orange-500" />
+                    <div className="text-lg font-bold">Backtest</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Run this formula as a long/cash strategy over historical BTC-USD daily data.
+                  </div>
+                </div>
+                <button onClick={() => setBacktestOpen(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Formula preview */}
+              <div className="bg-muted/30 border border-border/40 rounded p-2 font-mono text-xs mb-3 break-all">
+                {formula}
+              </div>
+
+              {/* Range picker */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Start date</label>
+                  <Input
+                    type="date"
+                    value={backtestStart}
+                    onChange={e => setBacktestStart(e.target.value)}
+                    min="2014-09-17"
+                    max={backtestEnd}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">End date</label>
+                  <Input
+                    type="date"
+                    value={backtestEnd}
+                    onChange={e => setBacktestEnd(e.target.value)}
+                    min={backtestStart}
+                    max={new Date().toISOString().slice(0, 10)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Run button */}
+              <div className="flex justify-end mb-4">
+                <Button onClick={runBacktest} disabled={backtestLoading || !formula}>
+                  {backtestLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running backtest...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run backtest
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Error */}
+              {backtestError && (
+                <div className="bg-red-500/10 border border-red-500/40 rounded p-3 text-sm text-red-300 mb-3">
+                  {backtestError}
+                </div>
+              )}
+
+              {/* Results */}
+              {backtestResult && (
+                <div className="space-y-4">
+                  <div className="text-[10px] text-muted-foreground font-mono">
+                    Actual range: <span className="text-foreground">{backtestResult.range.actualStart}</span> → <span className="text-foreground">{backtestResult.range.actualEnd}</span>
+                    {backtestResult.range.actualStart !== backtestResult.range.start && (
+                      <span className="ml-2">(formula data starts later than requested)</span>
+                    )}
+                  </div>
+
+                  {/* Stats grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <StatCard label="Strategy Return" value={fmtPct(backtestResult.stats.totalReturnPct)} accent={backtestResult.stats.alphaPct >= 0 ? 'green' : 'red'} sub={`Buy & Hold: ${fmtPct(backtestResult.stats.buyHoldReturnPct)}`} />
+                    <StatCard label="Alpha" value={fmtPct(backtestResult.stats.alphaPct)} accent={backtestResult.stats.alphaPct >= 0 ? 'green' : 'red'} sub="vs buy & hold" />
+                    <StatCard label="Annualized (CAGR)" value={fmtPct(backtestResult.stats.annualizedReturnPct)} accent="neutral" />
+                    <StatCard label="Sharpe Ratio" value={backtestResult.stats.sharpeRatio.toFixed(2)} accent={backtestResult.stats.sharpeRatio >= 1 ? 'green' : backtestResult.stats.sharpeRatio >= 0 ? 'neutral' : 'red'} sub="annualized, 0 rf" />
+                    <StatCard label="Max Drawdown" value={fmtPct(backtestResult.stats.maxDrawdownPct)} accent="red" />
+                    <StatCard label="Win Rate" value={fmtPct(backtestResult.stats.winRatePct)} accent="neutral" sub={`in-position days (${backtestResult.stats.totalDays} total)`} />
+                    <StatCard label="Exposure" value={fmtPct(backtestResult.stats.exposurePct)} accent="neutral" sub={`${backtestResult.stats.numTrades} trades`} />
+                    <StatCard label="Days" value={backtestResult.stats.totalDays.toLocaleString()} accent="neutral" sub={`${backtestResult.stats.signalDays} in position`} />
+                  </div>
+
+                  {/* Equity curve chart */}
+                  {backtestResult.equityCurve && backtestResult.equityCurve.length > 0 && (
+                    <div className="bg-muted/20 border border-border/30 rounded p-3">
+                      <div className="text-xs text-muted-foreground mb-2">Equity curve ($1 normalized)</div>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <LineChart data={downsampleEquity(backtestResult.equityCurve)} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                          <CartesianGrid stroke="#333" strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tick={{ fontSize: 10, fill: '#888' }}
+                            tickFormatter={(d) => d.slice(0, 7)}
+                            minTickGap={50}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 10, fill: '#888' }}
+                            tickFormatter={(v) => `${v.toFixed(1)}x`}
+                            domain={['auto', 'auto']}
+                          />
+                          <RTooltip
+                            contentStyle={{ background: '#1a1a1a', border: '1px solid #444', fontSize: 12 }}
+                            labelStyle={{ color: '#fb923c' }}
+                            formatter={(v: number) => [`${v.toFixed(3)}x`, '']}
+                          />
+                          <Line type="monotone" dataKey="buyHold" stroke="#888" strokeWidth={1.5} dot={false} name="Buy & Hold" />
+                          <Line type="monotone" dataKey="strategy" stroke="#fb923c" strokeWidth={2} dot={false} name="Strategy" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <div className="flex items-center gap-4 text-[10px] mt-2">
+                        <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#fb923c] inline-block"></span> Strategy</span>
+                        <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#888] inline-block"></span> Buy &amp; Hold</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+// Helper: format percentage with sign
+function fmtPct(v: number): string {
+  const sign = v >= 0 ? '+' : '';
+  return `${sign}${v.toFixed(2)}%`;
+}
+
+// Helper: downsample equity curve for chart performance (~200 points)
+function downsampleEquity(curve: Array<{ date: string; strategy: number; buyHold: number }>): Array<{ date: string; strategy: number; buyHold: number }> {
+  const MAX = 200;
+  if (curve.length <= MAX) return curve;
+  const step = Math.max(1, Math.floor(curve.length / MAX));
+  const sampled: typeof curve = [];
+  for (let i = 0; i < curve.length; i += step) sampled.push(curve[i]);
+  if (sampled[sampled.length - 1] !== curve[curve.length - 1]) sampled.push(curve[curve.length - 1]);
+  return sampled;
+}
+
+// Helper: stat card with accent color
+function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: 'green' | 'red' | 'neutral' }) {
+  const valueColor = accent === 'green' ? 'text-green-400' : accent === 'red' ? 'text-red-400' : 'text-foreground';
+  return (
+    <div className="bg-muted/30 border border-border/40 rounded p-3">
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</div>
+      <div className={`text-xl font-bold font-mono mt-1 ${valueColor}`}>{value}</div>
+      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
     </div>
   );
 }

@@ -3817,6 +3817,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: h } = await import('../lib/workbench/evaluate.js');
       return h(req, res);
     }
+    if (path === '/api/workbench/backtest' || path === '/api/workbench/backtest/') {
+      const { default: h } = await import('../lib/workbench/backtest.js');
+      return h(req, res);
+    }
 
     // ─── Risk Metric (Phase 6, 2026-08-19) ─────────────────────────────────
     // Lazy-imported handlers; each lib/risk/* file does its own fetches
