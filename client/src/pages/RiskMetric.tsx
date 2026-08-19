@@ -460,6 +460,23 @@ export default function RiskMetric() {
                   <YAxis yAxisId="price" orientation="right" stroke="#888" fontSize={11}
                     tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
                   <RTooltip content={<RiskTooltip />} />
+                  {/* Halving markers (4 vertical lines at halving dates) */}
+                  {halvingMarkers.map((m, idx) => (
+                    <ReferenceLine
+                      key={idx}
+                      x={m.x}
+                      stroke="#888"
+                      strokeDasharray="2 2"
+                      fill="#888"
+                      fontSize={10}
+                      label={m.label}
+                      position="top"
+                    />
+                  ))}
+                  {/* Band lines (3 horizontal lines at y=0.5/0.8/0.15) */}
+                  <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" fill="#888" fontSize={10} label="Neutral" position="right" />
+                  <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" fill="#dc2626" fontSize={10} label="Extreme Greed" position="right" />
+                  <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" fill="#16a34a" fontSize={10} label="Extreme Fear" position="right" />
                   <Area
                     yAxisId="risk"
                     type="monotone"
