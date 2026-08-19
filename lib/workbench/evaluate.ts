@@ -476,6 +476,18 @@ function cachedFetch(blockId: string, start: Date, end: Date): Promise<Series[]>
         fetchCache.delete(key);
         throw e;
       });
+    } else if (blockId.startsWith('premium.')) {
+      // Premium indicator blocks (DeMark / Elliott / Wyckoff). All derive
+      // from BTC OHLCV via Yahoo Finance; one shared 1h OHLC cache.
+      p = (async () => {
+        const { PREMIUM_BLOCK_FETCHERS } = await import('./premium-blocks.js');
+        const fetcher = PREMIUM_BLOCK_FETCHERS[blockId];
+        if (!fetcher) throw new Error(`Unknown premium block: ${blockId}`);
+        return fetcher();
+      })().catch(e => {
+        fetchCache.delete(key);
+        throw e;
+      });
     } else {
       const fetcher = BLOCK_FETCHERS[blockId];
       if (!fetcher) return Promise.reject(new Error(`Unknown block: ${blockId}`));

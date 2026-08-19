@@ -142,6 +142,28 @@ const TEMPLATES: Template[] = [
     formula: 'macro.cpi_yoy',
     range: { start: '2026-08-01', end: '2026-08-31' },
   },
+  // ─── Premium indicator templates (DeMark / Elliott / Wyckoff) ─────────
+  {
+    id: 'demark_setup_count',
+    name: 'DeMark Setup Count (1y)',
+    description: 'Daily DeMark Sequential setup count for BTC. Hits ±9 = completed setup (Tom DeMark\'s classic exhaustion signal). Use crosses_above() to detect completion days.',
+    formula: 'premium.demark_setup',
+    range: { start: '2025-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'elliott_wave_position',
+    name: 'Elliott Wave Position (1y)',
+    description: 'Current Elliott wave position from 5-bar zigzag pivots. Positive = impulse wave (1..5), negative = corrective (-1..-3), 0 = unclear. Combine with crosses_above(..., 0) to detect new impulse starts.',
+    formula: 'premium.elliott_wave',
+    range: { start: '2025-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'wyckoff_phase',
+    name: 'Wyckoff Phase (1y)',
+    description: 'Detected Wyckoff phase per day: 1–5 = Accum A→Markup (buy zone late), 10–14 = Distrib A→Markdown (sell zone late), 0 = unclear. Combine with prior price action to confirm.',
+    formula: 'premium.wyckoff_phase',
+    range: { start: '2025-08-01', end: '2026-08-31' },
+  },
 ];
 
 function ok(res: VercelResponse, data: unknown) {
