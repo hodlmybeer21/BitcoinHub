@@ -477,6 +477,14 @@ export default function RiskMetric() {
                   <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" fill="#888" fontSize={10} label="Neutral" position="right" />
                   <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" fill="#dc2626" fontSize={10} label="Extreme Greed" position="right" />
                   <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" fill="#16a34a" fontSize={10} label="Extreme Fear" position="right" />
+                  {/* Price bars colored by band (per-band Cell mapping — was the
+                      original 'Invariant failed' suspect; trying it LAST with a
+                      fill fallback to prevent undefined-fill crashes) */}
+                  <Bar yAxisId="price" dataKey="price" maxBarSize={6}>
+                    {ts.data.points.map((p, idx) => (
+                      <Cell key={idx} fill={p.bandColor || '#666'} fillOpacity={0.35} />
+                    ))}
+                  </Bar>
                   <Area
                     yAxisId="risk"
                     type="monotone"
