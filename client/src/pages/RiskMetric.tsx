@@ -448,43 +448,12 @@ export default function RiskMetric() {
                     fontSize={11}
                     tickFormatter={(v: string) => v.slice(0, 7)}
                   />
-                  <YAxis yAxisId="risk" domain={[0, 1]} stroke="#888" fontSize={11} />
-                  {/* Removed the right-side price YAxis (yAxisId="price") — the dual
-                      YAxis setup was the next suspect in the 'Invariant failed'
-                      binary search. The Bar below is now scaled to the risk
-                      YAxis (wrong but not a crash; fix as a follow-up) */}
+                  <YAxis domain={[0, 1]} stroke="#888" fontSize={11} />
                   <RTooltip content={<RiskTooltip />} />
-                  {/* Halving markers (4 vertical lines at halving dates) */}
-                  {halvingMarkers.map((m, idx) => (
-                    <ReferenceLine
-                      key={idx}
-                      x={m.x}
-                      stroke="#888"
-                      strokeDasharray="2 2"
-                      fill="#888"
-                      fontSize={10}
-                      label={m.label}
-                      position="top"
-                    />
-                  ))}
-                  {/* Band lines (3 horizontal lines at y=0.5/0.8/0.15) */}
-                  <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" fill="#888" fontSize={10} label="Neutral" position="right" />
-                  <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" fill="#dc2626" fontSize={10} label="Extreme Greed" position="right" />
-                  <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" fill="#16a34a" fontSize={10} label="Extreme Fear" position="right" />
-                  {/* Price bars (single fill — the <Bar> with <Cell> children
-                      was the fragile Recharts 2.15.x internal that triggered
-                      'Invariant failed' when combined with the dual YAxis,
-                      gradient fill, ReferenceLines, and Area. Removed the
-                      <Cell> children; keeping the <Bar> with a single fill
-                      loses the per-band coloring but the chart renders) */}
-                  <Bar yAxisId="risk" dataKey="price" fill="#475569" fillOpacity={0.35} maxBarSize={6} />
-                  <Area
-                    yAxisId="risk"
+                  <Line
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
-                    fill="#ea580c"
-                    fillOpacity={0.2}
                     strokeWidth={1.5}
                     dot={false}
                   />
