@@ -28,6 +28,12 @@ const BLOCKS: BlockMeta[] = [
   { id: 'macro.vix',              label: 'VIX',                    category: 'macro',    description: 'CBOE Volatility Index',                            unit: 'index' },
   { id: 'macro.gold',             label: 'Gold',                   category: 'macro',    description: 'Gold spot price (USD/oz)',                         unit: 'USD' },
   { id: 'time.day_of_week',       label: 'Day of Week',            category: 'time',     description: '0=Sunday, 6=Saturday',                            unit: '0-6' },
+  { id: 'risk.metric',            label: 'BTC Risk Metric',        category: 'risk',     description: '0–1 cycle-position score (BTC)',                  unit: '0–1' },
+  { id: 'risk.bmsb_lower',        label: 'BMSB Lower (20w SMA)',   category: 'risk',     description: 'Bull Market Support Band lower boundary',         unit: 'USD' },
+  { id: 'risk.bmsb_upper',        label: 'BMSB Upper (21w EMA)',   category: 'risk',     description: 'Bull Market Support Band upper boundary',         unit: 'USD' },
+  { id: 'risk.pi_long',           label: 'Pi Cycle Long (350d ×2)',category: 'risk',     description: '350-day MA × 2 (top signal trigger)',             unit: 'USD' },
+  { id: 'risk.pi_short',          label: 'Pi Cycle Short (111d)',  category: 'risk',     description: '111-day MA (top signal trigger)',                 unit: 'USD' },
+  { id: 'risk.cycle_pos',         label: 'Halving Cycle Position', category: 'risk',     description: 'Position in 4-year halving cycle (0–1)',          unit: '0–1' },
 ];
 
 function ok(res: VercelResponse, data: unknown) {

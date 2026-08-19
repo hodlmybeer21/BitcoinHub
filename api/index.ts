@@ -408,7 +408,7 @@ async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse)
       if (!checkRateLimit(ip, 'write')) {
         return err(res, 429, 'Rate limit exceeded: max 60 writes/min per IP. Slow down.');
       }
-      const { userId, dataKey, title, description, action, sourceOwnerUserId, sourceDataKey, forkerDataKey } = req.body ?? {};
+      const { userId, dataKey, title, description, action, sourceId, forkerDataKey } = req.body ?? {};
       if (!userId || typeof userId !== 'string' || !dataKey || typeof dataKey !== 'string') {
         return err(res, 400, 'userId (string) and dataKey (string) are required');
       }
@@ -3815,6 +3815,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (path === '/api/workbench/evaluate' || path === '/api/workbench/evaluate/') {
       const { default: h } = await import('../lib/workbench/evaluate.js');
+      return h(req, res);
+    }
+
+    // ─── Risk Metric (Phase 6, 2026-08-19) ─────────────────────────────────
+    // Lazy-imported handlers; each lib/risk/* file does its own fetches
+    // with lazy axios inside the function body. .js suffix required.
+    if (path === '/api/risk/cycles' || path === '/api/risk/cycles/') {
+      const { default: h } = await import('../lib/risk/cycles.js');
+      return h(req, res);
+    }
+    if (path === '/api/risk/indicator' || path === '/api/risk/indicator/') {
+      const { default: h } = await import('../lib/risk/composite.js');
+      return h(req, res);
+    }
+    if (path === '/api/risk/timeseries' || path === '/api/risk/timeseries/') {
+      const { default: h } = await import('../lib/risk/timeseries.js');
+      return h(req, res);
+    }
+    if (path === '/api/risk/indicators' || path === '/api/risk/indicators/') {
+      const { default: h } = await import('../lib/risk/indicators.js');
       return h(req, res);
     }
 

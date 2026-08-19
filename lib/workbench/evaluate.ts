@@ -450,12 +450,27 @@ function cachedFetch(blockId: string, start: Date, end: Date): Promise<Series[]>
   const key = `${blockId}::${startDay}::${endDay}`;
   let p = fetchCache.get(key);
   if (!p) {
-    const fetcher = BLOCK_FETCHERS[blockId];
-    if (!fetcher) return Promise.reject(new Error(`Unknown block: ${blockId}`));
-    p = fetcher(start, end).catch(e => {
-      fetchCache.delete(key);
-      throw e;
-    });
+    // Risk blocks (Phase 6, 2026-08-19) are lazy-imported to keep the
+    // cold-start bundle small and to isolate the cross-API fetch (which
+    // could otherwise pull axios into the Workbench evaluator graph).
+    if (blockId.startsWith('risk.')) {
+      p = (async () => {
+        const { RISK_BLOCK_FETCHERS } = await import('./risk-blocks.js');
+        const fetcher = RISK_BLOCK_FETCHERS[blockId];
+        if (!fetcher) throw new Error(`Unknown risk block: ${blockId}`);
+        return fetcher();
+      })().catch(e => {
+        fetchCache.delete(key);
+        throw e;
+      });
+    } else {
+      const fetcher = BLOCK_FETCHERS[blockId];
+      if (!fetcher) return Promise.reject(new Error(`Unknown block: ${blockId}`));
+      p = fetcher(start, end).catch(e => {
+        fetchCache.delete(key);
+        throw e;
+      });
+    }
     fetchCache.set(key, p);
   }
   return p;

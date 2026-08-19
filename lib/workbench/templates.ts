@@ -69,6 +69,42 @@ const TEMPLATES: Template[] = [
     formula: 'btc.price > sma(btc.price, 200)',
     range: { start: '2015-01-01', end: '2025-12-31' },
   },
+  // ─── Risk Metric templates (Phase 6, 2026-08-19) ─────────────────────────
+  {
+    id: 'risk_metric_snapshot',
+    name: 'BTC Risk Metric (Current)',
+    description: 'Current BTC cycle-position risk score on the 0–1 scale. Reads from the Risk Indicator dashboard.',
+    formula: 'risk.metric',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'risk_bmsb_lower',
+    name: 'Bull Market Support Band (Lower)',
+    description: 'BTC 20-week SMA — Ben Cowen\'s BMSB lower boundary. Historically a buy zone when price is below.',
+    formula: 'risk.bmsb_lower',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'risk_bmsb_upper',
+    name: 'Bull Market Support Band (Upper)',
+    description: 'BTC 21-week EMA — Ben Cowen\'s BMSB upper boundary.',
+    formula: 'risk.bmsb_upper',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'risk_pi_cycle_ratio',
+    name: 'Pi Cycle Top Ratio',
+    description: 'Pi Cycle ratio (111d MA / 350d MA × 2). Tops historically fire when this crosses 1.0.',
+    formula: 'risk.pi_short / risk.pi_long',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'risk_cycle_position_pct',
+    name: 'Halving Cycle Position %',
+    description: 'Position in the 4-year halving cycle (0–100%). Year 1 = early cycle, year 4 = late cycle.',
+    formula: 'risk.cycle_pos * 100',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
 ];
 
 function ok(res: VercelResponse, data: unknown) {
