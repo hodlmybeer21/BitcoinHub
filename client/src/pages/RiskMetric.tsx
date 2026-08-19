@@ -450,8 +450,10 @@ export default function RiskMetric() {
                     interval={Math.floor(ts.data.points.length / 8)}
                   />
                   <YAxis yAxisId="risk" domain={[0, 1]} stroke="#888" fontSize={11} />
-                  <YAxis yAxisId="price" orientation="right" stroke="#888" fontSize={11}
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                  {/* Removed the right-side price YAxis (yAxisId="price") — the dual
+                      YAxis setup was the next suspect in the 'Invariant failed'
+                      binary search. The Bar below is now scaled to the risk
+                      YAxis (wrong but not a crash; fix as a follow-up) */}
                   <RTooltip content={<RiskTooltip />} />
                   {/* Halving markers (4 vertical lines at halving dates) */}
                   {halvingMarkers.map((m, idx) => (
@@ -476,7 +478,7 @@ export default function RiskMetric() {
                       gradient fill, ReferenceLines, and Area. Removed the
                       <Cell> children; keeping the <Bar> with a single fill
                       loses the per-band coloring but the chart renders) */}
-                  <Bar yAxisId="price" dataKey="price" fill="#475569" fillOpacity={0.35} maxBarSize={6} />
+                  <Bar yAxisId="risk" dataKey="price" fill="#475569" fillOpacity={0.35} maxBarSize={6} />
                   <Area
                     yAxisId="risk"
                     type="monotone"
