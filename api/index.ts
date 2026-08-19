@@ -649,12 +649,10 @@ async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse)
 // ─── Bitcoin Market Data ───────────────────────────────────────────────────────
 
 async function handleMarketData(_: VercelRequest, res: VercelResponse) {
-  try {
+  return upstreamOr500(res, async () => {
     const data = await getBitcoinMarketData();
-    ok(res, data);
-  } catch (e: any) {
-    err(res, 500, e.message);
-  }
+    return ok(res, data);
+  });
 }
 
 async function getBitcoinMarketData() {
@@ -668,13 +666,11 @@ async function getBitcoinMarketData() {
 // ─── Bitcoin Chart ─────────────────────────────────────────────────────────────
 
 async function handleChart(req: VercelRequest, res: VercelResponse) {
-  try {
+  return upstreamOr500(res, async () => {
     const tf = (req.query.timeframe as string) || '1D';
     const data = await getBitcoinChart(tf);
-    ok(res, data);
-  } catch (e: any) {
-    err(res, 500, e.message);
-  }
+    return ok(res, data);
+  });
 }
 
 async function getBitcoinChart(timeframe: string) {
@@ -697,12 +693,10 @@ async function getBitcoinChart(timeframe: string) {
 // ─── Fear & Greed ─────────────────────────────────────────────────────────────
 
 async function handleFearGreed(_: VercelRequest, res: VercelResponse) {
-  try {
+  return upstreamOr500(res, async () => {
     const data = await getFearGreedData();
-    ok(res, data);
-  } catch (e: any) {
-    err(res, 500, e.message);
-  }
+    return ok(res, data);
+  });
 }
 
 async function getFearGreedData() {
@@ -731,12 +725,10 @@ async function getFearGreedData() {
 // ─── Financial Markets (S&P 500, DXY, Gold, VIX) ───────────────────────────────
 
 async function handleFinancialMarkets(_: VercelRequest, res: VercelResponse) {
-  try {
+  return upstreamOr500(res, async () => {
     const data = await getFinancialMarketData();
-    ok(res, data);
-  } catch (e: any) {
-    err(res, 500, e.message);
-  }
+    return ok(res, data);
+  });
 }
 
 async function getFinancialMarketData() {
