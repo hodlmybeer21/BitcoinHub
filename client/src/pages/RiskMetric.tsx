@@ -26,6 +26,7 @@ import {
   Tooltip as RTooltip, ReferenceLine, ReferenceDot,
 } from "recharts";
 import { Link } from "wouter";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -436,8 +437,9 @@ export default function RiskMetric() {
             <Skeleton className="h-80 w-full" />
           ) : ts.data && ts.data.points.length > 0 ? (
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={ts.data.points} margin={{ top: 5, right: 60, left: 0, bottom: 5 }}>
+              <ErrorBoundary label="Risk time series chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={ts.data.points} margin={{ top: 5, right: 60, left: 0, bottom: 5 }}>
                   <defs>
                     <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#ea580c" stopOpacity={0.5} />
@@ -488,7 +490,8 @@ export default function RiskMetric() {
                     strokeWidth={1.5}
                   />
                 </ComposedChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </ErrorBoundary>
             </div>
           ) : null}
         </CardContent>
