@@ -220,7 +220,7 @@ export async function publishIndicator(
     `UPDATE anonymous_data
      SET visibility = 'public', gallery_title = $3, gallery_description = $4, published_at = NOW()
      WHERE user_id = $1 AND data_key = $2
-     RETURNING published_at`,
+     RETURNING id, published_at`,
     [userId, dataKey, galleryTitle, galleryDescription],
   );
   if (result.rows.length === 0) {
