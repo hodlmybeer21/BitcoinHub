@@ -227,7 +227,13 @@ function ConfidenceBadge({ level }: { level: 'very_low' | 'low' | 'medium' | 'hi
 
 function RiskTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
-  const p = payload[0].payload as RiskPoint;
+  // Recharts 2.15.x pre-invokes the content component during the chart's
+  // initial layout pass with a synthetic payload where payload.length > 0
+  // but payload[0].payload is undefined. Guarding here prevents
+  // 'Invariant failed' from a downstream .toFixed/.toLocaleString on
+  // undefined (Tyler's #37001 black-screen root cause, 2026-08-19).
+  const p = payload[0]?.payload;
+  if (!p) return null;
   return (
     <div className="bg-card border border-muted rounded-md p-2 text-xs shadow-md">
       <div className="font-mono mb-1">{p.date}</div>
@@ -466,7 +472,11 @@ export default function RiskMetric() {
                   {/* Price bars colored by band — gives the chart its 'green/red' visual */}
                   <Bar yAxisId="price" dataKey="price" maxBarSize={6}>
                     {ts.data.points.map((p, idx) => (
-                      <Cell key={idx} fill={p.bandColor} fillOpacity={0.35} />
+                      // Defensive fallback: if any point is ever missing bandColor,
+                      // Cell throws 'Invariant failed' (Recharts 2.15.x requires a
+                      // valid CSS color string). Current data is all valid; this
+                      // is belt-and-suspenders alongside the RiskTooltip guard.
+                      <Cell key={idx} fill={p.bandColor || '#666'} fillOpacity={0.35} />
                     ))}
                   </Bar>
                   <Area
