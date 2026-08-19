@@ -51,7 +51,8 @@ export async function fetchFredObservations(
     };
   }
 
-  const apiKey = process.env.FRED_API_KEY;
+  const rawKey = process.env.FRED_API_KEY;
+  const apiKey = typeof rawKey === 'string' ? rawKey.trim() : rawKey;
   if (!apiKey) {
     throw new Error('FRED_API_KEY not set — Tyler, please add it via Vercel dashboard (Project Settings → Environment Variables).');
   }
