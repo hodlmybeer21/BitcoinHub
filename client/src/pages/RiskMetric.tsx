@@ -441,6 +441,13 @@ export default function RiskMetric() {
               <ErrorBoundary label="Risk time series chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={ts.data.points} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="riskGradientV2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#ea580c" stopOpacity={0.5} />
+                      <stop offset="50%" stopColor="#eab308" stopOpacity={0.5} />
+                      <stop offset="100%" stopColor="#16a34a" stopOpacity={0.5} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis
                     dataKey="date"
@@ -454,8 +461,7 @@ export default function RiskMetric() {
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
-                    fill="#ea580c"
-                    fillOpacity={0.2}
+                    fill="url(#riskGradientV2)"
                     strokeWidth={1.5}
                     dot={false}
                   />
