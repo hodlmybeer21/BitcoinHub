@@ -458,16 +458,19 @@ export default function RiskMetric() {
                       x={m.x}
                       stroke="#888"
                       strokeDasharray="2 2"
-                      label={{ value: m.label, position: 'top', fill: '#888', fontSize: 10 }}
+                      fill="#888"
+                      fontSize={10}
+                      label={m.label}
+                      position="top"
                     />
                   ))}
-                  <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" label={{ value: 'Neutral', position: 'right', fill: '#888', fontSize: 10 }} />
-                  <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" label={{ value: 'Extreme Greed', position: 'right', fill: '#dc2626', fontSize: 10 }} />
-                  <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" label={{ value: 'Extreme Fear', position: 'right', fill: '#16a34a', fontSize: 10 }} />
-                  {/* Price bars (single fill — per-band Cell mapping was throwing
-                      'Invariant failed' in Recharts 2.15.x; revisit if confirmed
-                      safe) */}
-                  <Bar yAxisId="price" dataKey="price" fill="#475569" maxBarSize={6} />
+                  <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" fill="#888" fontSize={10} label="Neutral" position="right" />
+                  <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" fill="#dc2626" fontSize={10} label="Extreme Greed" position="right" />
+                  <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" fill="#16a34a" fontSize={10} label="Extreme Fear" position="right" />
+                  {/* Price bars (default fill — per-band Cell mapping + explicit fill
+                      were both throwing 'Invariant failed' in Recharts 2.15.x;
+                      revisit if confirmed safe) */}
+                  <Bar yAxisId="price" dataKey="price" maxBarSize={6} />
                   <Area
                     yAxisId="risk"
                     type="monotone"
