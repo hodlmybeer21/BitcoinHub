@@ -447,7 +447,6 @@ export default function RiskMetric() {
                     stroke="#888"
                     fontSize={11}
                     tickFormatter={(v: string) => v.slice(0, 7)}
-                    interval={Math.floor(ts.data.points.length / 8)}
                   />
                   <YAxis yAxisId="risk" domain={[0, 1]} stroke="#888" fontSize={11} />
                   {/* Removed the right-side price YAxis (yAxisId="price") — the dual
