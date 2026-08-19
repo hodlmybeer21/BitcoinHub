@@ -608,11 +608,10 @@ interface EvalContext {
 
 async function resolveData(node: { type: 'data'; id: string }, ctx: EvalContext): Promise<number[] | null> {
   if (ctx.seriesCache.has(node.id)) return ctx.seriesCache.get(node.id)!;
-  const fetcher = BLOCK_FETCHERS[node.id];
-  if (!fetcher) {
-    ctx.errors.push(`Unknown block: ${node.id}`);
-    return null;
-  }
+  // Route through cachedFetch() so lazy-imported families (risk.*, macro.*,
+  // premium.*) are reachable. The inline BLOCK_FETCHERS registry only
+  // contains base blocks; checking it here would silently false-positive on
+  // lazy-imported block IDs.
   try {
     const start = new Date(ctx.dates[0]);
     const end = new Date(ctx.dates[ctx.dates.length - 1]);
@@ -627,7 +626,7 @@ async function resolveData(node: { type: 'data'; id: string }, ctx: EvalContext)
     ctx.sources.push({ id: node.id, points: series.length });
     return aligned;
   } catch (e: any) {
-    ctx.errors.push(`Fetch failed for ${node.id}: ${e.message}`);
+    ctx.errors.push(e?.message ?? `Fetch failed for ${node.id}`);
     ctx.seriesCache.set(node.id, new Array(ctx.dates.length).fill(0));
     return new Array(ctx.dates.length).fill(0);
   }
@@ -753,7 +752,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const end = new Date(endDay);
     const fetched = await Promise.all(
       Array.from(dataIds).map(async id => {
-        if (!BLOCK_FETCHERS[id]) return { id, series: [] };
+        // Route through cachedFetch() to handle lazy-imported families
+        // (risk.* / macro.* / premium.*) as well as base blocks.
         try {
           const series = await cachedFetch(id, start, end);
           return { id, series };
