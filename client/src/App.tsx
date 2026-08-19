@@ -33,6 +33,7 @@ import RiskMetric from "@/pages/RiskMetric";
 import Macro from "@/pages/Macro";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Router() {
   return (
@@ -63,7 +64,11 @@ function Router() {
         <Route path="/workbench/backtests/:id" component={WorkbenchBacktestDetail} />
         <Route path="/workbench/overlay" component={WorkbenchOverlay} />
         <Route path="/about" component={About} />
-        <Route path="/risk" component={RiskMetric} />
+        <Route path="/risk">
+          <ErrorBoundary label="Risk indicator">
+            <RiskMetric />
+          </ErrorBoundary>
+        </Route>
         <Route path="/macro" component={Macro} />
         <Route path="/forgot-password" component={() => (
           <div className="min-h-[60vh] flex items-center justify-center px-4">
