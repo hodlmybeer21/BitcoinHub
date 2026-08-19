@@ -450,10 +450,12 @@ export default function RiskMetric() {
                   />
                   <YAxis domain={[0, 1]} stroke="#888" fontSize={11} />
                   <RTooltip content={<RiskTooltip />} />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
+                    fill="#ea580c"
+                    fillOpacity={0.2}
                     strokeWidth={1.5}
                     dot={false}
                   />
