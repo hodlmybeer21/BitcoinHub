@@ -227,7 +227,7 @@ export async function publishIndicator(
     throw new Error('Indicator not found. Save it first before publishing.');
   }
   await logAudit(userId, 'publish', dataKey, galleryTitle.length, ip);
-  return { ok: true, publishedAt: result.rows[0].published_at as string };
+  return { ok: true, publishedAt: result.rows[0].published_at as string, id: result.rows[0].id as number };
 }
 
 export async function unpublishIndicator(
