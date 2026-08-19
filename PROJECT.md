@@ -14,10 +14,11 @@
 BitcoinHub is Tyler's crypto analytics dashboard — F&G, whale alerts,
 Deribit options flow, congressional trades, US crypto legislation tracker,
 Grok-powered AI analysis, DCA simulator, ** MPT optimizer **, and ** Workbench
-(no-code indicator builder) **. The site is technically far ahead of
-competitors like IntoTheCryptoverse; the gap is the ** business-model layer **
-(paid tiers, no-code tooling, shareable indicators). This session closed that
-gap by shipping MPT + Workbench on prod.
+(no-code indicator builder + community gallery + backtest) **. The site is
+technically far ahead of competitors like IntoTheCryptoverse; the gap is the
+** business-model layer ** (paid tiers, no-code tooling, shareable indicators).
+This session closed that gap by shipping MPT + Workbench + visual editor +
+gallery + backtest on prod.
 
 **Goals**: give retail crypto users a single hub that combines institutional-grade
 data + the ability to compose + share their own indicators without writing
@@ -27,7 +28,7 @@ code, and eventually monetize via paid tiers built on top of those capabilities.
 
 ## 2. Current State (live on prod)
 
-Verified working as of 2026-08-19 10:50 UTC. Anything older is suspect —
+Verified working as of 2026-08-19 19:43 UTC. Anything older is suspect —
 verify with a curl before relying on it.
 
 ### What's live right now
@@ -38,10 +39,12 @@ verify with a curl before relying on it.
 - **Workbench** — `/workbench` (no-code indicator builder)
 - **Risk Metric** — `/risk` (BTC cycle-position score 0–1 with halving
   context, BMSB, Pi Cycle, 4y chart, 6 risk bands
-  extreme_fear→extreme_greed). Headline moat from ITCV; composes
-  cleanly into Workbench via 6 `risk.*` block fetchers and 6 templates
-  (risk_metric_snapshot, risk_bmsb_lower/upper, risk_pi_cycle_ratio,
-  risk_cycle_position_pct, +1 pre-existing risk_off_dxy).
+  extreme_fear→extreme_greed). **KNOWN LIMITATION:** the 4-Year Risk
+  History chart was debugged today (9 fix commits) but the visual
+  richness (per-band bar colors, halving markers, band lines, gradient
+  fill) was lost in the process. The chart now renders as a single
+  orange line (the e08d4d0 working state). See section 7 for the
+  known limitation and future work.
 - **Time in Risk Bands** — Time in Risk Bands panel on /risk
   (current streak + stacked distribution bar + 6-band grid + last
   transition). New /api/risk/bands-stats route + risk.band_stats
@@ -54,33 +57,53 @@ verify with a curl before relying on it.
   prod** — /api/fred/series + /api/fred/categories work, /api/fred/data
   returns 503 until the env var is set. Code is fully functional locally
   (25/25 smoke tests pass).
+- **Backtest Share** — Workbench backtests can be published to the
+  community gallery (`/workbench/backtests`), viewed at `/workbench/backtests/:id`,
+  forked to a user's local Workbench. 3 new API endpoints (`POST /api/workbench/backtest/publish`,
+  `GET /api/workbench/backtests`, `GET /api/workbench/backtest/:id`) reusing the existing
+  `anonymous_data` table + visibility/gallery fields. Demo roundtrip verified
+  (8/8 smoke tests pass).
 
-### Recent commits (origin/main, newest first)
+### Recent commits (origin/main, newest first — today's session is at the top)
 
 | Commit | What |
 |---|---|
-| `5370339` | **feat(macro)**: Phase 6b — FRED macro suite + Workbench integration + dashboard. New `lib/fred/{quote,series,handler}.ts` (~13KB) with 12 series across 5 categories — Liquidity (WALCL Fed Total Assets, RRPONTSYD O/N Reverse Repo, M1SL M1 Money), Rates (T10Y2Y 2s10s, T10Y3M 3m10y, MORTGAGE30US 30Y Mortgage, T5YIE 5y5y breakevens), Inflation (CPIAUCSL headline YoY, CPILFESL core YoY), Employment (UNRATE, ICSA initial claims), Sentiment (NFCI Chicago Fed Financial Conditions). `/api/fred/{series,categories,data}` routes wired (lazy-import dispatcher). Workbench integration: `lib/workbench/macro-blocks.ts` (12 fetchers), 12 macro.* block defs in `lib/workbench/blocks.ts`, `evaluate.ts` macro dispatcher, 3 templates (`macro_liquidity_snapshot`, `macro_recession_watch`, `macro_inflation_snapshot`). Client: `client/src/pages/Macro.tsx` (11.3KB) — responsive 3-col grid of 12 cards with category filter, 1y sparklines (Recharts AreaChart), YoY change indicators, color-coded by category. `/macro` route in `App.tsx` + `Layers` icon nav link in `Navbar.tsx`. Smoke test: `scripts/test-fred.ts` 25/25 pass (live WALCL=$6.76T, UNRATE=4.1%, T10Y2Y=0.52%, CPI YoY=3.30%). |
-| `1c9bd46` | **feat(risk)**: Phase 6a — Time in Risk Bands + price color-coded chart. New `computeBandStats()` in `composite.ts` (per-band % + current streak + last transition). Chart swapped `AreaChart` → `ComposedChart` with per-bar `<Cell>` band-coloring for price (visually striking: chart goes green→red as BTC climbs the bands). New `/api/risk/bands-stats` route + `lib/risk/bands-stats.ts` (lazy-imported handler, lazy axios inside). New dashboard panel: current streak banner + stacked distribution bar (h-8, colored per band) + per-band stats grid + last-transition line. Workbench: `risk.band_stats` block registered (returns 6 series — one per band pct), 2 new templates (`risk_band_stats_snapshot`, `risk_extreme_fear_share`). Smoke test: 46/46 pass (was 38/38; +8 band-stats tests covering synthetic + live BTC distribution, current streak, last transition, warmup-day accounting). |
-| `f5ab2e8` | **fix(risk)**: timeseries returns 0 points — window slicing after risk. Previous handler sliced closes to the displayed window before computing risk, but the 1460-day z-score warmup consumed the entire window, yielding 0 valid points. Fix: compute risk on the FULL 10y input, then apply the window only when slicing the output. computeRiskTimeSeries now accepts an optional `windowDays` param and starts the downsampling loop at the window start. Verified: `/api/risk/timeseries?days=1460` now returns 200 points starting 2022-08-20. |
-| `44c0312` | **chore**: trigger Vercel rebuild — risk routes missing from prod. After push of `8fe2ca5`, prod dispatcher returned 'Route not found' for all `/api/risk/*` paths. ETag on the 404 was identical to the response for any other unknown path, confirming Vercel was serving an older build (presumably a silent build failure / cache rollback). Force a fresh deploy to pick up commit `8fe2ca5`. Empty commit; verified: 3/4 routes work after rebuild, then fixed the 4th in `f5ab2e8`. |
-| `8fe2ca5` | **feat(risk)**: Phase 6 — Risk Metric dashboard + Workbench integration. Adds the headline moat from intothecryptoverse.com — a 0–1 cycle-position score for BTC (and ETH/soon) combining Mayer Multiple z-score, RSI(14), halving-cycle position, and 200w-deviation into a single risk band (extreme_fear → extreme_greed) with confidence weighting. Server: `lib/risk/{cycles,cycles-shared,mayer,composite,indicators,quote,timeseries}.ts` (pure-TS, no ml libs, lazy axios, 1h in-memory cache, Yahoo primary + CoinGecko fallback). 4 routes wired in `api/index.ts`: `/api/risk/{cycles,indicator,timeseries,indicators}`. Workbench: `lib/workbench/risk-blocks.ts` (6 risk.* block fetchers), 6 new blocks in `lib/workbench/blocks.ts` (risk.metric, risk.bmsb_*, risk.pi_*), lazy-import path in `lib/workbench/evaluate.ts` (preserves lazy-import invariant), 6 risk templates in `lib/workbench/templates.ts`. Client: `client/src/pages/RiskMetric.tsx` (625 lines: 3 stat cards + Recharts time series with band colors + halving ReferenceLines + BMSB + Pi Cycle panels + Workbench fork links), `/risk` route in `client/src/App.tsx`, Risk Indicator nav link (Gauge icon) in `client/src/components/Navbar.tsx`. Verified: `scripts/test-risk.ts` 38/38 pass (synthetic + live Yahoo fetch); BTC live risk = 0.452 (Cautious, high). Spec: `RISK_SPEC.md`. |
-| `b5a08ec` | **feat(gallery)**: forking — complete the network-effect loop (Phase 5b). |
-| `665b7c8` | **feat(persistence)**: anonymous UUID sync layer (foundation for paid tiers + public gallery). Backend: `anonymous_data` table with composite unique index, `lib/persistence/server.ts` (self-healing CREATE TABLE + lazy-imported Neon pool + upsert/get helpers), `api/index.ts` `handlePersistenceSync` handler (POST upsert / GET single key / GET all keys, 1MB per key cap), `lib/persistence/client.ts` later moved to `client/src/lib/persistence/client.ts`. Frontend: `useSyncedStorage<T>(dataKey, initialValue, localKey)` hook (local first-paint + debounced server sync + offline fallback) + `getUserId` UUID helper. Page integrations: Workbench.tsx (`workbench_indicators` + `workbench_canvas_positions`), PortfolioMPT.tsx (`mpt_portfolios` + `mpt_dca_plan`), DCASimulator.tsx (`mpt_dca_plan`). |
-| `481683e` | **fix(persistence)**: dedupe Workbench STORAGE_KEY + move client.ts to client/src/. Two deploy bugs found: Workbench.tsx had duplicate const STORAGE_KEY / const CANVAS_POS_KEY + dead loadCanvasPositions / persistCanvasPositions helpers (esbuild rejected at parse → silently dropped the whole module). Also: `@/lib/persistence/client` import resolved to `client/src/...` but file was at project root (Vite looked for client/src/lib/persistence/client, didn't find it → build failed for any page importing useSyncedStorage). Moved file to `client/src/lib/persistence/client.ts` with consolidated React imports. |
-| `7ef64f2` | **feat(workbench)**: templates gallery + portability MVP (Phase 3 slice 3). New `/workbench/templates` page lists all 8 built-in templates with category filter (Sentiment/Price/Funding/Macro/Other — derived client-side). Each card has 'Use this template' button that navigates to `/workbench?formula=<encoded>`. Workbench.tsx reads `?formula=` (pre-fills formula) and `?import=` (opens fork dialog with base64-decoded indicator) on mount, clearing the query string after consume. Each saved indicator gets Share button (copies base64-encoded `?import=` URL to clipboard) and Export button (downloads `<name>.workbench.json`). '+ Import' button in Saved card opens paste-JSON dialog. Import dialog has two modes: fork-from-shared-URL (preview + Fork & Save) and paste-JSON (textarea + Import). Fixed bottom-right toast for feedback. No new deps. |
-| `c25c5b4` | **feat(workbench)**: drag-from-palette onto canvas (Phase 3 slice 2). BlockChip is HTML5-draggable with `application/bitcoinhub-block` mime; canvas wrapper has onDragOver/onDrop; on drop, `rfInstance.screenToFlowPosition` converts cursor coords to flow coords and pushes the position onto a dropQueue. `astToGraph` consumes one queue position per DataNode in DFS order so the dropped block appears exactly where the user dropped it. `useEffect` clears the queue after consumption so re-parses without new drops fall back to auto-layout + saved positions. |
-| `2601ad1` | **feat(workbench)**: drag-drop canvas editor (Workbench Phase 3 slice). New 'Canvas' tab alongside Formula / Visual. Renders parsed AST as a @xyflow/react node graph — each AST node becomes a styled ReactFlow node (color-coded by block category + AST kind) with input/output handles showing how the formula composes. Custom BlockNode component handles 1-input (neg/not/series), 2-input (add/sub/mul/div/cmp/cross), 3-input (between), and N-input (and/or) shapes. Node positions persist to localStorage (`bitcoinhub_workbench_canvas_v1`) and survive reloads + formula edits. Formula string remains source of truth; canvas is the visualization. Future slices: drag-from-palette-onto-canvas, manual edge creation, graph→formula bidirectional editing. |
-| `296408f` | **feat(mpt)**: migrate-to-DCA bridge (MPT Phase 2 B3). MPT results → modal captures monthly/duration/MinVol-vs-MaxSharpe → plan persisted to localStorage + location.state → DCA page hydrates, pre-fills BTC portion (monthly = total × BTC weight, startYear = plan.startYear), renders 'MPT Migration Plan' card above the existing 2-col grid with per-asset weight/monthly/period-total + source attribution + dismiss button. localStorage key: `bitcoinhub_dca_mpt_plan_v1`. |
-| `cbaa902` | **feat(mpt)**: stress test panel (4 historical crashes: COVID, China ban, Luna/UST, FTX). Per-event portfolio drawdown + recovery. |
-| `86ceaff` | **feat(mpt)**: portfolio persistence (localStorage save/load for named portfolios). Save button + Saved Portfolios card + save dialog modal. |
-| `27f83db` | **feat(workbench)**: visual editing mode (Visual ⇆ Formula toggle, structured AST cards with color-coded chips). |
-| `0714e6a` | **feat(workbench)**: 5 new source blocks (btc.dominance, etf.volume, stablecoin.total_supply, onchain.active_addresses, real Deribit put/call). 11 → 16 blocks. |
-| `c388a98` | **fix(deploy)**: add `.js` extension to dynamic imports of `lib/*` handlers — THE FIX that made everything work. |
-| `a86b76f` | **fix(deploy)**: lazy-import axios inside each handler (not at module top) to avoid Vercel cold-start crash. |
-| `1e93736` | **fix(deploy)**: inline MPT + Workbench routes via `lib/` helpers (under Hobby 12-function limit). |
-| `2228776` | **fix(deploy)**: self-contained serverless files (FAILED — hit Vercel 12-function limit). |
-| `2960f81` | **feat(workbench)**: no-code indicator builder MVP (parser + 11 source blocks + 8 templates + localStorage). |
-| `adfe59e` | **feat(portfolio)**: MPT optimizer MVP (7-asset universe, 4-year halving cycles, Ledoit-Wolf shrinkage, 10k Monte Carlo Dirichlet, max-Sharpe + min-vol, rebalance trades). |
+| `bb31a6f` | **fix(risk)**: restore to e08d4d0 working state (binary-search abandoned). The 4 single-prop fixes (Bar+Cell, gradient fill, dual YAxis, XAxis interval) didn't fix the "Invariant failed" — the actual culprit is a combination of all the internals together. Restored the e08d4d0 minimal LineChart. The visual richness (per-band bar colors, halving markers, band lines, gradient fill) is lost — the chart now renders as a single orange line. Future work: restore the visual richness incrementally with the inner ErrorBoundary catching any throw. |
+| `58af0e9` | **fix(risk)**: remove XAxis interval prop (next suspect in 'Invariant failed' binary search). The 4th single-prop fix — didn't fix it. The binary-search approach of removing individual props one at a time isn't converging. |
+| `d1a048c` | **fix(risk)**: remove dual YAxis (next suspect in 'Invariant failed' binary search). The 3rd single-prop fix — didn't fix it. |
+| `d980645` | **fix(risk)**: remove gradient fill (next suspect in 'Invariant failed' binary search). The 2nd single-prop fix — didn't fix it. |
+| `c0d1b81` | **fix(risk)**: remove Cell children from Bar (the fragile Recharts 2.15.x internal). The 1st single-prop fix — didn't fix it. |
+| `e08d4d0` | **fix(risk)**: replace ComposedChart with minimal LineChart, fix 'Invariant failed'. The 6th fix — the chart rendered but with reduced visual richness. |
+| `61dc1be` | **fix(risk)**: simplify ReferenceLine labels + drop Bar fill, fix 'Invariant failed'. The 5th fix. |
+| `2e23a2b` | **fix(risk)**: wrap time-series chart in its own ErrorBoundary. Catches chart-level crashes and shows a useful red card for the chart. Route-level ErrorBoundary (`e20c401`) stays as a second line of defense. |
+| `50489d3` | **fix(risk)**: add RiskTooltip guard against Recharts 2.15.x synthetic payload. The RiskTooltip content component is pre-invoked during the chart's initial layout pass with a synthetic payload where `payload.length > 0` but `payload[0].payload` is `undefined`. The `as RiskPoint` type assertion was a lie at runtime. Added `const p = payload[0]?.payload; if (!p) return null;` guard. |
+| `20c5b4f` | **feat(workbench)**: live indicator overlay on BTC price chart — `/workbench/overlay` page. New page that visualizes any saved Workbench formula as green / red markers on a BTC-USD daily price chart. |
+| `7d92c71` | **fix(workbench)**: add Bar+Cell to 4-Year chart (rebuild visual richness, part 6 of N). Reverted in c0d1b81. |
+| `39df098` | **fix(risk)**: add ReferenceLines to 4-Year chart (rebuild visual richness, part 5 of N). |
+| `698d9e5` | **fix(risk)**: add dual YAxis to 4-Year chart (rebuild visual richness, part 4 of N). Reverted in d1a048c. |
+| `cd7939a` | **fix(risk)**: add XAxis interval to 4-Year chart (rebuild visual richness, part 3 of N). Reverted in 58af0e9. |
+| `83ccf1f` | **fix(risk)**: add gradient fill to 4-Year chart (rebuild visual richness, part 2 of N). Reverted in d980645. |
+| `49ad2e3` | **fix(risk)**: add Area fill to 4-Year chart (rebuild visual richness, part 1 of N). |
+| `e20c401` | **fix(risk)**: wrap /risk route in ErrorBoundary so crashes show useful UI. |
+| `8d92c71` | **feat(workbench)**: live indicator overlay on BTC price chart — `/workbench/overlay` page. |
+| `2f19af0` | **fix(workbench)**: Since 2016 preset + default range flip (2016 UI fix). |
+| `b2ae324` | **feat(site)**: /about page — methodology, data sources, FAQ, honesty. |
+| `8fed72c` | **feat(workbench)**: backtest result sharing — publish + browse + fork. |
+| `6c90e8e` | **fix(risk)**: guard RiskTooltip against Recharts 2.15.x synthetic payload. |
+| `e08d4d0` | **fix(risk)**: replace ComposedChart with minimal LineChart, fix 'Invariant failed'. |
+| `61dc1be` | **fix(risk)**: simplify ReferenceLine labels + drop Bar fill, fix 'Invariant failed'. |
+| `2e23a2b` | **fix(risk)**: wrap time-series chart in its own ErrorBoundary. |
+| `c0d1b81` | **fix(risk)**: remove Cell children from Bar (the fragile Recharts 2.15.x internal). |
+| `d980645` | **fix(risk)**: remove gradient fill (next suspect in 'Invariant failed' binary search). |
+| `d1a048c` | **fix(risk)**: remove dual YAxis (next suspect in 'Invariant failed' binary search). |
+| `cd7939a` | **fix(risk)**: add XAxis interval to 4-Year chart (rebuild visual richness, part 3 of N). |
+| `83ccf1f` | **fix(risk)**: add gradient fill to 4-Year chart (rebuild visual richness, part 2 of N). |
+| `49ad2e3` | **fix(risk)**: add Area fill to 4-Year chart (rebuild visual richness, part 1 of N). |
+| `b8ad623` | **refactor(api)**: wrap top upstream handlers in upstreamOr500. |
+| `5221d63` | **feat(workbench)**: multi-asset backtesting (BTC + IBIT + FBTC + MSTR + COIN + MARA + RIOT). |
+| `6fbe367` | **feat(workbench)**: valuation blocks (Puell, MVRV-Z, DXY corr, NVT). |
+| `19fd200` | **polish(workbench)**: 3 audit follow-ups — FRED downsampler, monthly-lag UX, 502→503 polish. |
+| `e20c401` | **fix(risk)**: wrap /risk route in ErrorBoundary so crashes show useful UI. |
 
 ### MPT Phase 2 status
 
@@ -104,6 +127,8 @@ verify with a curl before relying on it.
 | **Persistence — runtime verification** | ✅ Live on prod (postgres `ep-icy-star-autojvnu-pooler.c-10.us-east-1.aws.neon.tech/neondb`) | — |
 | **Persistence hardening (rate limit + CORS + audit)** | ✅ Live on prod — all 6 smoke tests pass (OPTIONS 204 + CORS headers, POST 200, GET 200, GET no-param 400, CORS rejection on bad origin, rate limit 429 on request #60) | `0bd891b` |
 | **Workbench community gallery** | ✅ Live on prod — publish + list endpoints verified (cache-buster GET returns both published items in published_at DESC order; /workbench/gallery page renders 200) | `ab634a8` |
+| **Backtest result sharing (Phase 7)** | ✅ Live on prod — POST publish + GET list + GET detail endpoints verified; /workbench/backtests page renders 200 | `8fed72c` |
+| **Live indicator overlay on BTC chart (Phase 8)** | ✅ Live on prod — /workbench/overlay page renders 200; saved formulas visualize as green/red markers on BTC price chart | `8d92c71` |
 
 ---
 
@@ -154,6 +179,17 @@ cold-start bundle weight. Any new code must respect them.
    budget already counts them. They count even though they're
    self-contained (because they're in `api/`).
 
+8. **Inner ErrorBoundary for fragile components** — when a component
+   has known Recharts 2.15.x fragility (e.g., the time-series chart
+   with ComposedChart + Bar + Cell + Area + ReferenceLines + dual YAxis +
+   XAxis interval), wrap it in an `<ErrorBoundary>` from
+   `client/src/components/ErrorBoundary.tsx` so a throw shows a useful
+   red card instead of a black screen. Pattern: route-level boundary
+   for page-level crashes (`e20c401`) + inner boundary for fragile
+   sub-components (`2e23a2b` for the chart). This was the key debugging
+   tool that surfaced the actual error.message and made the
+   binary-search possible.
+
 ---
 
 ## 4. IntoTheCryptoverse Comparison (original driver of this session)
@@ -186,6 +222,16 @@ analysis at session start:
 - ✅ Workbench (the "no-code for retail" differentiator)
 - ✅ Visual editor for Workbench formulas (closer to "Scratch meets
   TradingView" feel)
+- ✅ Community gallery + templates (IntoTheCryptoverse parity)
+- ✅ Persistence (anonymous UUID sync layer — foundation for paid tiers)
+- ✅ Backtest result sharing (publish + browse + fork)
+- ✅ Live indicator overlay on BTC price chart
+- ✅ Multi-asset backtesting (BTC + 6 other assets)
+- ✅ Valuation blocks (Puell, MVRV-Z, DXY corr, NVT)
+- ✅ Audit follow-ups (FRED downsampler, monthly-lag UX, 502→503 polish)
+- ✅ Since 2016 UI fix (preset + default range flip)
+- ✅ /about page (methodology, data sources, FAQ, honesty)
+- ✅ /risk page debug (9 fix commits, restored to e08d4d0 working state)
 
 ---
 
@@ -248,15 +294,22 @@ pick the top one and ship, but these are the queue.
 Per Tyler's pattern (decisive + delegating), I should pick the top one and ship.
 But here are the top 3 in priority order for Tyler to override:
 
-1. **MPT Phase 2 B3 — DCA migration bridge** (closes the loop on flagship features)
+1. **Restore the 4-Year Risk History chart's visual richness** (~1-2 hr)
+   - The 4-Year chart was debugged today but the visual richness
+     (per-band bar colors, halving markers, band lines, gradient fill)
+     was lost. The original ComposedChart worked, so the fragility was
+     in the specific combination of internals when re-added all at once.
+     The inner ErrorBoundary (`2e23a2b`) makes this safe — each add is
+     wrapped, a bad add shows a red card instead of a black screen. I can
+     binary-search the internals one at a time to find which ones work
+     in combination.
+   - Smaller scope: ~100-200 lines of incremental changes
+   - High value: brings the chart back to its full visual richness
+
+2. **MPT Phase 2 B3 — DCA migration bridge** (closes the loop on flagship features)
    - Smaller scope: ~100-150 lines
    - High value: connects two existing features into one workflow
    - Can ship in 1-2 hours
-
-2. **Workbench Phase 3 — drag-drop canvas** (visual upgrade)
-   - Larger scope: 2-4 hours, requires `@dnd-kit` or `reactflow` install
-   - High value: brings the "no-code" UX to parity with IntoTheCryptoverse
-   - Multiple sub-tasks: drag-drop, sockets, undo/redo, save-as-template
 
 3. **Persistence migration** (foundation for paid tiers)
    - Larger scope: schema design + Drizzle migration + auth flow
@@ -283,6 +336,21 @@ But here are the top 3 in priority order for Tyler to override:
   dispatcher doesn't import from `server/routes.ts` (the transitive
   import chain that pulled in `live-indicators.ts` is broken).
 
+### Known limitations (from today's debug)
+
+- **4-Year Risk History chart visual richness reduced** — the chart now
+  renders as a single orange line (the e08d4d0 working state). The
+  per-band bar colors, halving markers, band lines, and gradient fill
+  were lost in the debug process. The 4 single-prop binary-search
+  attempts (Bar+Cell, gradient fill, dual YAxis, XAxis interval) didn't
+  fix the "Invariant failed" — the actual culprit is a combination of
+  all the internals together. Future work: restore the visual richness
+  incrementally with the inner ErrorBoundary (`2e23a2b`) catching any
+  throw. The original ComposedChart worked, so the fragility was in the
+  specific combination of internals when re-added all at once. Future
+  work: binary-search the internals one at a time, or try a different
+  chart library (chart.js, d3) if Recharts 2.15.x keeps being fragile.
+
 ### Operational / external
 
 - **Pre-market scan cron** (9:00 ET weekdays) — timing out via model
@@ -307,6 +375,13 @@ But here are the top 3 in priority order for Tyler to override:
   in this session: use prior context deliveries where the conversation
   history was visible to recover Tyler's text.
 
+- **Binary-search approach for debugging fragile Recharts internals
+  didn't converge.** When 4 single-prop fixes in a row don't fix the
+  error, the actual culprit is a combination of internals together. Don't
+  keep removing individual props — change approach: restore to a minimal
+  working state and rebuild incrementally with the ErrorBoundary catching
+  any throw. This was the lesson from today's /risk debug.
+
 ---
 
 ## 8. File Map (where things live)
@@ -322,8 +397,14 @@ BitcoinHub/
 ├── client/src/
 │   ├── pages/
 │   │   ├── PortfolioMPT.tsx        # MPT page (~800 lines, B1+B2 baked in)
-│   │   └── Workbench.tsx           # Workbench page (~700 lines, visual mode baked in)
-│   ├── components/                 # UI primitives (Card, Button, etc.)
+│   │   ├── Workbench.tsx           # Workbench page (~700 lines, visual mode baked in)
+│   │   ├── WorkbenchOverlay.tsx    # Live indicator overlay on BTC price chart
+│   │   ├── WorkbenchBacktests.tsx   # Backtest result sharing — list page
+│   │   ├── WorkbenchBacktestDetail.tsx  # Backtest result sharing — detail page
+│   │   ├── About.tsx               # /about page (methodology, data sources, FAQ, honesty)
+│   │   └── RiskMetric.tsx          # /risk page (3 stat cards + 4y chart + band dist + BMSB/Pi Cycle)
+│   ├── components/
+│   │   └── ErrorBoundary.tsx       # Defensive error boundary (used by /risk chart)
 │   └── lib/queryClient.ts          # Fixed apiRequest() bug (commit 14435b8)
 ├── lib/
 │   ├── mpt/
@@ -331,19 +412,34 @@ BitcoinHub/
 │   │   ├── compute.ts              # 22 KB, vanilla MPT math (covariance, MC, rebalance)
 │   │   ├── quote.ts                # Last-price quote
 │   │   └── stress.ts               # Stress test (4 historical crashes)
-│   └── workbench/
-│       ├── blocks.ts               # 16-block registry
-│       ├── parse.ts                # Formula → AST parser
-│       └── evaluate.ts             # AST evaluator + block fetchers
+│   ├── workbench/
+│   │   ├── blocks.ts               # 25+ block registry
+│   │   ├── parse.ts                # Formula → AST parser
+│   │   ├── evaluate.ts             # AST evaluator + block fetchers
+│   │   ├── macro-blocks.ts         # FRED macro fetchers
+│   │   ├── premium-blocks.ts       # DeMark, Elliott, Wyckoff, whale
+│   │   ├── risk-blocks.ts          # Risk.* block fetchers
+│   │   └── valuation-blocks.ts     # Puell, MVRV-Z, DXY corr, NVT
+│   ├── fred/
+│   │   ├── quote.ts                # FRED API quote
+│   │   ├── series.ts               # FRED series registry
+│   │   └── handler.ts              # FRED data route handler
+│   └── persistence/
+│       └── server.ts               # Persistence backend (anonymous UUID sync)
 ├── server/                         # Express-side legacy (DO NOT IMPORT FROM)
 │   ├── api/                       # Used by api/entry.ts
 │   ├── mpt/                       # Original Express MPT
 │   └── workbench/                 # Original Express Workbench
 ├── scripts/
 │   ├── test-mpt.ts                # Local MPT smoke test (21/21 green)
-│   └── test-workbench.ts          # Local Workbench smoke test (21/21 green)
+│   ├── test-workbench.ts          # Local Workbench smoke test (21/21 green)
+│   ├── test-fred.ts               # Local FRED smoke test (25/25 green)
+│   ├── test-risk.ts               # Local Risk smoke test (38/38 green)
+│   ├── test-backtest.ts           # Local backtest smoke test (8/8 green)
+│   └── audit-workbench.py         # Workbench audit script
 ├── WORKBENCH_SPEC.md               # Workbench spec (Phase 1+2 scope)
 ├── MPT_SPEC.md                     # MPT spec (Phase 1+2 scope)
+├── RISK_SPEC.md                    # Risk spec (Phase 6 scope)
 └── PROJECT.md                      # ← This file (the meta-doc)
 ```
 
@@ -369,9 +465,15 @@ BitcoinHub/
   error in the response body.** Generic error message hides the real
   cause — the response body usually has it (e.g. `Cannot find module
   '/var/task/lib/mpt/cycles'`).
+- **Use inner ErrorBoundary for fragile sub-components** — when a
+  component has known fragility (e.g., the time-series chart with
+  ComposedChart + Bar + Cell + Area + ReferenceLines + dual YAxis),
+  wrap it in `<ErrorBoundary>` so a throw shows a useful red card
+  instead of a black screen. This is the key debugging pattern for
+  fragile third-party libraries.
 
 ---
 
-_Last updated: 2026-08-19 00:00 UTC, by `goodbot`._
+_Last updated: 2026-08-19 19:50 UTC, by `goodbot`._
 _Update trigger: any shipping decision, scope change, or new architecture
 invariant._
