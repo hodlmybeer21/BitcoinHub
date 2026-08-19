@@ -251,19 +251,29 @@ export async function listPublicIndicators(
   limit: number = 50,
   offset: number = 0,
   ip: string = 'unknown',
+  dataKeyPrefix?: string,
 ): Promise<PublicIndicatorListItem[]> {
   await ensureTable();
   const pool = await getPool();
+  // If a dataKeyPrefix is supplied, filter to rows whose data_key starts with
+  // it (used by /api/workbench/backtests to scope to published backtests only
+  // — each backtest gets its own dataKey like 'workbench_backtest_<ts>_<r>').
+  const where = dataKeyPrefix
+    ? `WHERE visibility = 'public' AND data_key LIKE $3`
+    : `WHERE visibility = 'public'`;
+  const params: any[] = dataKeyPrefix
+    ? [limit, offset, `${dataKeyPrefix}%`]
+    : [limit, offset];
   const result = await pool.query(
     `SELECT id, user_id, data_key, gallery_title, gallery_description, data_value,
             view_count, fork_count, published_at
      FROM anonymous_data
-     WHERE visibility = 'public'
+     ${where}
      ORDER BY published_at DESC
      LIMIT $1 OFFSET $2`,
-    [limit, offset],
+    params,
   );
-  await logAudit('anonymous', 'list_public', null, result.rows.length, ip);
+  await logAudit('anonymous', 'list_public', dataKeyPrefix ?? null, result.rows.length, ip);
   return result.rows.map((row: any) => ({
     id: row.id as number,
     authorUuidPrefix: String(row.user_id).slice(0, 8),
@@ -275,6 +285,51 @@ export async function listPublicIndicators(
     forkCount: row.fork_count as number,
     publishedAt: row.published_at as string,
   }));
+}
+
+// Fetch a single public row by id (used by /api/workbench/backtest/[id] for
+// the detail view). Increments view_count atomically. Returns null if the
+// row doesn't exist or isn't public — the caller should respond 404.
+export async function getPublicRowById(
+  id: number,
+  ip: string = 'unknown',
+): Promise<{
+  id: number;
+  authorUuidPrefix: string;
+  userId: string;
+  dataKey: string;
+  title: string;
+  description: string;
+  dataValue: string;
+  viewCount: number;
+  forkCount: number;
+  publishedAt: string;
+} | null> {
+  await ensureTable();
+  const pool = await getPool();
+  const result = await pool.query(
+    `UPDATE anonymous_data
+     SET view_count = view_count + 1
+     WHERE id = $1 AND visibility = 'public'
+     RETURNING id, user_id, data_key, gallery_title, gallery_description,
+               data_value, view_count, fork_count, published_at`,
+    [id],
+  );
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  await logAudit('anonymous', 'read_public', row.data_key as string, (row.data_value as string).length, ip);
+  return {
+    id: row.id as number,
+    authorUuidPrefix: String(row.user_id).slice(0, 8),
+    userId: row.user_id as string,
+    dataKey: row.data_key as string,
+    title: (row.gallery_title as string) || (row.data_key as string),
+    description: (row.gallery_description as string) || '',
+    dataValue: row.data_value as string,
+    viewCount: row.view_count as number,
+    forkCount: row.fork_count as number,
+    publishedAt: row.published_at as string,
+  };
 }
 
 export async function forkIndicator(

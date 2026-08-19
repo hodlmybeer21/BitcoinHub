@@ -379,6 +379,166 @@ async function handlePersistenceSync(req: VercelRequest, res: VercelResponse) {
 // List published indicators (GET) or publish/unpublish a user's own (POST).
 // Rate-limited + CORS-allowlisted + audited identically to /api/persistence/sync.
 
+// ─── Backtest Share (Phase 9, 2026-08-19) ───────────────────────────────
+// Publishes Workbench backtest runs to a public community gallery so users
+// can share their strategy results. Each published run gets a unique
+// dataKey like `workbench_backtest_<ts>_<r>` and reuses the same
+// anonymous_data row + visibility/gallery_* fields as the indicator gallery
+// (Phase 5). The full backtest result (formula, mode, weights, range,
+// stats, equity curve) lives in data_value as a JSON blob — same pattern as
+// the indicator gallery. No new schema, no migration — uses existing infra.
+
+async function handleBacktestPublish(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'OPTIONS') {
+    setPersistenceCorsHeaders(res);
+    return res.status(204).end();
+  }
+  setPersistenceCorsHeaders(res);
+  try {
+    if (!process.env.DATABASE_URL) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    const { upsertAnonData, publishIndicator, checkRateLimit } = await import('../lib/persistence/server.js');
+    const ip = getClientIp(req);
+    if (req.method !== 'POST') return err(res, 405, 'POST required');
+    if (!checkRateLimit(ip, 'write')) {
+      return err(res, 429, 'Rate limit exceeded: max 60 writes/min per IP. Slow down.');
+    }
+    const { userId, title, description, backtestResult } = req.body ?? {};
+    if (!userId || typeof userId !== 'string') {
+      return err(res, 400, 'userId (string) is required');
+    }
+    if (typeof title !== 'string' || title.length === 0 || title.length > 100) {
+      return err(res, 400, 'title (1-100 chars) is required');
+    }
+    if (typeof description !== 'string' || description.length > 500) {
+      return err(res, 400, 'description (max 500 chars) is required');
+    }
+    if (!backtestResult || typeof backtestResult !== 'object') {
+      return err(res, 400, 'backtestResult (object) is required');
+    }
+    if (typeof backtestResult.formula !== 'string' || !backtestResult.formula.trim()) {
+      return err(res, 400, 'backtestResult.formula (non-empty string) is required');
+    }
+    // Cap the equity curve stored in data_value — large curves balloon the row.
+    // The detail endpoint serves the full curve from the row, but a reasonable
+    // cap protects DB storage + list response sizes. ~6.5K daily points covers
+    // 2016-01-01 → today at 1 bar/day with margin.
+    const MAX_EQUITY_POINTS = 6500;
+    if (Array.isArray(backtestResult.equityCurve) && backtestResult.equityCurve.length > MAX_EQUITY_POINTS) {
+      const step = Math.ceil(backtestResult.equityCurve.length / MAX_EQUITY_POINTS);
+      backtestResult.equityCurve = backtestResult.equityCurve.filter(
+        (_: any, i: number) => i % step === 0 || i === backtestResult.equityCurve.length - 1,
+      );
+    }
+    const dataKey = `workbench_backtest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const dataValue = JSON.stringify(backtestResult);
+    await upsertAnonData(userId, dataKey, dataValue, ip);
+    const result = await publishIndicator(userId, dataKey, title, description, ip);
+    return ok(res, { ok: true, id: result.id, dataKey, shareUrl: `/workbench/backtests/${result.id}`, publishedAt: result.publishedAt });
+  } catch (e: any) {
+    console.error('[backtest-publish] error:', e?.message || e);
+    if (e?.message?.includes('DATABASE_URL')) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    return err(res, 500, e?.message || 'Backtest publish failed');
+  }
+}
+
+async function handleBacktestList(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'OPTIONS') {
+    setPersistenceCorsHeaders(res);
+    return res.status(204).end();
+  }
+  setPersistenceCorsHeaders(res);
+  try {
+    if (!process.env.DATABASE_URL) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    const { listPublicIndicators, checkRateLimit } = await import('../lib/persistence/server.js');
+    const ip = getClientIp(req);
+    if (req.method !== 'GET') return err(res, 405, 'GET required');
+    if (!checkRateLimit(ip, 'read')) {
+      return err(res, 429, 'Rate limit exceeded: max 300 reads/min per IP. Slow down.');
+    }
+    const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+    const offset = Math.max(0, parseInt((req.query.offset as string) || '0', 10) || 0);
+    const rows = await listPublicIndicators(limit, offset, ip, 'workbench_backtest_');
+    // Enrich each row with a summary parsed from data_value (formula excerpt,
+    // key stats). The full data_value is served by the detail endpoint.
+    const items = rows.map((row) => {
+      let summary: any = null;
+      try {
+        const parsed = JSON.parse(row.excerpt.length >= 200 ? row.excerpt + '…' : row.excerpt);
+        summary = parsed;
+      } catch {
+        // excerpt may be truncated mid-JSON; fall back to raw excerpt
+      }
+      return {
+        id: row.id,
+        authorUuidPrefix: row.authorUuidPrefix,
+        dataKey: row.dataKey,
+        title: row.title,
+        description: row.description,
+        viewCount: row.viewCount,
+        forkCount: row.forkCount,
+        publishedAt: row.publishedAt,
+        excerpt: row.excerpt,
+        summary,
+      };
+    });
+    return ok(res, { items, limit, offset, count: items.length });
+  } catch (e: any) {
+    console.error('[backtest-list] error:', e?.message || e);
+    if (e?.message?.includes('DATABASE_URL')) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    return err(res, 500, e?.message || 'Backtest list failed');
+  }
+}
+
+async function handleBacktestGet(req: VercelRequest, res: VercelResponse, id: number) {
+  if (req.method === 'OPTIONS') {
+    setPersistenceCorsHeaders(res);
+    return res.status(204).end();
+  }
+  setPersistenceCorsHeaders(res);
+  try {
+    if (!process.env.DATABASE_URL) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    const { getPublicRowById, checkRateLimit } = await import('../lib/persistence/server.js');
+    const ip = getClientIp(req);
+    if (req.method !== 'GET') return err(res, 405, 'GET required');
+    if (!checkRateLimit(ip, 'read')) {
+      return err(res, 429, 'Rate limit exceeded: max 300 reads/min per IP. Slow down.');
+    }
+    if (!Number.isInteger(id) || id <= 0) {
+      return err(res, 400, 'id (positive integer) is required');
+    }
+    const row = await getPublicRowById(id, ip);
+    if (!row) return err(res, 404, 'Backtest not found or not public');
+    let parsed: any = null;
+    try { parsed = JSON.parse(row.dataValue); } catch { /* leave null */ }
+    return ok(res, {
+      id: row.id,
+      authorUuidPrefix: row.authorUuidPrefix,
+      title: row.title,
+      description: row.description,
+      viewCount: row.viewCount,
+      forkCount: row.forkCount,
+      publishedAt: row.publishedAt,
+      backtestResult: parsed,
+    });
+  } catch (e: any) {
+    console.error('[backtest-get] error:', e?.message || e);
+    if (e?.message?.includes('DATABASE_URL')) {
+      return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
+    }
+    return err(res, 500, e?.message || 'Backtest get failed');
+  }
+}
+
 async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     setPersistenceCorsHeaders(res);
@@ -3820,6 +3980,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/workbench/backtest' || path === '/api/workbench/backtest/') {
       const { default: h } = await import('../lib/workbench/backtest.js');
       return h(req, res);
+    }
+    if (path === '/api/workbench/backtest/publish' || path === '/api/workbench/backtest/publish/') {
+      return handleBacktestPublish(req, res);
+    }
+    if (path === '/api/workbench/backtests' || path === '/api/workbench/backtests/') {
+      return handleBacktestList(req, res);
+    }
+    // Single published backtest by numeric id (anonymous_data.id PK).
+    // Path shape: /api/workbench/backtest/<positive-int>
+    {
+      const m = path.match(/^\/api\/workbench\/backtest\/(\d+)\/?$/);
+      if (m) {
+        const id = parseInt(m[1], 10);
+        return handleBacktestGet(req, res, id);
+      }
     }
 
     // ─── Risk Metric (Phase 6, 2026-08-19) ─────────────────────────────────

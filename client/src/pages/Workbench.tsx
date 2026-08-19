@@ -33,7 +33,7 @@ import {
   Download, Share2, Upload, Link as LinkIcon, LineChart as LineChartIcon, TrendingUp, X,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { useSyncedStorage } from "@/lib/persistence/client";
+import { useSyncedStorage, getUserId } from "@/lib/persistence/client";
 
 // --- Types ---
 
@@ -690,6 +690,65 @@ export default function Workbench() {
     const eq = 1 / 7;
     return { BTC: eq, IBIT: eq, FBTC: eq, MSTR: eq, COIN: eq, MARA: eq, RIOT: eq };
   });
+
+  // Backtest publish state (Phase 9, 2026-08-19) — Share-to-gallery dialog
+  // after a backtest completes. POSTs the full result to
+  // /api/workbench/backtest/publish, returns the share URL.
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishTitle, setPublishTitle] = useState('');
+  const [publishDescription, setPublishDescription] = useState('');
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishResult, setPublishResult] = useState<{ id: string; dataKey: string; shareUrl: string } | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  async function publishBacktest() {
+    if (!backtestResult) return;
+    if (!publishTitle.trim()) {
+      setPublishError('Title is required');
+      return;
+    }
+    setPublishLoading(true);
+    setPublishError(null);
+    setPublishResult(null);
+    try {
+      const userId = getUserId();
+      const res = await fetch('/api/workbench/backtest/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          title: publishTitle.trim(),
+          description: publishDescription.trim(),
+          backtestResult,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        setPublishError(json.error);
+      } else {
+        setPublishResult({ id: json.dataKey, dataKey: json.dataKey, shareUrl: json.shareUrl });
+      }
+    } catch (e: any) {
+      setPublishError(e?.message ?? 'Publish failed');
+    } finally {
+      setPublishLoading(false);
+    }
+  }
+
+  function openPublishDialog() {
+    if (!backtestResult) return;
+    // Seed title with a sensible default so the user can publish with one click.
+    const mode = backtestResult.mode === 'portfolio' ? 'Portfolio' : 'BTC';
+    const rng = backtestResult.range?.actualStart?.slice(0, 4) || '';
+    const rngEnd = backtestResult.range?.actualEnd?.slice(0, 4) || '';
+    const rangeLabel = rng && rngEnd && rng !== rngEnd ? `${rng}–${rngEnd}` : rng || '2016+';
+    const def = `${mode} backtest ${rangeLabel} (${fmtPct(backtestResult.stats.totalReturnPct)})`;
+    setPublishTitle((cur) => cur.trim() || def);
+    setPublishDescription((cur) => cur.trim() || '');
+    setPublishError(null);
+    setPublishResult(null);
+    setPublishOpen(true);
+  }
 
   // Backtest run — POSTs the formula + range, gets stats + equity curve.
   async function runBacktest() {
@@ -1546,6 +1605,143 @@ export default function Workbench() {
                       </div>
                     </div>
                   )}
+
+                  {/* Share-to-gallery CTA (Phase 9, 2026-08-19) */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button onClick={openPublishDialog} variant="default" size="sm" className="flex-1">
+                      <Share2 className="h-3 w-3 mr-1" /> Share to gallery
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/workbench/backtests">
+                        <Users className="h-3 w-3 mr-1" /> Browse gallery
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Publish dialog modal (Phase 9) */}
+              {publishOpen && (
+                <div
+                  className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+                  onClick={() => { if (!publishLoading) { setPublishOpen(false); setPublishResult(null); } }}
+                >
+                  <div
+                    className="bg-card border border-border/60 rounded-lg p-6 max-w-lg w-full shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="text-lg font-bold">Share backtest</div>
+                        <div className="text-xs text-muted-foreground">Publish this run to the community gallery</div>
+                      </div>
+                      <button
+                        onClick={() => { if (!publishLoading) { setPublishOpen(false); setPublishResult(null); } }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {publishResult ? (
+                      // Success state
+                      <div className="space-y-3">
+                        <div className="bg-green-500/10 border border-green-500/40 rounded p-3 text-sm text-green-300">
+                          ✓ Published. Share this link:
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            readOnly
+                            value={`${typeof window !== 'undefined' ? window.location.origin : ''}/workbench/backtests/${encodeURIComponent(publishResult.dataKey)}`}
+                            className="flex-1 bg-muted/30 border border-border/40 rounded px-2 py-1 text-xs font-mono"
+                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/workbench/backtests/${encodeURIComponent(publishResult.dataKey)}`;
+                              navigator.clipboard?.writeText(url);
+                            }}
+                          >
+                            <Copy className="h-3 w-3 mr-1" /> Copy
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2">
+                          <Button asChild variant="outline" size="sm" className="flex-1">
+                            <Link href="/workbench/backtests">
+                              <Users className="h-3 w-3 mr-1" /> View gallery
+                            </Link>
+                          </Button>
+                          <Button
+                            onClick={() => { setPublishOpen(false); setPublishResult(null); setPublishTitle(''); setPublishDescription(''); }}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                          >
+                            Close
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Form state
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Title <span className="text-red-400">*</span></label>
+                          <Input
+                            value={publishTitle}
+                            onChange={(e) => setPublishTitle(e.target.value)}
+                            placeholder="e.g., F&G<25 long-term strategy (2016–2026)"
+                            maxLength={100}
+                            className="mt-1"
+                          />
+                          <div className="text-[10px] text-muted-foreground mt-1 text-right">{publishTitle.length}/100</div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Description (optional)</label>
+                          <Input
+                            value={publishDescription}
+                            onChange={(e) => setPublishDescription(e.target.value)}
+                            placeholder="Short note about the strategy"
+                            maxLength={500}
+                            className="mt-1"
+                          />
+                          <div className="text-[10px] text-muted-foreground mt-1 text-right">{publishDescription.length}/500</div>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground bg-muted/20 border border-border/30 rounded p-2">
+                          Formula: <span className="font-mono text-foreground break-all">{backtestResult.formula}</span>
+                          <br />Range: {backtestResult.range.actualStart} → {backtestResult.range.actualEnd}
+                          {backtestResult.mode === 'portfolio' && (
+                            <>
+                              <br />Mode: Portfolio ({Object.entries(backtestResult.weights || {}).map(([k, v]) => `${k} ${Math.round((v as number) * 100)}%`).join(', ')})
+                            </>
+                          )}
+                        </div>
+                        {publishError && (
+                          <div className="bg-red-500/10 border border-red-500/40 rounded p-2 text-xs text-red-300">
+                            {publishError}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 pt-2">
+                          <Button
+                            onClick={publishBacktest}
+                            disabled={publishLoading || !publishTitle.trim()}
+                            className="flex-1"
+                          >
+                            {publishLoading ? 'Publishing…' : 'Publish'}
+                          </Button>
+                          <Button
+                            onClick={() => { if (!publishLoading) setPublishOpen(false); }}
+                            variant="outline"
+                            disabled={publishLoading}
+                            className="flex-1"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
