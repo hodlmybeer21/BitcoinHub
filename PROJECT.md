@@ -27,7 +27,7 @@ code, and eventually monetize via paid tiers built on top of those capabilities.
 
 ## 2. Current State (live on prod)
 
-Verified working as of 2026-08-19 07:50 UTC. Anything older is suspect —
+Verified working as of 2026-08-19 10:50 UTC. Anything older is suspect —
 verify with a curl before relying on it.
 
 ### What's live right now
@@ -42,11 +42,25 @@ verify with a curl before relying on it.
   cleanly into Workbench via 6 `risk.*` block fetchers and 6 templates
   (risk_metric_snapshot, risk_bmsb_lower/upper, risk_pi_cycle_ratio,
   risk_cycle_position_pct, +1 pre-existing risk_off_dxy).
+- **Time in Risk Bands** — Time in Risk Bands panel on /risk
+  (current streak + stacked distribution bar + 6-band grid + last
+  transition). New /api/risk/bands-stats route + risk.band_stats
+  Workbench block + 2 templates.
+- **Macro Indicators** — `/macro` dashboard (12 FRED series across
+  Liquidity / Rates / Inflation / Employment / Sentiment categories,
+  with 1y sparklines + YoY change indicators). New /api/fred/{series,
+  categories,data} routes + 12 macro.* Workbench blocks + 3 templates.
+  **Needs `FRED_API_KEY` set in Vercel env vars to fully populate on
+  prod** — /api/fred/series + /api/fred/categories work, /api/fred/data
+  returns 503 until the env var is set. Code is fully functional locally
+  (25/25 smoke tests pass).
 
 ### Recent commits (origin/main, newest first)
 
 | Commit | What |
 |---|---|
+| `5370339` | **feat(macro)**: Phase 6b — FRED macro suite + Workbench integration + dashboard. New `lib/fred/{quote,series,handler}.ts` (~13KB) with 12 series across 5 categories — Liquidity (WALCL Fed Total Assets, RRPONTSYD O/N Reverse Repo, M1SL M1 Money), Rates (T10Y2Y 2s10s, T10Y3M 3m10y, MORTGAGE30US 30Y Mortgage, T5YIE 5y5y breakevens), Inflation (CPIAUCSL headline YoY, CPILFESL core YoY), Employment (UNRATE, ICSA initial claims), Sentiment (NFCI Chicago Fed Financial Conditions). `/api/fred/{series,categories,data}` routes wired (lazy-import dispatcher). Workbench integration: `lib/workbench/macro-blocks.ts` (12 fetchers), 12 macro.* block defs in `lib/workbench/blocks.ts`, `evaluate.ts` macro dispatcher, 3 templates (`macro_liquidity_snapshot`, `macro_recession_watch`, `macro_inflation_snapshot`). Client: `client/src/pages/Macro.tsx` (11.3KB) — responsive 3-col grid of 12 cards with category filter, 1y sparklines (Recharts AreaChart), YoY change indicators, color-coded by category. `/macro` route in `App.tsx` + `Layers` icon nav link in `Navbar.tsx`. Smoke test: `scripts/test-fred.ts` 25/25 pass (live WALCL=$6.76T, UNRATE=4.1%, T10Y2Y=0.52%, CPI YoY=3.30%). |
+| `1c9bd46` | **feat(risk)**: Phase 6a — Time in Risk Bands + price color-coded chart. New `computeBandStats()` in `composite.ts` (per-band % + current streak + last transition). Chart swapped `AreaChart` → `ComposedChart` with per-bar `<Cell>` band-coloring for price (visually striking: chart goes green→red as BTC climbs the bands). New `/api/risk/bands-stats` route + `lib/risk/bands-stats.ts` (lazy-imported handler, lazy axios inside). New dashboard panel: current streak banner + stacked distribution bar (h-8, colored per band) + per-band stats grid + last-transition line. Workbench: `risk.band_stats` block registered (returns 6 series — one per band pct), 2 new templates (`risk_band_stats_snapshot`, `risk_extreme_fear_share`). Smoke test: 46/46 pass (was 38/38; +8 band-stats tests covering synthetic + live BTC distribution, current streak, last transition, warmup-day accounting). |
 | `f5ab2e8` | **fix(risk)**: timeseries returns 0 points — window slicing after risk. Previous handler sliced closes to the displayed window before computing risk, but the 1460-day z-score warmup consumed the entire window, yielding 0 valid points. Fix: compute risk on the FULL 10y input, then apply the window only when slicing the output. computeRiskTimeSeries now accepts an optional `windowDays` param and starts the downsampling loop at the window start. Verified: `/api/risk/timeseries?days=1460` now returns 200 points starting 2022-08-20. |
 | `44c0312` | **chore**: trigger Vercel rebuild — risk routes missing from prod. After push of `8fe2ca5`, prod dispatcher returned 'Route not found' for all `/api/risk/*` paths. ETag on the 404 was identical to the response for any other unknown path, confirming Vercel was serving an older build (presumably a silent build failure / cache rollback). Force a fresh deploy to pick up commit `8fe2ca5`. Empty commit; verified: 3/4 routes work after rebuild, then fixed the 4th in `f5ab2e8`. |
 | `8fe2ca5` | **feat(risk)**: Phase 6 — Risk Metric dashboard + Workbench integration. Adds the headline moat from intothecryptoverse.com — a 0–1 cycle-position score for BTC (and ETH/soon) combining Mayer Multiple z-score, RSI(14), halving-cycle position, and 200w-deviation into a single risk band (extreme_fear → extreme_greed) with confidence weighting. Server: `lib/risk/{cycles,cycles-shared,mayer,composite,indicators,quote,timeseries}.ts` (pure-TS, no ml libs, lazy axios, 1h in-memory cache, Yahoo primary + CoinGecko fallback). 4 routes wired in `api/index.ts`: `/api/risk/{cycles,indicator,timeseries,indicators}`. Workbench: `lib/workbench/risk-blocks.ts` (6 risk.* block fetchers), 6 new blocks in `lib/workbench/blocks.ts` (risk.metric, risk.bmsb_*, risk.pi_*), lazy-import path in `lib/workbench/evaluate.ts` (preserves lazy-import invariant), 6 risk templates in `lib/workbench/templates.ts`. Client: `client/src/pages/RiskMetric.tsx` (625 lines: 3 stat cards + Recharts time series with band colors + halving ReferenceLines + BMSB + Pi Cycle panels + Workbench fork links), `/risk` route in `client/src/App.tsx`, Risk Indicator nav link (Gauge icon) in `client/src/components/Navbar.tsx`. Verified: `scripts/test-risk.ts` 38/38 pass (synthetic + live Yahoo fetch); BTC live risk = 0.452 (Cautious, high). Spec: `RISK_SPEC.md`. |
