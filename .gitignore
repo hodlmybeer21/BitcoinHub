@@ -5,3 +5,9 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .vercel
+
+# Env files (FRED_API_KEY etc. — secrets)
+.env
+.env.local
+.env.*.local
+.env.production.local

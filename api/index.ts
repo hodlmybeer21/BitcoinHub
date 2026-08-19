@@ -3851,6 +3851,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: h } = await import('../lib/fred/handler.js');
       return h(req, res);
     }
+    if (path === '/api/debug-env' || path === '/api/debug-env/') {
+      const { default: h } = await import('../lib/debug.js');
+      return h(req, res);
+    }
 
     // Fallback
     err(res, 404, `Route not found: ${path}`);
