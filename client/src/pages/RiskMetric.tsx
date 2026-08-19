@@ -24,6 +24,7 @@ import {
 import {
   ComposedChart, Area, Bar, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   Tooltip as RTooltip, ReferenceLine, ReferenceDot,
+  LineChart, Line,
 } from "recharts";
 import { Link } from "wouter";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -439,48 +440,24 @@ export default function RiskMetric() {
             <div className="h-80">
               <ErrorBoundary label="Risk time series chart">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={ts.data.points} margin={{ top: 5, right: 60, left: 0, bottom: 5 }}>
+                  <LineChart data={ts.data.points} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis
                     dataKey="date"
                     stroke="#888"
                     fontSize={11}
                     tickFormatter={(v: string) => v.slice(0, 7)}
-                    interval={Math.floor(ts.data.points.length / 8)}
                   />
-                  <YAxis yAxisId="risk" domain={[0, 1]} stroke="#888" fontSize={11} />
-                  <YAxis yAxisId="price" orientation="right" stroke="#888" fontSize={11}
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                  <YAxis domain={[0, 1]} stroke="#888" fontSize={11} />
                   <RTooltip content={<RiskTooltip />} />
-                  {halvingMarkers.map((m, idx) => (
-                    <ReferenceLine
-                      key={idx}
-                      x={m.x}
-                      stroke="#888"
-                      strokeDasharray="2 2"
-                      fill="#888"
-                      fontSize={10}
-                      label={m.label}
-                      position="top"
-                    />
-                  ))}
-                  <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" fill="#888" fontSize={10} label="Neutral" position="right" />
-                  <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" fill="#dc2626" fontSize={10} label="Extreme Greed" position="right" />
-                  <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" fill="#16a34a" fontSize={10} label="Extreme Fear" position="right" />
-                  {/* Price bars (default fill — per-band Cell mapping + explicit fill
-                      were both throwing 'Invariant failed' in Recharts 2.15.x;
-                      revisit if confirmed safe) */}
-                  <Bar yAxisId="price" dataKey="price" maxBarSize={6} />
-                  <Area
-                    yAxisId="risk"
+                  <Line
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
-                    fill="#ea580c"
-                    fillOpacity={0.2}
                     strokeWidth={1.5}
+                    dot={false}
                   />
-                </ComposedChart>
+                </LineChart>
                 </ResponsiveContainer>
               </ErrorBoundary>
             </div>
