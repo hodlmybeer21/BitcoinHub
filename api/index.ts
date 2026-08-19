@@ -3842,6 +3842,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return h(req, res);
     }
 
+    // ─── FRED Macro Suite (Phase 6b, 2026-08-19) ────────────────────────────
+    // Single dispatcher for /api/fred/{series,categories,data}.
+    // All three routes share the same handler — the handler routes internally
+    // based on the trailing path segment. Graceful 503 when FRED_API_KEY is
+    // missing on prod (Tyler needs to set it in Vercel dashboard).
+    if (path.startsWith('/api/fred')) {
+      const { default: h } = await import('../lib/fred/handler.js');
+      return h(req, res);
+    }
+
     // Fallback
     err(res, 404, `Route not found: ${path}`);
   } catch (e: any) {

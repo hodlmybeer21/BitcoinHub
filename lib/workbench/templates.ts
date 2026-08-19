@@ -120,6 +120,28 @@ const TEMPLATES: Template[] = [
     formula: 'risk.band_stats * 0',  // placeholder — Workbench returns the 6 series; user can pick index 0
     range: { start: '2026-08-01', end: '2026-08-31' },
   },
+  // ─── Macro suite templates (Phase 6b, 2026-08-19) ────────────────────────
+  {
+    id: 'macro_liquidity_snapshot',
+    name: 'Macro Liquidity Snapshot',
+    description: 'Current Fed balance sheet, ONRRP, and M1 — the 3 liquidity indicators that matter for BTC. Composite into a single chart in the Workbench.',
+    formula: 'macro.fed_assets',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'macro_recession_watch',
+    name: 'Recession Watch (Yield Curve)',
+    description: '2s10s and 3m10y Treasury spreads. Negative values have preceded every US recession since 1970.',
+    formula: 'macro.ust_2s10s',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'macro_inflation_snapshot',
+    name: 'Inflation Snapshot',
+    description: 'Headline CPI YoY + Core CPI YoY + 5y5y breakevens. See if market inflation expectations match reality.',
+    formula: 'macro.cpi_yoy',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
 ];
 
 function ok(res: VercelResponse, data: unknown) {

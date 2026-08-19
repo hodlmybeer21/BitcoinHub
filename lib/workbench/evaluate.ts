@@ -463,6 +463,19 @@ function cachedFetch(blockId: string, start: Date, end: Date): Promise<Series[]>
         fetchCache.delete(key);
         throw e;
       });
+    } else if (blockId.startsWith('macro.')) {
+      // Macro blocks (Phase 6b, 2026-08-19) — hit /api/fred/data via
+      // bitcoinhub.goodbotai.tech so the Workbench evaluator stays
+      // stateless. Same lazy-import pattern as risk-blocks.
+      p = (async () => {
+        const { MACRO_BLOCK_FETCHERS } = await import('./macro-blocks.js');
+        const fetcher = MACRO_BLOCK_FETCHERS[blockId];
+        if (!fetcher) throw new Error(`Unknown macro block: ${blockId}`);
+        return fetcher();
+      })().catch(e => {
+        fetchCache.delete(key);
+        throw e;
+      });
     } else {
       const fetcher = BLOCK_FETCHERS[blockId];
       if (!fetcher) return Promise.reject(new Error(`Unknown block: ${blockId}`));

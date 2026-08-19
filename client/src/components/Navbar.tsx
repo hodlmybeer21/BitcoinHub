@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins, PieChart, Hammer, Gauge } from "lucide-react";
+import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins, PieChart, Hammer, Gauge, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -98,6 +98,13 @@ const Navbar = () => {
       label: "Risk Indicator",
       description: "BTC cycle-position score (0–1) with halving context",
       icon: Gauge,
+      comingSoon: false
+    },
+    {
+      href: "/macro",
+      label: "Macro Indicators",
+      description: "Fed, Treasury, CPI, unemployment + 12 FRED series",
+      icon: Layers,
       comingSoon: false
     },
     {

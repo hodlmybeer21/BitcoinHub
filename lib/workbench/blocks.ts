@@ -35,6 +35,19 @@ const BLOCKS: BlockMeta[] = [
   { id: 'risk.pi_short',          label: 'Pi Cycle Short (111d)',  category: 'risk',     description: '111-day MA (top signal trigger)',                 unit: 'USD' },
   { id: 'risk.cycle_pos',         label: 'Halving Cycle Position', category: 'risk',     description: 'Position in 4-year halving cycle (0–1)',          unit: '0–1' },
   { id: 'risk.band_stats',        label: 'Time in Risk Bands',     category: 'risk',     description: '% of days BTC spent in each risk band (6 series)',unit: '0–1 each' },
+  // ─── Macro suite (Phase 6b, 2026-08-19) ───────────────────────────────
+  { id: 'macro.fed_assets',        label: 'Fed Total Assets (WALCL)', category: 'macro',  description: 'Federal Reserve balance sheet — weekly',          unit: 'M USD' },
+  { id: 'macro.onrrp',             label: 'O/N Reverse Repo',         category: 'macro',  description: 'Overnight reverse repo facility usage — daily',   unit: 'B USD' },
+  { id: 'macro.m1',                label: 'M1 Money Supply',          category: 'macro',  description: 'M1 money supply — weekly',                       unit: 'B USD' },
+  { id: 'macro.ust_2s10s',         label: '2s10s Spread',             category: 'macro',  description: '10Y minus 2Y Treasury yield — daily',            unit: '%' },
+  { id: 'macro.ust_3m10y',         label: '3m10y Spread',             category: 'macro',  description: '10Y minus 3M Treasury yield — daily',            unit: '%' },
+  { id: 'macro.mortgage_30y',      label: '30Y Mortgage Rate',        category: 'macro',  description: '30-year fixed mortgage rate — weekly',           unit: '%' },
+  { id: 'macro.breakeven_5y5y',    label: '5y5y Breakeven',           category: 'macro',  description: '5y5y forward breakeven inflation — daily',        unit: '%' },
+  { id: 'macro.cpi_yoy',           label: 'CPI YoY',                  category: 'macro',  description: 'Headline CPI year-over-year % — monthly',        unit: '%' },
+  { id: 'macro.cpi_core_yoy',      label: 'Core CPI YoY',             category: 'macro',  description: 'Core CPI year-over-year % — monthly',            unit: '%' },
+  { id: 'macro.unemployment',      label: 'Unemployment Rate',        category: 'macro',  description: 'Civilian unemployment rate — monthly',           unit: '%' },
+  { id: 'macro.initial_claims',    label: 'Initial Jobless Claims',   category: 'macro',  description: 'Initial unemployment claims — weekly',           unit: 'k' },
+  { id: 'macro.nfci',              label: 'Chicago Fed NFCI',         category: 'macro',  description: 'National Financial Conditions Index — weekly',  unit: 'index' },
 ];
 
 function ok(res: VercelResponse, data: unknown) {
