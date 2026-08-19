@@ -677,6 +677,11 @@ export default function Workbench() {
   const [backtestResult, setBacktestResult] = useState<any | null>(null);
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestError, setBacktestError] = useState<string | null>(null);
+  const [backtestMode, setBacktestMode] = useState<'single' | 'portfolio'>('single');
+  const [backtestWeights, setBacktestWeights] = useState<Record<string, number>>(() => {
+    const eq = 1 / 7;
+    return { BTC: eq, IBIT: eq, FBTC: eq, MSTR: eq, COIN: eq, MARA: eq, RIOT: eq };
+  });
 
   // Backtest run — POSTs the formula + range, gets stats + equity curve.
   async function runBacktest() {
@@ -684,10 +689,14 @@ export default function Workbench() {
     setBacktestError(null);
     setBacktestResult(null);
     try {
-      const res = await apiRequest('POST', '/api/workbench/backtest', {
+      const body: any = {
         formula,
         range: { start: backtestStart, end: backtestEnd },
-      });
+      };
+      if (backtestMode === 'portfolio') {
+        body.weights = backtestWeights;
+      }
+      const res = await apiRequest('POST', '/api/workbench/backtest', body);
       const json = await res.json();
       if (json.error) {
         setBacktestError(json.error);
@@ -1366,6 +1375,63 @@ export default function Workbench() {
               <div className="bg-muted/30 border border-border/40 rounded p-2 font-mono text-xs mb-3 break-all">
                 {formula}
               </div>
+
+              {/* Mode toggle: single asset (BTC) vs portfolio */}
+              <div className="flex gap-2 mb-3">
+                <Button
+                  variant={backtestMode === 'single' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setBacktestMode('single')}
+                >
+                  Single Asset
+                </Button>
+                <Button
+                  variant={backtestMode === 'portfolio' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setBacktestMode('portfolio')}
+                >
+                  Portfolio
+                </Button>
+              </div>
+
+              {/* Portfolio weights — shown when mode = portfolio */}
+              {backtestMode === 'portfolio' && (() => {
+                const wsum = Object.values(backtestWeights).reduce((s, w) => s + (Number(w) || 0), 0);
+                const sumPct = wsum * 100;
+                const sumOk = Math.abs(wsum - 1) < 0.01;
+                return (
+                  <div className="bg-muted/20 border border-border/30 rounded p-3 mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-muted-foreground">
+                        Portfolio weights ({sumPct.toFixed(1)}%{sumOk ? '' : ' — must sum to 100%'})
+                      </div>
+                      <button
+                        onClick={() => setBacktestWeights({ BTC: 1/7, IBIT: 1/7, FBTC: 1/7, MSTR: 1/7, COIN: 1/7, MARA: 1/7, RIOT: 1/7 })}
+                        className="text-[10px] text-orange-400 hover:underline"
+                      >
+                        Equal weight
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {(['BTC', 'IBIT', 'FBTC', 'MSTR', 'COIN', 'MARA', 'RIOT'] as const).map(asset => (
+                        <div key={asset} className="flex items-center gap-1.5">
+                          <span className="text-xs font-mono w-10 text-muted-foreground">{asset}</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={backtestWeights[asset]}
+                            onChange={e => setBacktestWeights({ ...backtestWeights, [asset]: Number(e.target.value) })}
+                            className="h-7 text-xs"
+                          />
+                          <span className="text-[10px] text-muted-foreground">%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Range picker */}
               <div className="grid grid-cols-2 gap-3 mb-3">
