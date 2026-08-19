@@ -343,9 +343,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return err(res, 500, 'Asset price data unavailable (Yahoo Finance)');
       }
 
-      // Align all series to common dates (union)
+      // Map weights to Yahoo symbols first — needed for portfolioStart filter below.
+      const symbolWeights: Record<string, number> = {};
+      for (const [asset, w] of Object.entries(weights as Record<string, number>)) {
+        if (w > 0) symbolWeights[PORTFOLIO_UNIVERSE[asset].symbol] = w;
+      }
+
+      // Find first date each asset has data — used to compute portfolioStart.
+      // Without this filter, dates before an asset's listing get forward-filled
+      // with 0, then computeAssetReturns produces 0/0 = NaN for the transition,
+      // poisoning the entire portfolio sum (regression caught by test 6 with
+      // IBIT starting 2024-01-10).
+      const firstAvailableDate: Record<string, string> = {};
+      for (const [sym, prices] of assetPrices.entries()) {
+        firstAvailableDate[sym] = prices[0]?.date ?? '9999-99-99';
+      }
+
+      // Portfolio starts at the latest firstAvailableDate across WEIGHTED assets.
+      // Non-weighted fetched assets (BTC reference) don't constrain the start.
+      const allWeightedSymbols = Object.keys(symbolWeights);
+      let portfolioStart = '0000-00-00';
+      for (const sym of allWeightedSymbols) {
+        const d = firstAvailableDate[sym];
+        if (d > portfolioStart) portfolioStart = d;
+      }
+
+      // Align all series to common dates (union), filtered to portfolioStart onwards
       const allSeries: SeriesPoint[][] = [signals, ...assetPrices.values()];
-      const dates = unionOfDates(allSeries);
+      const dates = unionOfDates(allSeries).filter(d => d >= portfolioStart);
 
       // Build aligned per-symbol price arrays + aligned signal array
       const aligned: Record<string, number[]> = {};
@@ -369,14 +394,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         sigs.push(lastSig);
       }
 
-      // Map weights to Yahoo symbols
-      const symbolWeights: Record<string, number> = {};
-      for (const [asset, w] of Object.entries(weights as Record<string, number>)) {
-        if (w > 0) symbolWeights[PORTFOLIO_UNIVERSE[asset].symbol] = w;
-      }
-
-      // Portfolio returns (daily rebalanced) — only assets with data
-      const availableSymbols = Object.keys(aligned).filter(s => s !== PORTFOLIO_UNIVERSE.BTC.symbol);
+      // Portfolio composition: any WEIGHTED asset (BTC included if weighted) with data.
+      // The previous version filtered out BTC unconditionally, which broke any
+      // user passing {BTC: 1.0} (regression caught by test 5: 0% returns instead
+      // of ~14858%).
+      const availableSymbols = allWeightedSymbols.filter(s => aligned[s] !== undefined);
       const availableWeights: Record<string, number> = {};
       let wsum = 0;
       for (const sym of availableSymbols) {
