@@ -21,7 +21,7 @@ const BLOCKS: BlockMeta[] = [
   { id: 'stablecoin.total_supply',label: 'Stablecoin Supply',     category: 'liquidity',description: 'Total stablecoin USD supply (DefiLlama)',        unit: 'USD' },
   { id: 'options.put_call',       label: 'Options Put/Call Ratio', category: 'options',  description: 'BTC options put/call OI ratio (Deribit)',        unit: 'ratio' },
   { id: 'onchain.hashrate',       label: 'On-Chain Hashrate',      category: 'onchain',  description: 'Network hashrate (H/s)',                          unit: 'H/s' },
-  { id: 'onchain.active_addresses',label:'Active Addresses',       category: 'onchain',  description: 'Unique senders per day',                          unit: 'addresses' },
+  { id: 'onchain.active_addresses',label:'Active Addresses',       category: 'onchain',  description: 'Active senders per day (proxy: daily tx count via mempool.space — no free public active-addresses API).',                          unit: 'tx/day' },
   { id: 'macro.dxy',              label: 'Dollar Index (DXY)',     category: 'macro',    description: 'US Dollar Index',                                  unit: 'index' },
   { id: 'macro.sp500',            label: 'S&P 500',                category: 'macro',    description: 'S&P 500 Index',                                    unit: 'index' },
   { id: 'macro.ust10y',           label: '10Y Treasury Yield',     category: 'macro',    description: 'US 10-Year Treasury yield (%)',                    unit: '%' },
