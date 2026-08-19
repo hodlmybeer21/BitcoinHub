@@ -27,7 +27,7 @@ code, and eventually monetize via paid tiers built on top of those capabilities.
 
 ## 2. Current State (live on prod)
 
-Verified working as of 2026-08-18 18:24 UTC. Anything older is suspect —
+Verified working as of 2026-08-19 07:50 UTC. Anything older is suspect —
 verify with a curl before relying on it.
 
 ### What's live right now
@@ -36,11 +36,21 @@ verify with a curl before relying on it.
   `/api/dca-simulator`, etc.) — pre-existing, working
 - **MPT** — `/portfolio/mpt` (full Modern Portfolio Theory optimizer)
 - **Workbench** — `/workbench` (no-code indicator builder)
+- **Risk Metric** — `/risk` (BTC cycle-position score 0–1 with halving
+  context, BMSB, Pi Cycle, 4y chart, 6 risk bands
+  extreme_fear→extreme_greed). Headline moat from ITCV; composes
+  cleanly into Workbench via 6 `risk.*` block fetchers and 6 templates
+  (risk_metric_snapshot, risk_bmsb_lower/upper, risk_pi_cycle_ratio,
+  risk_cycle_position_pct, +1 pre-existing risk_off_dxy).
 
 ### Recent commits (origin/main, newest first)
 
 | Commit | What |
 |---|---|
+| `f5ab2e8` | **fix(risk)**: timeseries returns 0 points — window slicing after risk. Previous handler sliced closes to the displayed window before computing risk, but the 1460-day z-score warmup consumed the entire window, yielding 0 valid points. Fix: compute risk on the FULL 10y input, then apply the window only when slicing the output. computeRiskTimeSeries now accepts an optional `windowDays` param and starts the downsampling loop at the window start. Verified: `/api/risk/timeseries?days=1460` now returns 200 points starting 2022-08-20. |
+| `44c0312` | **chore**: trigger Vercel rebuild — risk routes missing from prod. After push of `8fe2ca5`, prod dispatcher returned 'Route not found' for all `/api/risk/*` paths. ETag on the 404 was identical to the response for any other unknown path, confirming Vercel was serving an older build (presumably a silent build failure / cache rollback). Force a fresh deploy to pick up commit `8fe2ca5`. Empty commit; verified: 3/4 routes work after rebuild, then fixed the 4th in `f5ab2e8`. |
+| `8fe2ca5` | **feat(risk)**: Phase 6 — Risk Metric dashboard + Workbench integration. Adds the headline moat from intothecryptoverse.com — a 0–1 cycle-position score for BTC (and ETH/soon) combining Mayer Multiple z-score, RSI(14), halving-cycle position, and 200w-deviation into a single risk band (extreme_fear → extreme_greed) with confidence weighting. Server: `lib/risk/{cycles,cycles-shared,mayer,composite,indicators,quote,timeseries}.ts` (pure-TS, no ml libs, lazy axios, 1h in-memory cache, Yahoo primary + CoinGecko fallback). 4 routes wired in `api/index.ts`: `/api/risk/{cycles,indicator,timeseries,indicators}`. Workbench: `lib/workbench/risk-blocks.ts` (6 risk.* block fetchers), 6 new blocks in `lib/workbench/blocks.ts` (risk.metric, risk.bmsb_*, risk.pi_*), lazy-import path in `lib/workbench/evaluate.ts` (preserves lazy-import invariant), 6 risk templates in `lib/workbench/templates.ts`. Client: `client/src/pages/RiskMetric.tsx` (625 lines: 3 stat cards + Recharts time series with band colors + halving ReferenceLines + BMSB + Pi Cycle panels + Workbench fork links), `/risk` route in `client/src/App.tsx`, Risk Indicator nav link (Gauge icon) in `client/src/components/Navbar.tsx`. Verified: `scripts/test-risk.ts` 38/38 pass (synthetic + live Yahoo fetch); BTC live risk = 0.452 (Cautious, high). Spec: `RISK_SPEC.md`. |
+| `b5a08ec` | **feat(gallery)**: forking — complete the network-effect loop (Phase 5b). |
 | `665b7c8` | **feat(persistence)**: anonymous UUID sync layer (foundation for paid tiers + public gallery). Backend: `anonymous_data` table with composite unique index, `lib/persistence/server.ts` (self-healing CREATE TABLE + lazy-imported Neon pool + upsert/get helpers), `api/index.ts` `handlePersistenceSync` handler (POST upsert / GET single key / GET all keys, 1MB per key cap), `lib/persistence/client.ts` later moved to `client/src/lib/persistence/client.ts`. Frontend: `useSyncedStorage<T>(dataKey, initialValue, localKey)` hook (local first-paint + debounced server sync + offline fallback) + `getUserId` UUID helper. Page integrations: Workbench.tsx (`workbench_indicators` + `workbench_canvas_positions`), PortfolioMPT.tsx (`mpt_portfolios` + `mpt_dca_plan`), DCASimulator.tsx (`mpt_dca_plan`). |
 | `481683e` | **fix(persistence)**: dedupe Workbench STORAGE_KEY + move client.ts to client/src/. Two deploy bugs found: Workbench.tsx had duplicate const STORAGE_KEY / const CANVAS_POS_KEY + dead loadCanvasPositions / persistCanvasPositions helpers (esbuild rejected at parse → silently dropped the whole module). Also: `@/lib/persistence/client` import resolved to `client/src/...` but file was at project root (Vite looked for client/src/lib/persistence/client, didn't find it → build failed for any page importing useSyncedStorage). Moved file to `client/src/lib/persistence/client.ts` with consolidated React imports. |
 | `7ef64f2` | **feat(workbench)**: templates gallery + portability MVP (Phase 3 slice 3). New `/workbench/templates` page lists all 8 built-in templates with category filter (Sentiment/Price/Funding/Macro/Other — derived client-side). Each card has 'Use this template' button that navigates to `/workbench?formula=<encoded>`. Workbench.tsx reads `?formula=` (pre-fills formula) and `?import=` (opens fork dialog with base64-decoded indicator) on mount, clearing the query string after consume. Each saved indicator gets Share button (copies base64-encoded `?import=` URL to clipboard) and Export button (downloads `<name>.workbench.json`). '+ Import' button in Saved card opens paste-JSON dialog. Import dialog has two modes: fork-from-shared-URL (preview + Fork & Save) and paste-JSON (textarea + Import). Fixed bottom-right toast for feedback. No new deps. |
