@@ -88,6 +88,13 @@ function daysAgoISO(days: number): string {
   d.setUTCDate(d.getUTCDate() - days);
   return d.toISOString().split('T')[0];
 }
+// 2016 is the floor for full BTC-cycle history on BitcoinHub (matches the
+// backtest default). Computed once at module load; recomputed each page load.
+const SINCE_2016_DAYS = Math.max(
+  1,
+  Math.floor((Date.now() - new Date('2016-01-01T00:00:00Z').getTime()) / 86400000),
+);
+const SINCE_2016_ISO = '2016-01-01';
 
 // --- Components ---
 
@@ -659,13 +666,14 @@ const RANGE_PRESETS: { label: string; days: number }[] = [
   { label: '180 days', days: 180 },
   { label: '1 year', days: 365 },
   { label: '2 years', days: 730 },
+  { label: 'Since 2016', days: SINCE_2016_DAYS },
 ];
 
 export default function Workbench() {
   const [formula, setFormula] = useState('fear_greed.value < 30');
-  const [rangeDays, setRangeDays] = useState(365);
+  const [rangeDays, setRangeDays] = useState(SINCE_2016_DAYS);
   const [range, setRange] = useState<{ start: string; end: string }>({
-    start: daysAgoISO(365),
+    start: SINCE_2016_ISO,
     end: todayISO(),
   });
   const [saved, setSaved] = useSyncedStorage<SavedIndicator[]>('workbench_indicators', [], STORAGE_KEY);
