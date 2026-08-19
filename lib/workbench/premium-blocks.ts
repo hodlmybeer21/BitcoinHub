@@ -31,7 +31,13 @@
 //      4=Accum D (spring), 5=Markup; 10=Distrib A, 11=Distrib B, 12=Distrib C,
 //      13=Distrib D (UTAD), 14=Markdown; 0=unclear.
 //
-// Each fetcher returns a 365-day series ending today.
+//   4. Mempool Whale Activity:
+//      Total USD volume of BTC transactions ≥100 BTC currently in the
+//      mempool. Self-calls /api/whale-alerts (same pattern as risk-* /
+//      macro-*). Real-time snapshot — not historical.
+//
+// Each fetcher returns a 365-day series ending today, except whale_activity
+// which returns a single-point series (real-time mempool snapshot).
 
 import type { Series } from './evaluate-types.js';
 
@@ -273,8 +279,30 @@ async function fetchWyckoffPhase(): Promise<Series[]> {
   return toSeries(ohlc, computeWyckoffPhase(ohlc));
 }
 
+// ─── Block 4: Mempool Whale Activity ─────────────────────────────
+// Real-time snapshot. Hits the deployed /api/whale-alerts endpoint and
+// sums the USD value of all whale-sized transactions currently in the
+// mempool (≥100 BTC per the deployed threshold).
+//
+// Returns a single-point Series for today. Composes cleanly with
+// sentiment blocks (F&G, risk.metric) to spot divergences — e.g., a
+// rising whale-activity reading while F&G is extreme_fear has
+// historically preceded local bottoms.
+async function fetchWhaleActivity(): Promise<Series[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const { default: axios } = await import('axios');
+  const res = await axios.get('https://bitcoinhub.goodbotai.tech/api/whale-alerts', {
+    timeout: 25000,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BitcoinHub/1.0)' },
+  });
+  const txs = (res.data?.transactions ?? []) as Array<{ amountUSD?: number }>;
+  const totalUSD = txs.reduce((s, t) => s + (typeof t.amountUSD === 'number' ? t.amountUSD : 0), 0);
+  return [{ date: today, value: totalUSD }];
+}
+
 export const PREMIUM_BLOCK_FETCHERS: Record<string, () => Promise<Series[]>> = {
   'premium.demark_setup': fetchDeMarkSetup,
   'premium.elliott_wave': fetchElliottWave,
   'premium.wyckoff_phase': fetchWyckoffPhase,
+  'premium.whale_activity': fetchWhaleActivity,
 };

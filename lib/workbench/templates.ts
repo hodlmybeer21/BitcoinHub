@@ -164,6 +164,13 @@ const TEMPLATES: Template[] = [
     formula: 'premium.wyckoff_phase',
     range: { start: '2025-08-01', end: '2026-08-31' },
   },
+  {
+    id: 'whale_activity_snapshot',
+    name: 'Mempool Whale Activity (Current)',
+    description: 'Real-time USD volume of BTC transactions ≥100 BTC currently in the mempool. Snapshot — not historical. Useful for F&G / risk divergence: rising whale activity + extreme_fear = potential local bottom.',
+    formula: 'premium.whale_activity',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
 ];
 
 function ok(res: VercelResponse, data: unknown) {

@@ -52,6 +52,7 @@ const BLOCKS: BlockMeta[] = [
   { id: 'premium.demark_setup',    label: 'DeMark Setup Count',       category: 'premium',  description: 'Tom DeMark Sequential setup count. Positive = buy count, negative = sell count. 9 = completed setup.', unit: '±13' },
   { id: 'premium.elliott_wave',    label: 'Elliott Wave Position',    category: 'premium',  description: 'Simplified Elliott wave label from 5-bar zigzag pivots. Positive = impulse (1..5), negative = corrective (-1..-3), 0 = unclear.', unit: '±5' },
   { id: 'premium.wyckoff_phase',   label: 'Wyckoff Phase',            category: 'premium',  description: 'Detected Wyckoff accumulation/distribution phase from price + volume. 1–5 = Accum A→Markup; 10–14 = Distrib A→Markdown; 0 = unclear.', unit: 'phase' },
+  { id: 'premium.whale_activity',  label: 'Mempool Whale Activity',   category: 'premium',  description: 'Total USD volume of BTC transactions ≥100 BTC currently in the mempool. Real-time snapshot of whale activity. Compose with F&G or risk.metric for divergence signals.', unit: 'USD' },
 ];
 
 function ok(res: VercelResponse, data: unknown) {
