@@ -22,7 +22,7 @@ import {
   BarChart3, Hammer, ArrowRight, Clock, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
+  ComposedChart, Area, Bar, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   Tooltip as RTooltip, ReferenceLine, ReferenceDot,
 } from "recharts";
 import { Link } from "wouter";
@@ -95,6 +95,27 @@ interface IndicatorsPayload {
   meta: { symbol: string; name: string; days: number; fetchedAt: string };
 }
 
+interface BandStatEntry {
+  band: string;
+  label: string;
+  color: string;
+  days: number;
+  pct: number;
+  firstSeen?: string;
+  lastSeen?: string;
+}
+
+interface BandStatsPayload {
+  symbol: string;
+  windowDays: number;
+  totalDays: number;
+  warmupDays: number;
+  distribution: BandStatEntry[];
+  currentStreak: { band: string; label: string; color: string; days: number; startedOn: string };
+  lastTransition?: { fromBand: string; toBand: string; on: string };
+  asOf: string;
+}
+
 // ─── Data fetching ──────────────────────────────────────────────────────────
 
 function useRiskSnapshot(symbol: string = 'BTC') {
@@ -146,6 +167,19 @@ function useRiskCycles() {
     },
     refetchInterval: 60 * 60 * 1000,  // 1h — cycle state changes daily
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+function useBandStats(symbol: string = 'BTC', days: number = 1460) {
+  return useQuery<BandStatsPayload>({
+    queryKey: ['/api/risk/bands-stats', symbol, days],
+    queryFn: async () => {
+      const res = await fetch(`/api/risk/bands-stats?symbol=${symbol}&days=${days}`);
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -210,9 +244,10 @@ export default function RiskMetric() {
   const ts = useRiskTimeseries();
   const ind = useRiskIndicators();
   const cycles = useRiskCycles();
+  const bands = useBandStats();
 
-  const isLoading = snapshot.isLoading || ts.isLoading || ind.isLoading || cycles.isLoading;
-  const hasError = snapshot.error || ts.error || ind.error || cycles.error;
+  const isLoading = snapshot.isLoading || ts.isLoading || ind.isLoading || cycles.isLoading || bands.isLoading;
+  const hasError = snapshot.error || ts.error || ind.error || cycles.error || bands.error;
 
   // Halving markers for the time series chart.
   const halvingMarkers = useMemo(() => {
@@ -396,12 +431,12 @@ export default function RiskMetric() {
           ) : ts.data && ts.data.points.length > 0 ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={ts.data.points} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <ComposedChart data={ts.data.points} margin={{ top: 5, right: 60, left: 0, bottom: 5 }}>
                   <defs>
                     <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ea580c" stopOpacity={0.4} />
-                      <stop offset="50%" stopColor="#eab308" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#16a34a" stopOpacity={0.4} />
+                      <stop offset="0%" stopColor="#ea580c" stopOpacity={0.5} />
+                      <stop offset="50%" stopColor="#eab308" stopOpacity={0.5} />
+                      <stop offset="100%" stopColor="#16a34a" stopOpacity={0.5} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -409,10 +444,12 @@ export default function RiskMetric() {
                     dataKey="date"
                     stroke="#888"
                     fontSize={11}
-                    tickFormatter={(v: string) => v.slice(0, 7)}     // YYYY-MM
+                    tickFormatter={(v: string) => v.slice(0, 7)}
                     interval={Math.floor(ts.data.points.length / 8)}
                   />
-                  <YAxis domain={[0, 1]} stroke="#888" fontSize={11} />
+                  <YAxis yAxisId="risk" domain={[0, 1]} stroke="#888" fontSize={11} />
+                  <YAxis yAxisId="price" orientation="right" stroke="#888" fontSize={11}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
                   <RTooltip content={<RiskTooltip />} />
                   {halvingMarkers.map((m, idx) => (
                     <ReferenceLine
@@ -423,19 +460,119 @@ export default function RiskMetric() {
                       label={{ value: m.label, position: 'top', fill: '#888', fontSize: 10 }}
                     />
                   ))}
-                  <ReferenceLine y={0.5} stroke="#666" strokeDasharray="2 4" label={{ value: 'Neutral', position: 'right', fill: '#888', fontSize: 10 }} />
-                  <ReferenceLine y={0.8} stroke="#dc2626" strokeDasharray="2 4" label={{ value: 'Extreme Greed', position: 'right', fill: '#dc2626', fontSize: 10 }} />
-                  <ReferenceLine y={0.15} stroke="#16a34a" strokeDasharray="2 4" label={{ value: 'Extreme Fear', position: 'right', fill: '#16a34a', fontSize: 10 }} />
+                  <ReferenceLine yAxisId="risk" y={0.5} stroke="#666" strokeDasharray="2 4" label={{ value: 'Neutral', position: 'right', fill: '#888', fontSize: 10 }} />
+                  <ReferenceLine yAxisId="risk" y={0.8} stroke="#dc2626" strokeDasharray="2 4" label={{ value: 'Extreme Greed', position: 'right', fill: '#dc2626', fontSize: 10 }} />
+                  <ReferenceLine yAxisId="risk" y={0.15} stroke="#16a34a" strokeDasharray="2 4" label={{ value: 'Extreme Fear', position: 'right', fill: '#16a34a', fontSize: 10 }} />
+                  {/* Price bars colored by band — gives the chart its 'green/red' visual */}
+                  <Bar yAxisId="price" dataKey="price" maxBarSize={6}>
+                    {ts.data.points.map((p, idx) => (
+                      <Cell key={idx} fill={p.bandColor} fillOpacity={0.35} />
+                    ))}
+                  </Bar>
                   <Area
+                    yAxisId="risk"
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
                     fill="url(#riskGradient)"
                     strokeWidth={1.5}
                   />
-                </AreaChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Time in Risk Bands */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5" />
+            Time in Risk Bands
+          </CardTitle>
+          <CardDescription>
+            How long BTC has spent in each band over the last {bands.data?.windowDays ?? 1460} days.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {bands.isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : bands.data ? (
+            <>
+              {/* Current streak banner */}
+              <div
+                className="rounded-lg p-3 mb-4 flex items-center justify-between"
+                style={{ backgroundColor: `${bands.data.currentStreak.color}22`, border: `1px solid ${bands.data.currentStreak.color}44` }}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" style={{ color: bands.data.currentStreak.color }} />
+                  <span className="text-sm">
+                    <span className="font-bold text-base" style={{ color: bands.data.currentStreak.color }}>
+                      {bands.data.currentStreak.days} days
+                    </span>{' '}
+                    in <strong>{bands.data.currentStreak.label}</strong>
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  since {bands.data.currentStreak.startedOn}
+                </span>
+              </div>
+
+              {/* Stacked distribution bar */}
+              <div className="flex h-8 rounded-md overflow-hidden mb-3 border border-muted/30">
+                {bands.data.distribution.map(d => (
+                  <div
+                    key={d.band}
+                    className="flex items-center justify-center text-[10px] font-bold transition-all hover:opacity-80"
+                    style={{
+                      width: `${d.pct * 100}%`,
+                      backgroundColor: d.color,
+                      color: 'white',
+                      opacity: d.pct > 0.02 ? 1 : 0,
+                    }}
+                    title={`${d.label}: ${(d.pct * 100).toFixed(1)}% (${d.days} days)`}
+                  >
+                    {d.pct > 0.05 ? `${(d.pct * 100).toFixed(0)}%` : ''}
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-band stats grid */}
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+                {bands.data.distribution.map(d => (
+                  <div
+                    key={d.band}
+                    className="rounded-md p-2 border"
+                    style={{ borderColor: `${d.color}44`, backgroundColor: `${d.color}10` }}
+                  >
+                    <div className="font-bold" style={{ color: d.color }}>{d.label}</div>
+                    <div className="text-muted-foreground mt-1">
+                      {(d.pct * 100).toFixed(1)}% · {d.days}d
+                    </div>
+                    {d.lastSeen && (
+                      <div className="text-muted-foreground text-[10px] mt-0.5">
+                        last: {d.lastSeen}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {bands.data.lastTransition && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  Last transition: {bands.data.lastTransition.fromBand} → {bands.data.lastTransition.toBand} on{' '}
+                  <span className="font-mono">{bands.data.lastTransition.on}</span>
+                </div>
+              )}
+
+              <div className="mt-3 text-xs text-muted-foreground">
+                {bands.data.warmupDays > 0 && (
+                  <>Excluded {bands.data.warmupDays} warmup days (z-score needs ~4y history). </>
+                )}
+                Total analyzed: {bands.data.totalDays} days.
+              </div>
+            </>
           ) : null}
         </CardContent>
       </Card>
@@ -598,6 +735,8 @@ export default function RiskMetric() {
               { id: 'risk_bmsb_lower',        label: 'BMSB Lower',        desc: '20-week SMA (buy zone)' },
               { id: 'risk_bmsb_upper',        label: 'BMSB Upper',        desc: '21-week EMA' },
               { id: 'risk_pi_cycle_ratio',    label: 'Pi Cycle Ratio',    desc: '111d MA / (350d MA × 2)' },
+              { id: 'risk_cycle_position_pct', label: 'Cycle Position',   desc: 'Days through current halving cycle' },
+              { id: 'risk_band_stats',        label: 'Time in Bands',     desc: '% of days spent in each risk band' },
             ].map(t => (
               <Link key={t.id} href={`/workbench?import=${encodeURIComponent(t.id)}`}>
                 <Button variant="outline" className="w-full justify-start gap-2 h-auto py-3">
@@ -613,9 +752,9 @@ export default function RiskMetric() {
             ))}
           </div>
           <div className="mt-4 text-xs text-muted-foreground">
-            <Badge variant="outline" className="mr-2">Phase 6</Badge>
+            <Badge variant="outline" className="mr-2">Phase 6 + 6a</Badge>
             Composite math lives in <code className="text-xs">lib/risk/composite.ts</code>.
-            Workbench integration added 6 new risk.* blocks to{' '}
+            Workbench integration added 7 risk.* blocks to{' '}
             <code className="text-xs">lib/workbench/blocks.ts</code>.
           </div>
         </CardContent>

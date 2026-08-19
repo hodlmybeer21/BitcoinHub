@@ -65,6 +65,23 @@ async function fetchCyclePos(): Promise<Series[]> {
   return [{ date: today, value: v }];
 }
 
+/**
+ * Returns 6 series, one per risk band, with the % of days BTC has spent
+ * in that band over the 4y window. Works as a Workbench bar chart source.
+ *   Series 0 = extreme_fear pct, Series 1 = fear pct, ..., Series 5 = extreme_greed pct
+ */
+async function fetchBandStats(): Promise<Series[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const { default: axios } = await import('axios');
+  const res = await axios.get(
+    'https://bitcoinhub.goodbotai.tech/api/risk/bands-stats?symbol=BTC&days=1460',
+    { timeout: 25000 },
+  );
+  const dist: Array<{ band: string; label: string; pct: number }> = res.data?.distribution ?? [];
+  if (dist.length !== 6) throw new Error(`Expected 6 band entries, got ${dist.length}`);
+  return dist.map(d => ({ date: today, value: d.pct }));
+}
+
 export const RISK_BLOCK_FETCHERS: Record<string, () => Promise<Series[]>> = {
   'risk.metric':     fetchRiskMetric,
   'risk.bmsb_lower': fetchBmsbLower,
@@ -72,4 +89,5 @@ export const RISK_BLOCK_FETCHERS: Record<string, () => Promise<Series[]>> = {
   'risk.pi_long':    fetchPiLong,
   'risk.pi_short':   fetchPiShort,
   'risk.cycle_pos':  fetchCyclePos,
+  'risk.band_stats': fetchBandStats,
 };

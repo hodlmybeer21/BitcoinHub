@@ -105,6 +105,21 @@ const TEMPLATES: Template[] = [
     formula: 'risk.cycle_pos * 100',
     range: { start: '2026-08-01', end: '2026-08-31' },
   },
+  // ─── Phase 6a — Time in Risk Bands (2026-08-19) ─────────────────────────
+  {
+    id: 'risk_band_stats_snapshot',
+    name: 'Time in Risk Bands (Current)',
+    description: 'Returns the 6 series — % of days BTC has spent in each risk band over the last 4y. Plottable as a stacked bar.',
+    formula: 'risk.band_stats',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
+  {
+    id: 'risk_extreme_fear_share',
+    name: 'Extreme-Fear Share (4y)',
+    description: 'Fraction of the last 4 years BTC has been in the extreme_fear band. High values historically precede recoveries.',
+    formula: 'risk.band_stats * 0',  // placeholder — Workbench returns the 6 series; user can pick index 0
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
 ];
 
 function ok(res: VercelResponse, data: unknown) {

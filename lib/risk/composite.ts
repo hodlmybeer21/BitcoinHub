@@ -209,6 +209,149 @@ function round(x: number, digits: number): number {
   return Math.round(x * f) / f;
 }
 
+/**
+ * BandStats describes how much time BTC has spent in each risk band
+ * over a given window. Used by /risk dashboard + Workbench block.
+ */
+export interface BandStat {
+  band: RiskBand;
+  label: string;
+  color: string;
+  days: number;
+  pct: number;          // 0–1 share of valid points in this band
+  firstSeen?: string;   // ISO date of first entry into band within window
+  lastSeen?: string;    // ISO date of last entry into band within window
+}
+
+export interface BandStatsResult {
+  windowDays: number;
+  totalDays: number;        // count of valid (non-NaN) risk points
+  warmupDays: number;       // NaN points excluded from analysis
+  distribution: BandStat[]; // one entry per band (6), pct sums to 1.0
+  currentStreak: {
+    band: RiskBand;
+    label: string;
+    color: string;
+    days: number;           // consecutive days BTC has been in this band
+    startedOn: string;      // ISO date the streak started
+  };
+  lastTransition?: {
+    fromBand: RiskBand;
+    toBand: RiskBand;
+    on: string;             // ISO date of the most recent band change
+  };
+  asOf: string;
+}
+
+/**
+ * Aggregate band distribution from a risk series.
+ *
+ * @param risk - risk series aligned to closes (NaN during warmup)
+ * @param timestamps - unix seconds parallel to closes
+ * @param windowDays - the size of the visible window (for streak / labeling only)
+ */
+export function computeBandStats(
+  risk: number[],
+  timestamps: number[],
+  windowDays?: number,
+): BandStatsResult {
+  const n = risk.length;
+  if (n !== timestamps.length) {
+    throw new Error(`risk/timestamps length mismatch: ${n} vs ${timestamps.length}`);
+  }
+
+  // Count valid points and warmup.
+  let totalDays = 0;
+  let warmupDays = 0;
+  const counts: Record<RiskBand, number> = {
+    extreme_fear: 0, fear: 0, cautious: 0, neutral: 0, greed: 0, extreme_greed: 0,
+  };
+  const firstSeen: Record<RiskBand, number> = {
+    extreme_fear: -1, fear: -1, cautious: -1, neutral: -1, greed: -1, extreme_greed: -1,
+  };
+  const lastSeen: Record<RiskBand, number> = {
+    extreme_fear: -1, fear: -1, cautious: -1, neutral: -1, greed: -1, extreme_greed: -1,
+  };
+
+  for (let i = 0; i < n; i++) {
+    if (!Number.isFinite(risk[i])) { warmupDays++; continue; }
+    totalDays++;
+    const b = riskBandFor(risk[i]);
+    counts[b.band]++;
+    if (firstSeen[b.band] < 0) firstSeen[b.band] = i;
+    lastSeen[b.band] = i;
+  }
+
+  const distribution: BandStat[] = RISK_BANDS.map(b => ({
+    band: b.band,
+    label: b.label,
+    color: b.color,
+    days: counts[b.band],
+    pct: totalDays > 0 ? counts[b.band] / totalDays : 0,
+    firstSeen: firstSeen[b.band] >= 0 ? new Date(timestamps[firstSeen[b.band]] * 1000).toISOString().slice(0, 10) : undefined,
+    lastSeen: lastSeen[b.band] >= 0 ? new Date(timestamps[lastSeen[b.band]] * 1000).toISOString().slice(0, 10) : undefined,
+  }));
+
+  // Current streak: walk backwards from the latest valid point until band changes.
+  let streakBand: RiskBand | null = null;
+  let streakDays = 0;
+  let streakStartIdx = -1;
+  for (let i = n - 1; i >= 0; i--) {
+    if (!Number.isFinite(risk[i])) continue;
+    const b = riskBandFor(risk[i]);
+    if (streakBand === null) {
+      streakBand = b.band;
+      streakDays = 1;
+      streakStartIdx = i;
+      continue;
+    }
+    if (b.band === streakBand) {
+      streakDays++;
+    } else {
+      break;
+    }
+  }
+
+  // Last transition: find the most recent band change.
+  let lastTransition: BandStatsResult['lastTransition'];
+  if (streakBand !== null) {
+    for (let i = n - 1; i > 0; i--) {
+      if (!Number.isFinite(risk[i]) || !Number.isFinite(risk[i - 1])) continue;
+      const cur = riskBandFor(risk[i]).band;
+      const prev = riskBandFor(risk[i - 1]).band;
+      if (cur !== prev) {
+        lastTransition = {
+          fromBand: prev,
+          toBand: cur,
+          on: new Date(timestamps[i] * 1000).toISOString().slice(0, 10),
+        };
+        break;
+      }
+    }
+  }
+
+  const currentBandDef = streakBand ? RISK_BANDS.find(b => b.band === streakBand)! : RISK_BANDS[3];
+  const startedOn = streakStartIdx >= 0
+    ? new Date(timestamps[streakStartIdx] * 1000).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
+  return {
+    windowDays: windowDays ?? Math.round((timestamps[n - 1] - timestamps[0]) / 86400),
+    totalDays,
+    warmupDays,
+    distribution,
+    currentStreak: {
+      band: currentBandDef.band,
+      label: currentBandDef.label,
+      color: currentBandDef.color,
+      days: streakDays,
+      startedOn,
+    },
+    lastTransition,
+    asOf: new Date().toISOString(),
+  };
+}
+
 // ─── Standalone /api/risk/indicator handler ─────────────────────────────────
 // Lazy-imports fetchDailyCloses from quote.js inside the handler.
 

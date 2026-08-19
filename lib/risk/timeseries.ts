@@ -2,7 +2,7 @@
 // /api/risk/timeseries handler. Returns downsampled historical risk
 // data for the chart, plus halving markers for overlay.
 
-import { computeRiskTimeSeries } from './composite.js';
+import { computeRiskTimeSeries, computeBandStats } from './composite.js';
 import { HALVINGS } from './cycles-shared.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 

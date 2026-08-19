@@ -28,6 +28,7 @@ import {
 import { computeBmsb, computePiCycle, computeCyclePos } from '../lib/risk/indicators.js';
 import { fetchDailyCloses } from '../lib/risk/quote.js';
 import { HALVINGS } from '../lib/risk/cycles-shared.js';
+import { computeBandStats } from '../lib/risk/composite.js';
 
 interface TestResult { name: string; pass: boolean; detail?: string; }
 const results: TestResult[] = [];
@@ -226,13 +227,63 @@ function approxEq(a: number, b: number, eps: number = 1e-6): boolean {
     // Dynamic import to avoid breaking the static import graph if the
     // module shape ever drifts. Catches integration regressions.
     const { RISK_BLOCK_FETCHERS } = await import('../lib/workbench/risk-blocks.js');
-    check('10. RISK_BLOCK_FETCHERS has 6 entries',
-      Object.keys(RISK_BLOCK_FETCHERS).length === 6,
+    check('10. RISK_BLOCK_FETCHERS has 7 entries (incl. risk.band_stats)',
+      Object.keys(RISK_BLOCK_FETCHERS).length === 7,
       Object.keys(RISK_BLOCK_FETCHERS).join(', '));
     check('10b. risk.metric fetcher is callable',
       typeof RISK_BLOCK_FETCHERS['risk.metric'] === 'function');
+    check('10c. risk.band_stats fetcher is callable',
+      typeof RISK_BLOCK_FETCHERS['risk.band_stats'] === 'function');
   } catch (e: any) {
     check('10. RISK_BLOCK_FETCHERS import', false, e?.message ?? 'unknown');
+  }
+}
+
+// ─── 11. computeBandStats (synthetic + live) ─────────────────────────────────────────────────
+{
+  console.log('\n🎨 Band stats tests...');
+  // 11a. Synthetic data: build 2000 closes, compute risk series, then band stats.
+  const closes: number[] = [];
+  let p = 100;
+  for (let i = 0; i < 2000; i++) {
+    p *= 1 + (Math.sin(i / 30) * 0.02 + 0.003);
+    closes.push(p);
+  }
+  const { risk } = computeRiskSeries(closes, false);
+  const timestamps = Array.from({ length: closes.length }, (_, i) =>
+    Math.floor((Date.now() - (closes.length - i) * 86400000) / 1000));
+  const stats = computeBandStats(risk, timestamps, 1460);
+
+  check('11a. computeBandStats returns 6 distribution entries',
+    stats.distribution.length === 6,
+    `got ${stats.distribution.length}`);
+  check('11b. distribution pct sums to ~1.0',
+    Math.abs(stats.distribution.reduce((s, d) => s + d.pct, 0) - 1.0) < 0.01,
+    `sum=${stats.distribution.reduce((s, d) => s + d.pct, 0).toFixed(3)}`);
+  check('11c. currentStreak has valid band + days',
+    typeof stats.currentStreak.band === 'string' &&
+    stats.currentStreak.days >= 1 &&
+    stats.currentStreak.days <= stats.totalDays,
+    `band=${stats.currentStreak.band}, days=${stats.currentStreak.days}`);
+  check('11d. totalDays + warmupDays equals series length',
+    stats.totalDays + stats.warmupDays === risk.length,
+    `total=${stats.totalDays}, warmup=${stats.warmupDays}, series=${risk.length}`);
+  check('11e. distribution labels match RISK_BANDS',
+    stats.distribution.every((d, i) => d.label === RISK_BANDS[i].label));
+
+  // 11f. Live BTC fetch + band stats
+  try {
+    const live = await fetchDailyCloses('BTC', 3650);
+    const liveRisk = computeRiskSeries(live.closes, true).risk;
+    const liveStats = computeBandStats(liveRisk, live.timestamps, 1460);
+    check('11f. live BTC band stats has reasonable current streak',
+      liveStats.currentStreak.days >= 1 && liveStats.currentStreak.days < 1500,
+      `streak=${liveStats.currentStreak.days} in ${liveStats.currentStreak.label}`);
+    check('11g. live BTC has data in at least 3 bands',
+      liveStats.distribution.filter(d => d.days > 0).length >= 3,
+      `${liveStats.distribution.filter(d => d.days > 0).length} bands have data`);
+  } catch (e: any) {
+    check('11f. live BTC band stats', false, e?.message ?? 'unknown');
   }
 }
 

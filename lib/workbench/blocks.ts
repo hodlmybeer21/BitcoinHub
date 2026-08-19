@@ -34,6 +34,7 @@ const BLOCKS: BlockMeta[] = [
   { id: 'risk.pi_long',           label: 'Pi Cycle Long (350d ×2)',category: 'risk',     description: '350-day MA × 2 (top signal trigger)',             unit: 'USD' },
   { id: 'risk.pi_short',          label: 'Pi Cycle Short (111d)',  category: 'risk',     description: '111-day MA (top signal trigger)',                 unit: 'USD' },
   { id: 'risk.cycle_pos',         label: 'Halving Cycle Position', category: 'risk',     description: 'Position in 4-year halving cycle (0–1)',          unit: '0–1' },
+  { id: 'risk.band_stats',        label: 'Time in Risk Bands',     category: 'risk',     description: '% of days BTC spent in each risk band (6 series)',unit: '0–1 each' },
 ];
 
 function ok(res: VercelResponse, data: unknown) {
