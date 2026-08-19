@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins, PieChart, Hammer, Gauge, Layers } from "lucide-react";
+import { Bell, Menu, X, ExternalLink, TrendingUp, BarChart3, Coins, PieChart, Hammer, Gauge, Layers, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -114,12 +114,19 @@ const Navbar = () => {
       icon: TrendingUp,
       external: true
     },
-    { 
-      href: "/analytics", 
-      label: "Live BTC Analytics", 
+    {
+      href: "/analytics",
+      label: "Live BTC Analytics",
       description: "Real-time market data & on-chain metrics",
       icon: BarChart3,
       external: false
+    },
+    {
+      href: "/about",
+      label: "About & Docs",
+      description: "Methodology, data sources, FAQ",
+      icon: BookOpen,
+      comingSoon: false
     },
   ];
 

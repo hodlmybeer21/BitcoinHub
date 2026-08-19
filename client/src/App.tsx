@@ -27,6 +27,7 @@ import WorkbenchTemplates from "@/pages/WorkbenchTemplates";
 import WorkbenchGallery from "@/pages/WorkbenchGallery";
 import WorkbenchBacktests from "@/pages/WorkbenchBacktests";
 import WorkbenchBacktestDetail from "@/pages/WorkbenchBacktestDetail";
+import About from "@/pages/About";
 import RiskMetric from "@/pages/RiskMetric";
 import Macro from "@/pages/Macro";
 import NotFound from "@/pages/not-found";
@@ -59,6 +60,7 @@ function Router() {
         <Route path="/workbench/gallery" component={WorkbenchGallery} />
         <Route path="/workbench/backtests" component={WorkbenchBacktests} />
         <Route path="/workbench/backtests/:id" component={WorkbenchBacktestDetail} />
+        <Route path="/about" component={About} />
         <Route path="/risk" component={RiskMetric} />
         <Route path="/macro" component={Macro} />
         <Route path="/forgot-password" component={() => (
