@@ -149,16 +149,31 @@ export function computeRiskTimeSeries(
   timestamps: number[],
   isBTC: boolean = false,
   maxPoints: number = 365,
+  windowDays?: number,
 ): { date: string; risk: number; band: RiskBand; bandColor: string; price: number }[] {
-  const series = computeRiskSeries(closes, isBTC);
   const n = closes.length;
   if (n < 250) throw new Error(`Need ≥250 closes, got ${n}`);
 
-  // Step to downsample to ~maxPoints.
-  const step = Math.max(1, Math.floor(n / maxPoints));
+  // Compute risk on the FULL input — the z-score warmup needs the full
+  // 1460-day history. We can't slice before computing risk.
+  const series = computeRiskSeries(closes, isBTC);
+
+  // Optional window: only include points whose timestamp is within the
+  // last `windowDays` of the series.
+  let startIdx = 0;
+  if (windowDays && windowDays > 0) {
+    const cutoffTs = timestamps[timestamps.length - 1] - windowDays * 86400;
+    for (let i = 0; i < timestamps.length; i++) {
+      if (timestamps[i] >= cutoffTs) { startIdx = i; break; }
+    }
+  }
+
+  // Step to downsample to ~maxPoints over the visible window.
+  const visible = n - startIdx;
+  const step = Math.max(1, Math.floor(visible / maxPoints));
   const out: { date: string; risk: number; band: RiskBand; bandColor: string; price: number }[] = [];
 
-  for (let i = 0; i < n; i += step) {
+  for (let i = startIdx; i < n; i += step) {
     if (!Number.isFinite(series.risk[i])) continue;
     const risk = series.risk[i];
     const b = riskBandFor(risk);

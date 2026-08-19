@@ -14,30 +14,21 @@ async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { fetchDailyCloses } = await import('./quote.js');
     // Always fetch 10y so the z-score window (1460d) is fully satisfied.
-    // Slice the result to the requested `days` window for display.
+    // computeRiskTimeSeries handles the window slicing internally — it needs
+    // the full history to produce valid (non-warmup) risk values.
     const FETCH_DAYS = 3650;
     const { closes, timestamps, meta } = await fetchDailyCloses(symbol, FETCH_DAYS);
 
     const isBTC = symbol === 'BTC';
+    const points = computeRiskTimeSeries(closes, timestamps, isBTC, maxPoints, days);
 
-    // Slice closes/timestamps to the last `days` for the user's window.
-    const cutoffTs = timestamps[timestamps.length - 1] - days * 86400;
-    let startIdx = 0;
-    for (let i = 0; i < timestamps.length; i++) {
-      if (timestamps[i] >= cutoffTs) { startIdx = i; break; }
-    }
-    const sliceCloses = closes.slice(startIdx);
-    const sliceTimestamps = timestamps.slice(startIdx);
-
-    const points = computeRiskTimeSeries(sliceCloses, sliceTimestamps, isBTC, maxPoints);
-
-    // Halving markers as ISO date strings, in scope of `days`.
-    const firstTs = sliceTimestamps[0] * 1000;
-    const lastTs = sliceTimestamps[sliceTimestamps.length - 1] * 1000;
+    // Halving markers as ISO date strings, in scope of the displayed window.
+    const lastTsFull = timestamps[timestamps.length - 1] * 1000;
+    const firstTsFull = (timestamps[timestamps.length - 1] - days * 86400) * 1000;
     const halvings = HALVINGS
       .filter(h => {
         const t = new Date(h.date).getTime();
-        return t >= firstTs && t <= lastTs;
+        return t >= firstTsFull && t <= lastTsFull;
       })
       .map(h => ({ date: h.date, cycleIndex: h.cycleIndex }));
 
