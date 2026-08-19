@@ -276,3 +276,68 @@ export async function listPublicIndicators(
     publishedAt: row.published_at as string,
   }));
 }
+
+export async function forkIndicator(
+  forkerUserId: string,
+  sourceId: number,
+  forkerDataKey: string,
+  ip: string = 'unknown',
+): Promise<{ ok: true; forkedDataKey: string; forkedAt: string; sourceTitle: string; sourceOwnerUserId: string; sourceDataKey: string }> {
+  await ensureTable();
+  const pool = await getPool();
+
+  // 1. Fetch the source indicator by its numeric primary key (must be public).
+  //    This is the canonical way to address a specific row without needing
+  //    the full UUID (the gallery list endpoint only returns the 8-char
+  //    prefix for privacy).
+  const sourceResult = await pool.query(
+    `SELECT user_id, data_key, data_value, gallery_title, visibility
+     FROM anonymous_data
+     WHERE id = $1`,
+    [sourceId],
+  );
+  if (sourceResult.rows.length === 0) {
+    throw new Error('Source indicator not found.');
+  }
+  const source = sourceResult.rows[0];
+  if (source.visibility !== 'public') {
+    throw new Error('Source indicator is not public and cannot be forked.');
+  }
+  const sourceOwnerUserId = source.user_id as string;
+  const sourceDataKey = source.data_key as string;
+
+  // 2. Insert a new row for the forker with the same dataValue.
+  // ON CONFLICT (user_id, data_key) DO UPDATE: if the forker already has
+  // an indicator at this dataKey, we re-fork (update the value). The
+  // updated_at timestamp refreshes so the forker sees it as the latest.
+  const insertResult = await pool.query(
+    `INSERT INTO anonymous_data (user_id, data_key, data_value, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (user_id, data_key)
+     DO UPDATE SET data_value = $3, updated_at = NOW()
+     RETURNING updated_at`,
+    [forkerUserId, forkerDataKey, source.data_value as string],
+  );
+  const forkedAt = insertResult.rows[0].updated_at as string;
+
+  // 3. Increment the source's fork_count. The source's own updated_at
+  // is NOT bumped (so its public ordering doesn't shift on every fork),
+  // but fork_count is updated via a dedicated UPDATE.
+  await pool.query(
+    `UPDATE anonymous_data
+     SET fork_count = fork_count + 1
+     WHERE user_id = $1 AND data_key = $2`,
+    [sourceOwnerUserId, sourceDataKey],
+  );
+
+  await logAudit(forkerUserId, 'fork', forkerDataKey, (source.data_value as string).length, ip);
+
+  return {
+    ok: true,
+    forkedDataKey: forkerDataKey,
+    forkedAt,
+    sourceTitle: (source.gallery_title as string) || sourceDataKey,
+    sourceOwnerUserId,
+    sourceDataKey,
+  };
+}

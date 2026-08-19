@@ -391,7 +391,7 @@ async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse)
     if (!process.env.DATABASE_URL) {
       return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
     }
-    const { listPublicIndicators, publishIndicator, unpublishIndicator, checkRateLimit } = await import('../lib/persistence/server.js');
+    const { listPublicIndicators, publishIndicator, unpublishIndicator, checkRateLimit, forkIndicator } = await import('../lib/persistence/server.js');
     const ip = getClientIp(req);
 
     if (req.method === 'GET') {
@@ -408,7 +408,7 @@ async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse)
       if (!checkRateLimit(ip, 'write')) {
         return err(res, 429, 'Rate limit exceeded: max 60 writes/min per IP. Slow down.');
       }
-      const { userId, dataKey, title, description, action } = req.body ?? {};
+      const { userId, dataKey, title, description, action, sourceOwnerUserId, sourceDataKey, forkerDataKey } = req.body ?? {};
       if (!userId || typeof userId !== 'string' || !dataKey || typeof dataKey !== 'string') {
         return err(res, 400, 'userId (string) and dataKey (string) are required');
       }
@@ -416,6 +416,21 @@ async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse)
         await unpublishIndicator(userId, dataKey, ip);
         return ok(res, { ok: true, action: 'unpublished' });
       }
+      if (action === 'fork') {
+        // Fork: copy a public indicator (identified by its numeric `sourceId`
+        // primary key) into the forker's library at (userId, forkerDataKey).
+        // Increments the source's fork_count. The gallery list endpoint
+        // only exposes the 8-char UUID prefix for privacy, so the client
+        // passes the row's primary key (which is the canonical way to
+        // address a specific row).
+        if (typeof sourceId !== 'number' || !Number.isInteger(sourceId) || sourceId <= 0) {
+          return err(res, 400, 'sourceId (positive integer) is required to fork');
+        }
+        const finalForkerDataKey = (typeof forkerDataKey === 'string' && forkerDataKey.length > 0) ? forkerDataKey : dataKey;
+        const result = await forkIndicator(userId, sourceId, finalForkerDataKey, ip);
+        return ok(res, result);
+      }
+      // Default action: publish
       if (typeof title !== 'string' || title.length === 0 || title.length > 100) {
         return err(res, 400, 'title (1-100 chars) is required to publish');
       }
@@ -432,7 +447,7 @@ async function handlePersistenceGallery(req: VercelRequest, res: VercelResponse)
     if (e?.message?.includes('DATABASE_URL')) {
       return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
     }
-    if (e?.message?.includes('not found')) {
+    if (e?.message?.includes('not found') || e?.message?.includes('not public')) {
       return err(res, 404, e.message);
     }
     return err(res, 500, e?.message || 'Gallery error');
