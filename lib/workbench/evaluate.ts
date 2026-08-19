@@ -589,7 +589,7 @@ function forwardFill(arr: (number | null)[]): number[] {
   for (const v of arr) {
     if (v !== null) { last = v; out.push(v); }
     else if (last !== null) { out.push(last); }
-    else { out.push(0); }
+    else { out.push(NaN); } // pre-observation gap (was 0 — audit polish 2026-08-19)
   }
   return out;
 }
@@ -679,24 +679,57 @@ async function resolveData(node: { type: 'data'; id: string }, ctx: EvalContext)
   // premium.*) are reachable. The inline BLOCK_FETCHERS registry only
   // contains base blocks; checking it here would silently false-positive on
   // lazy-imported block IDs.
+  const start = new Date(ctx.dates[0]);
+  const end = new Date(ctx.dates[ctx.dates.length - 1]);
+  let series: Series[] = [];
+  let resolvedId = node.id;
+  let isUnknownBlock = false;
   try {
-    const start = new Date(ctx.dates[0]);
-    const end = new Date(ctx.dates[ctx.dates.length - 1]);
-    const series = await cachedFetch(node.id, start, end);
-    if (series.length === 0) {
-      ctx.errors.push(`Block ${node.id} returned no data`);
-      ctx.seriesCache.set(node.id, new Array(ctx.dates.length).fill(0));
-      return new Array(ctx.dates.length).fill(0);
-    }
-    const aligned = forwardFill(alignOnDates(series, ctx.dates));
-    ctx.seriesCache.set(node.id, aligned);
-    ctx.sources.push({ id: node.id, points: series.length });
-    return aligned;
+    series = await cachedFetch(node.id, start, end);
   } catch (e: any) {
-    ctx.errors.push(e?.message ?? `Fetch failed for ${node.id}`);
-    ctx.seriesCache.set(node.id, new Array(ctx.dates.length).fill(0));
-    return new Array(ctx.dates.length).fill(0);
+    // Parser bug workaround (audit polish 2026-08-19): the parser treats
+    // dotted names like 'macro.cpi_yoy.value' as a single block ID because
+    // the prefix has a dot (so the heuristic returns the whole name).
+    // That's wrong — `.value` is meant as an AST accessor (which resolveData
+    // makes a no-op since everything is number[]), so on 'Unknown X block'
+    // errors with a multi-dot name, strip the last segment and retry. This
+    // is safe because it only kicks in when the literal lookup failed.
+    const msg = e?.message ?? '';
+    if (/^Unknown \w+ block: /.test(msg)) {
+      isUnknownBlock = true;
+      const lastDot = node.id.lastIndexOf('.');
+      if (lastDot > 0) {
+        const stripped = node.id.slice(0, lastDot);
+        try {
+          series = await cachedFetch(stripped, start, end);
+          resolvedId = stripped;
+        } catch {
+          ctx.errors.push(msg);
+        }
+      } else {
+        ctx.errors.push(msg);
+      }
+    } else {
+      ctx.errors.push(msg);
+    }
   }
+  if (series.length === 0) {
+    const err = isUnknownBlock
+      ? `Block ${node.id} (or ${resolvedId}) returned no data`
+      : `Block ${resolvedId} returned no data`;
+    if (!ctx.errors.length || ctx.errors[ctx.errors.length - 1] !== err) ctx.errors.push(err);
+    // Use NaN instead of 0 so charts show a gap instead of a misleading
+    // zero line. Formulas comparing with `> 0` etc. behave the same
+    // (NaN comparisons return false), but pre-/post-observation gaps are
+    // honest.
+    const gap = new Array(ctx.dates.length).fill(NaN);
+    ctx.seriesCache.set(node.id, gap);
+    return gap;
+  }
+  const aligned = forwardFill(alignOnDates(series, ctx.dates));
+  ctx.seriesCache.set(node.id, aligned);
+  ctx.sources.push({ id: resolvedId, points: series.length });
+  return aligned;
 }
 
 function elementWiseBinOp(a: number[], b: number[], op: (x: number, y: number) => number): number[] {
