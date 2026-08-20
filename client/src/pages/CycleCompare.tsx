@@ -167,6 +167,7 @@ const SECTION_PRESETS: Array<{
   description: string;
 }> = [
   { label: 'Halving → Top',        from: 'halving',   to: 'top',     description: 'How long from supply shock to euphoria' },
+  { label: 'Halving → Bottom',      from: 'halving',   to: 'bottom',  description: 'Post-halving drawdown — how long from supply shock to the cycle bottom and how deep' },
   { label: 'Top → Bottom',          from: 'top',       to: 'bottom',  description: 'The bear phase — how deep, how long' },
   { label: 'Bottom → Next Halving', from: 'bottom',    to: 'halving', description: 'The accumulation phase before next cycle' },
   { label: 'Halving → Next Halving', from: 'halving',  to: 'halving', description: 'Full 4-year cycle from supply shock to supply shock' },
