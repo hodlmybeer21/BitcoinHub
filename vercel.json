@@ -40,6 +40,14 @@
       "dest": "/slides/$1"
     },
     {
+      "src": "/cycle/compare",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/cycle/compare/",
+      "dest": "/index.html"
+    },
+    {
       "src": "/cycle/(.*)",
       "dest": "/cycle/$1"
     },
