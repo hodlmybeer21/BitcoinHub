@@ -57,35 +57,64 @@ function daysBetween(fromISO: string, toISO: string): number {
   return Math.max(0, Math.round((b - a) / 86400000));
 }
 
+function todayISO(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
 // For "to=halving of next cycle" semantics, we don't accept "halving" as a
 // generic to-kind; instead we derive the next-cycle halving from the cycle's
 // own metadata. This is so "halving → next-halving" just means "full cycle".
+//
+// In-progress semantics for concrete events (top, bottom):
+//   If the requested "to" event hasn't happened yet (cycle still in progress),
+//   we fall back to today's date and set inProgress=true. This lets users
+//   see e.g. cycle 4 top→today alongside cycles 2 & 3 top→bottom.
+//   For "to=halving", the next halving is always treated as a forecast (even
+//   if it's years away) since the user explicitly asked for that point.
 function resolveEndDate(
   cycle: CycleId,
   toKind: EventKind,
-): { date: string; resolvedKind: EventKind } | null {
-  // Special case: "to=halving" inside a non-final cycle = next halving
+): { date: string; resolvedKind: EventKind; inProgress: boolean } | null {
   if (toKind === 'halving') {
     const nxt = nextEvent(cycle);
     if (!nxt) return null;
-    return { date: nxt.date, resolvedKind: 'halving' };
+    return { date: nxt.date, resolvedKind: 'halving', inProgress: false };
   }
   const e = findEvent(toKind, cycle);
-  if (!e) return null;
-  return { date: e.date, resolvedKind: toKind };
+  if (e) {
+    const today = todayISO();
+    if (e.date <= today) {
+      return { date: e.date, resolvedKind: toKind, inProgress: false };
+    }
+    // Event exists in the dataset but is in the future (shouldn't happen
+    // for top/bottom since we only record confirmed events, but be defensive)
+    return { date: today, resolvedKind: toKind, inProgress: true };
+  }
+  // Event never happened for this cycle (e.g. cycle 4 bottom) → use today.
+  return { date: todayISO(), resolvedKind: toKind, inProgress: true };
 }
 
 function resolveStartDate(
   cycle: CycleId,
   fromKind: EventKind,
-): { date: string; resolvedKind: EventKind } | null {
+): { date: string; resolvedKind: EventKind; inProgress: boolean } | null {
   if (fromKind === 'halving') {
     const e = findEvent('halving', cycle);
-    return e ? { date: e.date, resolvedKind: 'halving' } : null;
+    return e ? { date: e.date, resolvedKind: 'halving', inProgress: false } : null;
   }
-  const e = findEvent(fromKind, cycle);
-  if (!e) return null;
-  return { date: e.date, resolvedKind: fromKind };
+  if (fromKind === 'top' || fromKind === 'bottom') {
+    const e = findEvent(fromKind, cycle);
+    if (e) {
+      const today = todayISO();
+      if (e.date <= today) {
+        return { date: e.date, resolvedKind: fromKind, inProgress: false };
+      }
+      return { date: today, resolvedKind: fromKind, inProgress: true };
+    }
+    return { date: todayISO(), resolvedKind: fromKind, inProgress: true };
+  }
+  // ath: start of an "ATH break" run — fall back to today's date if missing
+  return { date: todayISO(), resolvedKind: fromKind, inProgress: true };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -176,6 +205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         startPrice: +startPrice.toFixed(2),
         endPrice: +section[section.length - 1].price.toFixed(2),
         changePct: +(((section[section.length - 1].price - startPrice) / startPrice) * 100).toFixed(2),
+        inProgress: toRes.inProgress,
         points,
       });
     }
@@ -203,6 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       series: out,
       skipped,
       eventCatalog: ALL_EVENTS, // echo for the UI to render selectors
+      today: todayISO(),
       asOf: new Date().toISOString(),
     });
   } catch (e: any) {

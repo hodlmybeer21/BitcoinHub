@@ -107,6 +107,7 @@ interface OverlayCycle {
   startPrice: number;
   endPrice: number;
   changePct: number;
+  inProgress?: boolean;
   points: OverlayPoint[];
 }
 
@@ -741,7 +742,7 @@ function OverlayTab() {
       {data?.series && data.series.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {data.series.map(s => (
-            <Card key={s.cycleId}>
+            <Card key={s.cycleId} className={s.inProgress ? 'border-amber-500/40 bg-amber-500/[0.03]' : ''}>
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span
@@ -751,21 +752,32 @@ function OverlayTab() {
                   <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
                     {s.cycleLabel}
                   </div>
+                  {s.inProgress && (
+                    <Badge variant="outline" className="border-amber-500/50 text-amber-400 bg-amber-500/10 text-[10px] uppercase tracking-wider font-semibold">
+                      live · day {s.days}
+                    </Badge>
+                  )}
                 </div>
                 <div className="space-y-1.5 text-sm">
                   <Row label="From" value={`${fmtDate(s.fromDate)} (${preset.from})`} />
-                  <Row label="To" value={`${fmtDate(s.toDate)} (${s.toKind})`} />
+                  <Row label="To" value={
+                    s.inProgress
+                      ? <span className="text-amber-400">today <span className="text-muted-foreground">(in progress — {s.toKind} not yet)</span></span>
+                      : `${fmtDate(s.toDate)} (${s.toKind})`
+                  } />
                   <Row label="Duration" value={
                     <span className="font-mono">
                       {s.days} days <span className="text-muted-foreground">({(s.days / 30.44).toFixed(1)} mo)</span>
+                      {s.inProgress && <span className="text-amber-400 ml-1">· live</span>}
                     </span>
                   } />
                   <Row label="Price change" value={
                     <span className={`font-mono font-semibold ${s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                       {fmtPct(s.changePct)}
+                      {s.inProgress && <span className="text-amber-400 ml-1 text-xs font-normal">(so far)</span>}
                     </span>
                   } />
-                  <Row label="Peak" value={
+                  <Row label={s.inProgress ? 'Peak → now' : 'Peak'} value={
                     <span className="font-mono">
                       {fmtUSD(s.startPrice)} → {fmtUSD(s.endPrice)}
                     </span>
@@ -845,7 +857,10 @@ function OverlayTab() {
                     formatter={(value) => {
                       const cycleId = value as 'c1' | 'c2' | 'c3' | 'c4';
                       const series = data.series.find(s => s.cycleId === cycleId);
-                      return series ? series.cycleLabel : value;
+                      if (!series) return value;
+                      return series.inProgress
+                        ? `${series.cycleLabel} · live`
+                        : series.cycleLabel;
                     }}
                   />
                   {data.series.map(s => (
@@ -855,6 +870,7 @@ function OverlayTab() {
                       dataKey={s.cycleId}
                       stroke={CYCLE_COLORS[s.cycleId]}
                       strokeWidth={2}
+                      strokeDasharray={s.inProgress ? '6 3' : undefined}
                       dot={false}
                       name={s.cycleId}
                       connectNulls
