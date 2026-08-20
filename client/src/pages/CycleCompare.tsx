@@ -81,6 +81,8 @@ const ASSET_CATALOG: Array<{ symbol: string; label: string }> = [
   { symbol: 'IBIT', label: 'iShares Bitcoin Trust (IBIT)' },
   { symbol: 'COIN', label: 'Coinbase (COIN)' },
   { symbol: 'MSTR', label: 'MicroStrategy (MSTR)' },
+  { symbol: 'MARA', label: 'Marathon Digital (MARA)' },
+  { symbol: 'RIOT', label: 'Riot Platforms (RIOT)' },
 ];
 
 // ── Types matching the API responses ──────────────────────────────────────
@@ -978,7 +980,7 @@ interface AssetOverlayResp {
 function AssetOverlayTab() {
   const [presetIdx, setPresetIdx] = useState(0); // start with Halving → Top
   const [cycleId, setCycleId] = useState<'c2' | 'c3' | 'c4'>('c4');
-  const [selectedAssets, setSelectedAssets] = useState<string[]>(['BTC', 'IBIT', 'COIN', 'MSTR']);
+  const [selectedAssets, setSelectedAssets] = useState<string[]>(['BTC', 'IBIT', 'COIN', 'MSTR', 'MARA', 'RIOT']);
 
   const preset = SECTION_PRESETS[presetIdx];
 
