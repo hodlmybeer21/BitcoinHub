@@ -347,17 +347,20 @@ export default function Cycle() {
           </div>
           <Card className="overflow-hidden">
             <div className="aspect-video relative bg-black">
-              <img
-                src="/cycle/btc-cycle-markers.jpg"
-                alt="BTC price history with halving (blue), cycle top (orange), cycle bottom (red), and new ATH (green) vertical line markers across the full 11-year window"
+              <video
+                src="/cycle/btc-cycle.mp4"
+                controls
+                playsInline
+                preload="metadata"
                 className="absolute inset-0 w-full h-full object-cover"
-              />
+              >
+                Your browser does not support the video tag.
+              </video>
             </div>
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground">
-                BTC price history with cycle markers — halvings (blue), cycle tops (orange),
-                cycle bottoms (red), and new-ATH events (green) across the full 11-year window.
-                Same marker scheme as the live <a href="/cycle/compare" className="underline">/cycle/compare</a> chart.
+                60-second overview: the cycle pattern, the Q4 2026 window, and what it means for accumulation.
+                Built with Grok Imagine.
               </p>
             </CardContent>
           </Card>
@@ -413,8 +416,8 @@ export default function Cycle() {
         </p>
         <Card className="overflow-hidden">
           <img
-            src="/cycle/btc-super-cycle.png"
-            alt="Bitcoin 4-year cycle — all four cycles overlaid with the Q4 2026 target window"
+            src="/cycle/btc-cycle-markers.jpg"
+            alt="Bitcoin 4-year cycle — halving (blue), cycle top (orange), cycle bottom (red), and new-ATH (green) vertical line markers across the full 11-year price history"
             className="w-full h-auto"
           />
         </Card>
