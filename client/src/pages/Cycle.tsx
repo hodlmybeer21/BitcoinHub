@@ -347,20 +347,17 @@ export default function Cycle() {
           </div>
           <Card className="overflow-hidden">
             <div className="aspect-video relative bg-black">
-              <video
-                src="/cycle/btc-cycle.mp4"
-                controls
-                playsInline
-                preload="metadata"
+              <img
+                src="/cycle/btc-cycle-markers.jpg"
+                alt="BTC price history with halving (blue), cycle top (orange), cycle bottom (red), and new ATH (green) vertical line markers across the full 11-year window"
                 className="absolute inset-0 w-full h-full object-cover"
-              >
-                Your browser does not support the video tag.
-              </video>
+              />
             </div>
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground">
-                60-second overview: the cycle pattern, the Q4 2026 window, and what it means for accumulation.
-                Built with Grok Imagine.
+                BTC price history with cycle markers — halvings (blue), cycle tops (orange),
+                cycle bottoms (red), and new-ATH events (green) across the full 11-year window.
+                Same marker scheme as the live <a href="/cycle/compare" className="underline">/cycle/compare</a> chart.
               </p>
             </CardContent>
           </Card>
