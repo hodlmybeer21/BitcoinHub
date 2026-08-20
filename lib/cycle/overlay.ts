@@ -39,8 +39,21 @@ import {
   errJson,
 } from './btc-history.js';
 
-const VALID_KINDS: EventKind[] = ['halving', 'top', 'bottom', 'ath', 'prevBottom', 'nextTop'];
+const VALID_KINDS_API = ['halving', 'top', 'bottom', 'ath', 'prevbottom', 'nexttop'] as const;
 const VALID_CYCLES: CycleId[] = ['c1', 'c2', 'c3', 'c4'];
+
+// Map lowercase query-param form to canonical internal EventKind (camelCase).
+// The internal resolvers use camelCase; the API surface is all-lowercase so
+// the URL contract stays simple regardless of how many multi-word kinds
+// we add later.
+const API_TO_INTERNAL: Record<string, EventKind> = {
+  halving: 'halving',
+  top: 'top',
+  bottom: 'bottom',
+  ath: 'ath',
+  prevbottom: 'prevBottom',
+  nexttop: 'nextTop',
+};
 
 function parseList<T extends string>(raw: unknown, allowed: readonly T[]): T[] | null {
   if (raw === undefined || raw === null) return null;
@@ -133,16 +146,19 @@ function resolveStartDate(
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const fromKind = String(req.query.from ?? 'halving').toLowerCase() as EventKind;
-    const toKind = String(req.query.to ?? 'top').toLowerCase() as EventKind;
+    const fromKindAPI = String(req.query.from ?? 'halving').toLowerCase();
+    const toKindAPI = String(req.query.to ?? 'top').toLowerCase();
     const cycles = parseList<CycleId>(req.query.cycles, VALID_CYCLES) ?? ['c2', 'c3', 'c4'];
 
-    if (!VALID_KINDS.includes(fromKind)) {
-      return errJson(res, 400, `from must be one of: ${VALID_KINDS.join(', ')}`);
+    if (!(VALID_KINDS_API as readonly string[]).includes(fromKindAPI)) {
+      return errJson(res, 400, `from must be one of: ${VALID_KINDS_API.join(', ')} (case-insensitive)`);
     }
-    if (!VALID_KINDS.includes(toKind)) {
-      return errJson(res, 400, `to must be one of: ${VALID_KINDS.join(', ')}`);
+    if (!(VALID_KINDS_API as readonly string[]).includes(toKindAPI)) {
+      return errJson(res, 400, `to must be one of: ${VALID_KINDS_API.join(', ')} (case-insensitive)`);
     }
+
+    const fromKind = API_TO_INTERNAL[fromKindAPI];
+    const toKind = API_TO_INTERNAL[toKindAPI];
     if (cycles.length === 0) {
       return errJson(res, 400, 'cycles must be a non-empty comma-separated list');
     }
