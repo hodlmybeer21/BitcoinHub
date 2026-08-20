@@ -12,7 +12,7 @@
 //     hardcoded here (so they stay accurate as new ATHs print).
 
 export type CycleId = 'c1' | 'c2' | 'c3' | 'c4';
-export type EventKind = 'halving' | 'top' | 'bottom' | 'ath';
+export type EventKind = 'halving' | 'top' | 'bottom' | 'ath' | 'prevBottom' | 'nextTop';
 
 export interface CycleEvent {
   kind: EventKind;
@@ -120,6 +120,25 @@ export function nextEvent(cycle: CycleId): { kind: 'halving'; date: string } | n
   const nextCycle = order[idx + 1];
   const halving = HALVINGS.find(h => h.cycle === nextCycle);
   return halving ? { kind: 'halving', date: halving.date } : null;
+}
+
+// Cycle N-1's bottom (the "previous cycle bottom" used for cross-cycle sections
+// like "red → orange" = prev cycle bottom → this cycle top).
+export function findPrevBottom(cycle: CycleId): CycleEvent | null {
+  const order: CycleId[] = ['c1', 'c2', 'c3', 'c4'];
+  const idx = order.indexOf(cycle);
+  if (idx <= 0) return null; // no previous cycle
+  const prevCycle = order[idx - 1];
+  return BOTTOMS.find(b => b.cycle === prevCycle) ?? null;
+}
+
+// Cycle N+1's top (the "next cycle top" — symmetric counterpart).
+export function findNextTop(cycle: CycleId): CycleEvent | null {
+  const order: CycleId[] = ['c1', 'c2', 'c3', 'c4'];
+  const idx = order.indexOf(cycle);
+  if (idx === -1 || idx === order.length - 1) return null; // no next cycle
+  const nextCycle = order[idx + 1];
+  return TOPS.find(t => t.cycle === nextCycle) ?? null;
 }
 
 // ── "ATH events" are derived from the price series, but we expose a helper

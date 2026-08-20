@@ -141,14 +141,15 @@ const fmtDate = (iso: string) =>
 // ── Section definitions (the chips above the overlay chart) ───────────────
 const SECTION_PRESETS: Array<{
   label: string;
-  from: 'halving' | 'top' | 'bottom';
-  to:   'top' | 'bottom' | 'halving';
+  from: 'halving' | 'top' | 'bottom' | 'prevBottom';
+  to:   'top' | 'bottom' | 'halving' | 'nextTop';
   description: string;
 }> = [
-  { label: 'Halving → Top',        from: 'halving', to: 'top',     description: 'How long from supply shock to euphoria' },
-  { label: 'Top → Bottom',          from: 'top',     to: 'bottom',  description: 'The bear phase — how deep, how long' },
-  { label: 'Bottom → Next Halving', from: 'bottom',  to: 'halving', description: 'The accumulation phase before next cycle' },
-  { label: 'Halving → Next Halving', from: 'halving', to: 'halving', description: 'Full 4-year cycle from supply shock to supply shock' },
+  { label: 'Halving → Top',        from: 'halving',   to: 'top',     description: 'How long from supply shock to euphoria' },
+  { label: 'Top → Bottom',          from: 'top',       to: 'bottom',  description: 'The bear phase — how deep, how long' },
+  { label: 'Bottom → Next Halving', from: 'bottom',    to: 'halving', description: 'The accumulation phase before next cycle' },
+  { label: 'Halving → Next Halving', from: 'halving',  to: 'halving', description: 'Full 4-year cycle from supply shock to supply shock' },
+  { label: 'Prev Bottom → Top',     from: 'prevBottom', to: 'top',    description: 'Red to orange across cycle boundaries — the rise from previous bear bottom to current cycle peak' },
 ];
 
 const ALL_CYCLES: Array<{ id: 'c1' | 'c2' | 'c3' | 'c4'; label: string; range: string }> = [
@@ -650,6 +651,7 @@ function OverlayTab() {
                   <SelectItem value="halving">Halving</SelectItem>
                   <SelectItem value="top">Cycle Top</SelectItem>
                   <SelectItem value="bottom">Cycle Bottom</SelectItem>
+                  <SelectItem value="prevBottom">Prev Cycle Bottom</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -674,6 +676,7 @@ function OverlayTab() {
                   <SelectItem value="top">Cycle Top</SelectItem>
                   <SelectItem value="bottom">Cycle Bottom</SelectItem>
                   <SelectItem value="halving">Next Halving</SelectItem>
+                  <SelectItem value="nextTop">Next Cycle Top</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -27,6 +27,8 @@ import {
   CYCLES,
   findEvent,
   nextEvent,
+  findPrevBottom,
+  findNextTop,
   type CycleId,
   type EventKind,
 } from './events.js';
@@ -37,7 +39,7 @@ import {
   errJson,
 } from './btc-history.js';
 
-const VALID_KINDS: EventKind[] = ['halving', 'top', 'bottom', 'ath'];
+const VALID_KINDS: EventKind[] = ['halving', 'top', 'bottom', 'ath', 'prevBottom', 'nextTop'];
 const VALID_CYCLES: CycleId[] = ['c1', 'c2', 'c3', 'c4'];
 
 function parseList<T extends string>(raw: unknown, allowed: readonly T[]): T[] | null {
@@ -80,6 +82,12 @@ function resolveEndDate(
     if (!nxt) return null;
     return { date: nxt.date, resolvedKind: 'halving', inProgress: false };
   }
+  if (toKind === 'nextTop') {
+    // Cross-cycle: cycle N+1's top.
+    const e = findNextTop(cycle);
+    if (!e) return null; // cycle 4 has no next cycle
+    return { date: e.date, resolvedKind: 'nextTop', inProgress: false };
+  }
   const e = findEvent(toKind, cycle);
   if (e) {
     const today = todayISO();
@@ -112,6 +120,12 @@ function resolveStartDate(
       return { date: today, resolvedKind: fromKind, inProgress: true };
     }
     return { date: todayISO(), resolvedKind: fromKind, inProgress: true };
+  }
+  if (fromKind === 'prevBottom') {
+    // Cross-cycle: cycle N-1's bottom.
+    const e = findPrevBottom(cycle);
+    if (!e) return null; // cycle 1 has no previous
+    return { date: e.date, resolvedKind: 'prevBottom', inProgress: false };
   }
   // ath: start of an "ATH break" run — fall back to today's date if missing
   return { date: todayISO(), resolvedKind: fromKind, inProgress: true };
@@ -213,7 +227,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Resolve "from" / "to" event objects for header display
     const firstCycleId = cycles[0];
     const headerFrom = firstCycleId
-      ? (findEvent(fromKind, firstCycleId) ?? (fromKind === 'halving' ? findEvent('halving', firstCycleId) : null))
+      ? (fromKind === 'prevBottom'
+          ? findPrevBottom(firstCycleId)
+          : (findEvent(fromKind, firstCycleId) ?? (fromKind === 'halving' ? findEvent('halving', firstCycleId) : null)))
       : null;
     const headerTo = firstCycleId
       ? (toKind === 'halving'
@@ -221,6 +237,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               const nxt = nextEvent(firstCycleId);
               return nxt ? { kind: 'halving' as EventKind, cycle: firstCycleId, date: nxt.date } : null;
             })()
+          : toKind === 'nextTop'
+          ? findNextTop(firstCycleId)
           : findEvent(toKind, firstCycleId))
       : null;
 
