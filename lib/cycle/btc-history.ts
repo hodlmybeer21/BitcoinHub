@@ -1,14 +1,13 @@
-// BitcoinHub — BTC Daily Price History (server-side)
-// Fetches a long BTC-USD daily close series from Yahoo Finance and caches
-// results across warm Vercel invocations. Used by /api/cycle/markers and
-// /api/cycle/overlay.
+// BitcoinHub — BTC + Bitcoin-correlated Asset Daily Price History (server-side)
+// Fetches daily close series from Yahoo Finance for BTC, IBIT, COIN, MSTR,
+// FBTC, MARA, RIOT — used by /api/cycle/markers, /api/cycle/overlay, and
+// /api/cycle/asset-overlay.
 //
-// Source priority:
-//   1. Yahoo Finance v8 chart API (no key, 2014-09-17 onwards reliably).
-//   2. (No fallback needed — Yahoo has reliably served since 2014.)
+// Source: Yahoo Finance v8 chart API (no key, daily granularity, reliable
+// for all assets above since their respective IPOs).
 //
-// Lazy-imports axios inside the function body (per architecture invariant #3)
-// so it doesn't pull into the api/index.ts cold-start bundle.
+// Lazy-imports axios inside each fetcher function (per architecture
+// invariant #3) so it doesn't pull into the api/index.ts cold-start bundle.
 
 import type { VercelResponse } from '@vercel/node';
 
@@ -17,30 +16,56 @@ export interface DailyClose {
   price: number;  // USD close
 }
 
+export interface AssetMeta {
+  symbol: string;
+  yahoo: string;
+  label: string;
+  firstAvailable: string;  // YYYY-MM-DD
+}
+
+// Asset registry — covers BTC + the BTC-correlated equities/ETFs from the
+// MPT universe (lib/mpt/cycles.ts). firstAvailable dates are Yahoo's
+// earliest reliable daily close.
+export const ASSET_REGISTRY: Record<string, AssetMeta> = {
+  BTC:  { symbol: 'BTC',  yahoo: 'BTC-USD', label: 'Bitcoin',                  firstAvailable: '2014-09-17' },
+  IBIT: { symbol: 'IBIT', yahoo: 'IBIT',    label: 'iShares Bitcoin Trust',    firstAvailable: '2024-01-11' },
+  FBTC: { symbol: 'FBTC', yahoo: 'FBTC',    label: 'Fidelity Wise Origin BTC', firstAvailable: '2024-01-11' },
+  MSTR: { symbol: 'MSTR', yahoo: 'MSTR',    label: 'MicroStrategy',            firstAvailable: '2014-06-26' },
+  COIN: { symbol: 'COIN', yahoo: 'COIN',    label: 'Coinbase',                 firstAvailable: '2021-04-14' },
+  MARA: { symbol: 'MARA', yahoo: 'MARA',    label: 'Marathon Digital',         firstAvailable: '2014-07-02' },
+  RIOT: { symbol: 'RIOT', yahoo: 'RIOT',    label: 'Riot Platforms',           firstAvailable: '2014-07-02' },
+};
+
+export function getAssetMeta(symbol: string): AssetMeta | null {
+  return ASSET_REGISTRY[symbol.toUpperCase()] ?? null;
+}
+
 interface CacheEntry {
   fetchedAt: number;
   series: DailyClose[];
 }
 
-const CACHE: CacheEntry = { fetchedAt: 0, series: [] };
+const ASSET_CACHE = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-// Earliest Yahoo BTC-USD data point is 2014-09-17. We anchor from that date
-// so the long-history call only does one round trip.
-const YAHOO_EARLIEST_MS = Date.UTC(2014, 8, 17); // Sep 17, 2014 UTC
+// Generic asset history fetcher — used for all BTC-correlated assets.
+// Yahoo returns empty data for missing dates; we filter those out.
+export async function fetchAssetDailyHistory(symbol: string): Promise<DailyClose[]> {
+  const meta = getAssetMeta(symbol);
+  if (!meta) throw new Error(`Unknown asset symbol: ${symbol}`);
 
-export async function fetchBTCDailyHistory(): Promise<DailyClose[]> {
+  const cached = ASSET_CACHE.get(meta.symbol);
   const now = Date.now();
-  if (CACHE.series.length > 0 && now - CACHE.fetchedAt < CACHE_TTL_MS) {
-    return CACHE.series;
+  if (cached && cached.series.length > 0 && now - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.series;
   }
 
   // Lazy import per architecture invariant #3
   const { default: axios } = await import('axios');
 
-  const period1 = Math.floor(YAHOO_EARLIEST_MS / 1000);
+  const period1 = Math.floor(Date.parse(meta.firstAvailable + 'T00:00:00Z') / 1000);
   const period2 = Math.floor(now / 1000);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?period1=${period1}&period2=${period2}&interval=1d&events=history`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(meta.yahoo)}?period1=${period1}&period2=${period2}&interval=1d&events=history`;
 
   const res = await axios.get(url, {
     timeout: 20000,
@@ -51,7 +76,7 @@ export async function fetchBTCDailyHistory(): Promise<DailyClose[]> {
   const timestamps: number[] = result?.timestamp ?? [];
   const closes: (number | null)[] = result?.indicators?.quote?.[0]?.close ?? [];
   if (!timestamps.length || !closes.length) {
-    throw new Error('Yahoo returned empty BTC history');
+    throw new Error(`Yahoo returned empty ${meta.symbol} history`);
   }
 
   const series: DailyClose[] = [];
@@ -62,13 +87,16 @@ export async function fetchBTCDailyHistory(): Promise<DailyClose[]> {
     const isoDay = new Date(ts).toISOString().split('T')[0];
     series.push({ date: isoDay, price: c });
   }
-
-  // Sort ascending by date (Yahoo should already be, but be defensive)
   series.sort((a, b) => a.date.localeCompare(b.date));
 
-  CACHE.fetchedAt = now;
-  CACHE.series = series;
+  ASSET_CACHE.set(meta.symbol, { fetchedAt: now, series });
   return series;
+}
+
+// Backward-compat wrapper for the BTC-only callers (markers, existing
+// overlay math still references this name).
+export async function fetchBTCDailyHistory(): Promise<DailyClose[]> {
+  return fetchAssetDailyHistory('BTC');
 }
 
 // ── Helpers used by overlay + markers handlers ────────────────────────────

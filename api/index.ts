@@ -3949,6 +3949,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: h } = await import('../lib/cycle/overlay.js');
       return h(req, res);
     }
+    if (path === '/api/cycle/asset-overlay' || path === '/api/cycle/asset-overlay/') {
+      const { default: h } = await import('../lib/cycle/asset-overlay.js');
+      return h(req, res);
+    }
 
     // ── Tier 1 analytics upgrades (2026-07-31) ────────────────────────
     // Inline handlers using direct fetches (matches existing api/index.ts pattern;

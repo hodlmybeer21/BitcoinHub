@@ -31,7 +31,7 @@ import {
 } from 'recharts';
 import {
   ArrowLeft, GitCompareArrows, ChartLine, Layers, AlertTriangle, Loader2,
-  Calendar, ArrowRight, CheckCircle2, XCircle,
+  Calendar, ArrowRight, CheckCircle2, XCircle, BarChart3,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,6 +63,25 @@ const CYCLE_COLORS = {
   c3: '#34d399',  // emerald
   c4: '#60a5fa',  // sky
 } as const;
+
+// Asset colors (for the Multi-Asset tab — chosen to be distinguishable
+// from the cycle colors so users could later mix both views).
+const ASSET_COLORS: Record<string, string> = {
+  BTC:  '#f7931a',  // Bitcoin orange
+  IBIT: '#60a5fa',  // sky (BlackRock-ish)
+  COIN: '#a78bfa',  // violet (Coinbase-ish)
+  MSTR: '#f472b6',  // pink (MicroStrategy-ish)
+  FBTC: '#22d3ee',  // cyan (Fidelity)
+  MARA: '#fbbf24',  // amber (Marathon)
+  RIOT: '#f87171',  // rose (Riot)
+};
+
+const ASSET_CATALOG: Array<{ symbol: string; label: string }> = [
+  { symbol: 'BTC',  label: 'Bitcoin' },
+  { symbol: 'IBIT', label: 'iShares Bitcoin Trust (IBIT)' },
+  { symbol: 'COIN', label: 'Coinbase (COIN)' },
+  { symbol: 'MSTR', label: 'MicroStrategy (MSTR)' },
+];
 
 // ── Types matching the API responses ──────────────────────────────────────
 interface CycleEvent {
@@ -190,9 +209,12 @@ export default function CycleCompare() {
         </motion.div>
 
         <Tabs defaultValue="overlay" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-2xl grid-cols-3">
             <TabsTrigger value="overlay" className="flex items-center gap-2">
               <Layers className="h-4 w-4" /> Cycle Overlay
+            </TabsTrigger>
+            <TabsTrigger value="asset" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" /> Multi-Asset
             </TabsTrigger>
             <TabsTrigger value="annotated" className="flex items-center gap-2">
               <ChartLine className="h-4 w-4" /> Annotated Chart
@@ -201,6 +223,9 @@ export default function CycleCompare() {
 
           <TabsContent value="overlay" className="space-y-6">
             <OverlayTab />
+          </TabsContent>
+          <TabsContent value="asset" className="space-y-6">
+            <AssetOverlayTab />
           </TabsContent>
           <TabsContent value="annotated" className="space-y-6">
             <AnnotatedTab />
@@ -900,5 +925,373 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="text-muted-foreground text-xs uppercase tracking-wider">{label}</span>
       <span className="text-right">{value}</span>
     </div>
+  );
+}
+
+// ============================================================================
+// Tab 3 — Multi-Asset Overlay
+// ============================================================================
+//
+// Anchors on a single BTC cycle (c2/c3/c4) and overlays the requested assets
+// (BTC + IBIT + COIN + MSTR by default). Each asset's price during the
+// section is normalized to 0% at section start so all lines start at the
+// same point on the same x-axis. Useful for asking questions like:
+// "During BTC's halving→top (cycle 4), did COIN outperform BTC?"
+//
+// Backend: GET /api/cycle/asset-overlay?assets=...&cycle=...&from=...&to=...
+
+interface AssetOverlayPoint {
+  day: number;
+  date: string;
+  price: number;
+  retPct: number;
+}
+
+interface AssetOverlayResp {
+  cycle: 'c2' | 'c3' | 'c4';
+  cycleLabel: string;
+  section: {
+    from: { kind: string; cycle: string; date: string };
+    to:   { kind: string; cycle: string; date: string };
+    days: number;
+  };
+  assets: Array<{
+    symbol: string;
+    label: string;
+    firstAvailable: string;
+    fromDate: string;
+    toDate: string;
+    days: number;
+    startPrice: number;
+    endPrice: number;
+    changePct: number;
+    inProgress?: boolean;
+    points: AssetOverlayPoint[];
+  }>;
+  skipped: Array<{ symbol: string; reason: string }>;
+  assetCatalog: Array<{ symbol: string; label: string; firstAvailable: string }>;
+  eventCatalog: CycleEvent[];
+  today: string;
+  asOf: string;
+}
+
+function AssetOverlayTab() {
+  const [presetIdx, setPresetIdx] = useState(0); // start with Halving → Top
+  const [cycleId, setCycleId] = useState<'c2' | 'c3' | 'c4'>('c4');
+  const [selectedAssets, setSelectedAssets] = useState<string[]>(['BTC', 'IBIT', 'COIN', 'MSTR']);
+
+  const preset = SECTION_PRESETS[presetIdx];
+
+  const { data, isLoading, error, refetch, isFetching } = useQuery<AssetOverlayResp>({
+    queryKey: ['/api/cycle/asset-overlay', preset.from, preset.to, cycleId, selectedAssets.join(',')],
+    queryFn: async ({ queryKey }) => {
+      const [url, from, to, cycle, assets] = queryKey as [string, string, string, string, string];
+      const u = new URL(url, window.location.origin);
+      u.searchParams.set('from', from);
+      u.searchParams.set('to', to);
+      u.searchParams.set('cycle', cycle);
+      u.searchParams.set('assets', assets);
+      const r = await fetch(u.toString());
+      if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+      return r.json();
+    },
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  // Combine asset series into one chart dataset keyed by day, similar to
+  // the existing overlay tab.
+  const chartData = useMemo(() => {
+    if (!data?.assets?.length) return [];
+    const dayMap = new Map<number, any>();
+    for (const s of data.assets) {
+      for (const p of s.points) {
+        const row = dayMap.get(p.day) ?? { day: p.day };
+        row[s.symbol] = +p.retPct.toFixed(2);
+        row[`${s.symbol}_price`] = p.price;
+        row[`${s.symbol}_date`] = p.date;
+        dayMap.set(p.day, row);
+      }
+    }
+    return Array.from(dayMap.values()).sort((a, b) => a.day - b.day);
+  }, [data]);
+
+  const maxDay = useMemo(() => {
+    if (!data?.assets?.length) return 0;
+    return Math.max(...data.assets.map(s => s.days));
+  }, [data]);
+
+  function toggleAsset(symbol: string) {
+    setSelectedAssets(prev => {
+      if (prev.includes(symbol)) {
+        if (prev.length === 1) return prev;
+        return prev.filter(s => s !== symbol);
+      }
+      return [...prev, symbol].sort();
+    });
+  }
+
+  return (
+    <>
+      {/* Section + cycle + asset controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Pick a section + cycle + assets</CardTitle>
+          <CardDescription>
+            Section dates are anchored to BTC's cycle events. Each selected asset's price
+            during that window is normalized to 0% at section start so the shape lines up
+            day-for-day across all assets.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Section preset chips */}
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Section</div>
+            <div className="flex flex-wrap gap-2">
+              {SECTION_PRESETS.map((p, i) => (
+                <Button
+                  key={p.label}
+                  variant={i === presetIdx ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPresetIdx(i)}
+                  className={i === presetIdx ? 'bg-[#F7931A] hover:bg-[#E67500] text-black' : ''}
+                >
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">{preset.description}</div>
+          </div>
+
+          {/* Cycle dropdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground">BTC cycle anchor</label>
+              <Select value={cycleId} onValueChange={(v) => setCycleId(v as 'c2' | 'c3' | 'c4')}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="c2">Cycle 2 (2016 halving)</SelectItem>
+                  <SelectItem value="c3">Cycle 3 (2020 halving)</SelectItem>
+                  <SelectItem value="c4">Cycle 4 (2024 halving)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">From → To</label>
+              <div className="mt-1 px-3 py-2 rounded border border-border/40 bg-muted/20 text-sm font-mono flex items-center gap-2">
+                <span className="text-muted-foreground">{preset.from}</span>
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">{preset.to}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Asset multi-select */}
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Assets to overlay</div>
+            <div className="flex flex-wrap gap-2">
+              {ASSET_CATALOG.map(a => {
+                const checked = selectedAssets.includes(a.symbol);
+                return (
+                  <label
+                    key={a.symbol}
+                    className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors ${
+                      checked
+                        ? 'border-[#F7931A]/50 bg-[#F7931A]/10'
+                        : 'border-border/40 bg-muted/20 hover:bg-muted/40'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleAsset(a.symbol)}
+                    />
+                    <span
+                      className="w-3 h-3 rounded-full inline-block"
+                      style={{ backgroundColor: ASSET_COLORS[a.symbol] }}
+                    />
+                    <div>
+                      <div className="text-sm font-semibold leading-tight">{a.symbol}</div>
+                      <div className="text-[10px] text-muted-foreground leading-tight">{a.label}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            {isFetching ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Reloading…</> : 'Reload data'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Skipped notice */}
+      {data?.skipped && data.skipped.length > 0 && (
+        <Card>
+          <CardContent className="py-3">
+            <div className="text-xs text-muted-foreground">
+              <span className="font-semibold text-amber-400">
+                <AlertTriangle className="inline h-3 w-3 mr-1" />
+                {data.skipped.length} asset{data.skipped.length === 1 ? '' : 's'} skipped:
+              </span>{' '}
+              {data.skipped.map(s => `${s.symbol} (${s.reason})`).join(' · ')}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Asset summary cards */}
+      {data?.assets && data.assets.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {data.assets.map(s => (
+            <Card
+              key={s.symbol}
+              className={s.inProgress ? 'border-amber-500/40 bg-amber-500/[0.03]' : ''}
+            >
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: ASSET_COLORS[s.symbol] || '#888' }}
+                  />
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                    {s.symbol}
+                  </div>
+                  {s.inProgress && (
+                    <Badge variant="outline" className="border-amber-500/50 text-amber-400 bg-amber-500/10 text-[10px] uppercase tracking-wider font-semibold">
+                      live · day {s.days}
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground mb-2">{s.label}</div>
+                <div className="space-y-1.5 text-sm">
+                  <Row label="Section" value={
+                    <span className="font-mono text-xs">
+                      {fmtDate(s.fromDate)} → {s.inProgress ? <span className="text-amber-400">today</span> : fmtDate(s.toDate)}
+                    </span>
+                  } />
+                  <Row label="Duration" value={
+                    <span className="font-mono">
+                      {s.days}d
+                      {s.inProgress && <span className="text-amber-400 ml-1 text-xs">· live</span>}
+                    </span>
+                  } />
+                  <Row label="Price change" value={
+                    <span className={`font-mono font-semibold ${s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {fmtPct(s.changePct)}
+                      {s.inProgress && <span className="text-amber-400 ml-1 text-xs font-normal">(so far)</span>}
+                    </span>
+                  } />
+                  <Row label={s.inProgress ? 'Start → now' : 'Start → end'} value={
+                    <span className="font-mono text-xs">
+                      {fmtUSD(s.startPrice)} → {fmtUSD(s.endPrice)}
+                    </span>
+                  } />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Asset overlay chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {data ? `${data.cycleLabel} · ${preset.label}` : preset.label} — asset overlay
+          </CardTitle>
+          <CardDescription>
+            X-axis: days from BTC's section start (day 0). Y-axis: % return from each
+            asset's section-start price. Each colored line is one asset during the same
+            BTC-anchored window.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error ? (
+            <div className="bg-red-500/10 border border-red-500/40 rounded p-3 text-sm text-red-300">
+              <AlertTriangle className="inline h-4 w-4 mr-1" /> Failed to load: {(error as Error).message}
+            </div>
+          ) : isLoading || !data ? (
+            <Skeleton className="h-[440px] w-full" />
+          ) : data.assets.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">
+              No assets available for this section. Try a different combination.
+            </div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={440}>
+                <LineChart data={chartData} margin={{ top: 16, right: 24, left: 8, bottom: 5 }}>
+                  <CartesianGrid stroke="#333" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="day"
+                    type="number"
+                    domain={[0, maxDay]}
+                    tick={{ fontSize: 10, fill: '#888' }}
+                    tickFormatter={(d) => `${d}d`}
+                    label={{ value: 'days from section start', position: 'insideBottom', offset: -2, fill: '#888', fontSize: 11 }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#888' }}
+                    tickFormatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(0)}%`}
+                    label={{ value: '% return', angle: -90, position: 'insideLeft', fill: '#888', fontSize: 11 }}
+                  />
+                  <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
+                  <RTooltip
+                    contentStyle={{ background: '#1a1a1a', border: '1px solid #444', fontSize: 12 }}
+                    labelStyle={{ color: '#fb923c' }}
+                    labelFormatter={(day: number) => `Day ${day}`}
+                    formatter={(value: number, name: string) => {
+                      if (name.endsWith('_price') || name.endsWith('_date')) return [null, null];
+                      const asset = data.assets.find(s => s.symbol === name);
+                      if (!asset) return [null, null];
+                      return [
+                        <div key={name} className="space-y-0.5">
+                          <div className="font-mono text-emerald-300">
+                            {value >= 0 ? '+' : ''}{value.toFixed(2)}%
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">{asset.symbol} · {asset.label}</div>
+                        </div>,
+                        null,
+                      ];
+                    }}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    formatter={(value) => {
+                      const asset = data.assets.find(s => s.symbol === value);
+                      if (!asset) return value;
+                      return asset.inProgress ? `${asset.symbol} · live` : asset.symbol;
+                    }}
+                  />
+                  {data.assets.map(s => (
+                    <Line
+                      key={s.symbol}
+                      type="monotone"
+                      dataKey={s.symbol}
+                      stroke={ASSET_COLORS[s.symbol] || '#888'}
+                      strokeWidth={2}
+                      strokeDasharray={s.inProgress ? '6 3' : undefined}
+                      dot={false}
+                      name={s.symbol}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="text-[10px] text-muted-foreground mt-2 flex flex-wrap gap-4">
+                <span><CheckCircle2 className="inline h-3 w-3 mr-0.5 text-emerald-400" /> Outperforming start</span>
+                <span><XCircle className="inline h-3 w-3 mr-0.5 text-red-400" /> Underperforming start</span>
+                <span className="ml-auto">{chartData.length.toLocaleString()} daily points across {data.assets.length} asset{data.assets.length === 1 ? '' : 's'}</span>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </>
   );
 }
