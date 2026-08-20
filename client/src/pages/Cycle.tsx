@@ -162,6 +162,11 @@ export default function Cycle() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
+              <Link href="/cycle/compare">
+                <Button size="lg" variant="outline" className="border-[#F7931A]/40 text-[#F7931A] hover:bg-[#F7931A]/10">
+                  Compare Cycles
+                </Button>
+              </Link>
               <Link href="/analytics">
                 <Button size="lg" variant="outline">
                   See Live Analytics

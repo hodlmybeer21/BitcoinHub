@@ -15,6 +15,7 @@ import Legislation from "@/pages/Legislation";
 import Admin from "@/pages/Admin";
 import DCASimulator from "@/pages/DCASimulator";
 import Cycle from "@/pages/Cycle";
+import CycleCompare from "@/pages/CycleCompare";
 import Newsletter from "@/pages/Newsletter";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
@@ -50,6 +51,7 @@ function Router() {
         <Route path="/admin" component={Admin} />
         <Route path="/dca-simulator" component={DCASimulator} />
         <Route path="/cycle" component={Cycle} />
+        <Route path="/cycle/compare" component={CycleCompare} />
         <Route path="/newsletter" component={Newsletter} />
         <Route path="/privacy" component={Privacy} />
         <Route path="/terms" component={Terms} />

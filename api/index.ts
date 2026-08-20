@@ -3936,6 +3936,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // ── Cycle Compare (2026-08-20) ────────────────────────────────────────
+    // /api/cycle/markers → static events + computed ATH breaks + full BTC daily series.
+    // /api/cycle/overlay → normalized section overlay (halving→top, top→bottom, etc).
+    // Each lib/cycle/* module does its own fetches with lazy axios inside the
+    // function body. .js suffix required (architecture invariant #2).
+    if (path === '/api/cycle/markers' || path === '/api/cycle/markers/') {
+      const { default: h } = await import('../lib/cycle/markers.js');
+      return h(req, res);
+    }
+    if (path === '/api/cycle/overlay' || path === '/api/cycle/overlay/') {
+      const { default: h } = await import('../lib/cycle/overlay.js');
+      return h(req, res);
+    }
+
     // ── Tier 1 analytics upgrades (2026-07-31) ────────────────────────
     // Inline handlers using direct fetches (matches existing api/index.ts pattern;
     // dynamic-import of ../server/api/*.ts modules caused bundler edge cases).
