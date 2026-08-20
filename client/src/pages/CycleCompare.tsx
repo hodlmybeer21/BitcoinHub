@@ -295,45 +295,59 @@ function AnnotatedTab() {
   });
 
   // Downsample BTC daily series to ~800 points so Recharts stays snappy.
-  // Strategy: keep first + last + evenly-spaced samples in between.
+  // Strategy: keep first + last + evenly-spaced samples in between. We add
+  // a `ts` field (unix ms) so the X axis can be time-scaled — without it,
+  // Recharts treats dates as categories and ReferenceLine with x={date}
+  // silently fails for event dates that aren't in the downsampled set.
   const chartData = useMemo(() => {
     if (!data?.btcDaily?.length) return [];
     const series = data.btcDaily;
     const targetPoints = 800;
-    if (series.length <= targetPoints) return series;
-    const step = Math.ceil(series.length / targetPoints);
-    const out: typeof series = [];
-    for (let i = 0; i < series.length; i += step) {
-      out.push(series[i]);
+    let sampled: typeof series;
+    if (series.length <= targetPoints) {
+      sampled = series;
+    } else {
+      const step = Math.ceil(series.length / targetPoints);
+      sampled = [];
+      for (let i = 0; i < series.length; i += step) {
+        sampled.push(series[i]);
+      }
+      if (sampled[sampled.length - 1].date !== series[series.length - 1].date) {
+        sampled.push(series[series.length - 1]);
+      }
     }
-    // Always include the very last point so the right edge is current
-    if (out[out.length - 1].date !== series[series.length - 1].date) {
-      out.push(series[series.length - 1]);
-    }
-    return out;
+    return sampled.map(p => ({
+      date: p.date,
+      price: p.price,
+      ts: Date.parse(p.date + 'T00:00:00Z'),
+    }));
   }, [data]);
 
   // Build reference-dot data for each event kind so we can render them
   // as small dots on the chart (more legible than vertical lines alone).
+  // ts is added so ReferenceDot can position on the time-scaled X axis.
   const eventDots = useMemo(() => {
     if (!data || !chartData.length) return [];
     const byDate = new Map(chartData.map(p => [p.date, p.price]));
-    const allEvents: Array<{ kind: string; date: string; price: number; label: string; cycle: string }> = [];
+    const allEvents: Array<{ kind: string; date: string; ts: number; price: number; label: string; cycle: string }> = [];
+
+    const priceAt = (isoDay: string): number | null => {
+      let px = byDate.get(isoDay);
+      if (px !== undefined) return px;
+      for (let i = chartData.length - 1; i >= 0; i--) {
+        if (chartData[i].date <= isoDay) return chartData[i].price;
+      }
+      return null;
+    };
 
     for (const ev of data.events) {
       if (!showMarkers[ev.kind as keyof typeof showMarkers]) continue;
-      // Find the closest chartData point on or before ev.date
-      let px = byDate.get(ev.date);
-      if (px === undefined) {
-        // walk backwards through chartData to find the nearest prior close
-        for (let i = chartData.length - 1; i >= 0; i--) {
-          if (chartData[i].date <= ev.date) { px = chartData[i].price; break; }
-        }
-      }
-      if (px === undefined) continue;
+      const px = priceAt(ev.date);
+      if (px === null) continue;
       allEvents.push({
         kind: ev.kind,
         date: ev.date,
+        ts: Date.parse(ev.date + 'T00:00:00Z'),
         price: px,
         label: ev.label ?? `${ev.kind} ${ev.cycle}`,
         cycle: ev.cycle,
@@ -341,16 +355,12 @@ function AnnotatedTab() {
     }
     for (const ab of data.athBreaks) {
       if (!showMarkers.ath) continue;
-      let px = byDate.get(ab.date);
-      if (px === undefined) {
-        for (let i = chartData.length - 1; i >= 0; i--) {
-          if (chartData[i].date <= ab.date) { px = chartData[i].price; break; }
-        }
-      }
-      if (px === undefined) continue;
+      const px = priceAt(ab.date);
+      if (px === null) continue;
       allEvents.push({
         kind: 'ath',
         date: ab.date,
+        ts: Date.parse(ab.date + 'T00:00:00Z'),
         price: px,
         label: `New ATH $${Math.round(ab.price).toLocaleString()}`,
         cycle: 'c4', // visual only; the cycle this ATH belongs to
@@ -427,9 +437,12 @@ function AnnotatedTab() {
               <ComposedChart data={chartData} margin={{ top: 16, right: 24, left: 8, bottom: 5 }}>
                 <CartesianGrid stroke="#333" strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="date"
+                  dataKey="ts"
+                  type="number"
+                  scale="time"
+                  domain={['dataMin', 'dataMax']}
                   tick={{ fontSize: 10, fill: '#888' }}
-                  tickFormatter={(d) => d.slice(0, 7)}
+                  tickFormatter={(ts) => new Date(ts).toISOString().slice(0, 7)}
                   minTickGap={60}
                 />
                 <YAxis
@@ -442,26 +455,27 @@ function AnnotatedTab() {
                 <RTooltip
                   contentStyle={{ background: '#1a1a1a', border: '1px solid #444', fontSize: 12 }}
                   labelStyle={{ color: '#fb923c' }}
+                  labelFormatter={(label) => typeof label === 'number' ? new Date(label).toISOString().slice(0, 10) : String(label)}
                   formatter={(v: number) => [`$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'BTC']}
                 />
 
-                {/* Vertical marker lines */}
+                {/* Vertical marker lines — all SOLID matching Tyler's TradingView reference.
+                    x uses unix-ms timestamps so they line up on the time-scaled axis
+                    even when the exact event date isn't in the downsampled data. */}
                 {data.events.filter(e => showMarkers[e.kind as keyof typeof showMarkers]).map((e, i) => (
                   <ReferenceLine
                     key={`v-${e.kind}-${e.cycle}-${i}`}
-                    x={e.date}
+                    x={Date.parse(e.date + 'T00:00:00Z')}
                     stroke={MARKER_COLORS[e.kind as keyof typeof MARKER_COLORS]}
                     strokeWidth={1.5}
-                    strokeDasharray={e.kind === 'halving' ? '0' : '4 4'}
                   />
                 ))}
                 {showMarkers.ath && data.athBreaks.slice(0, 30).map((ab, i) => (
                   <ReferenceLine
                     key={`ath-${i}`}
-                    x={ab.date}
+                    x={Date.parse(ab.date + 'T00:00:00Z')}
                     stroke={MARKER_COLORS.ath}
-                    strokeWidth={1}
-                    strokeDasharray="2 4"
+                    strokeWidth={1.5}
                   />
                 ))}
 
@@ -471,7 +485,7 @@ function AnnotatedTab() {
                 {eventDots.map((d, i) => (
                   <ReferenceDot
                     key={`dot-${i}`}
-                    x={d.date}
+                    x={d.ts}
                     y={d.price}
                     r={4}
                     fill={MARKER_COLORS[d.kind as keyof typeof MARKER_COLORS]}
