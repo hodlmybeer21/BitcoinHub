@@ -619,6 +619,41 @@ function OverlayTab() {
     return Array.from(dayMap.values()).sort((a, b) => a.day - b.day);
   }, [data]);
 
+  // Vertical marker lines for halving/top/bottom events that fall within
+  // each cycle's section. X axis is "days from section start" so we map
+  // each event's calendar date to that cycle's day offset. Halvings across
+  // cycles all land at day 0 (deduped). Tops land at each cycle's own end
+  // day. ATHs deliberately omitted (176 events would crowd the chart).
+  const overlayMarkerLines = useMemo(() => {
+    if (!data?.series?.length || !data?.eventCatalog) return [];
+    const lines: Array<{ day: number; kind: 'halving' | 'top' | 'bottom'; color: string }> = [];
+    for (const cycleSeries of data.series) {
+      const startMs = Date.parse(cycleSeries.fromDate + 'T00:00:00Z');
+      const endMs = Date.parse(cycleSeries.toDate + 'T00:00:00Z');
+      for (const ev of data.eventCatalog) {
+        if (ev.kind !== 'halving' && ev.kind !== 'top' && ev.kind !== 'bottom') continue;
+        const evMs = Date.parse(ev.date + 'T00:00:00Z');
+        if (evMs < startMs || evMs > endMs) continue;
+        const day = Math.round((evMs - startMs) / 86400000);
+        lines.push({
+          day,
+          kind: ev.kind as 'halving' | 'top' | 'bottom',
+          color: MARKER_COLORS[ev.kind as keyof typeof MARKER_COLORS],
+        });
+      }
+    }
+    // Dedupe by (day, kind) — multiple cycles' halvings collapse to day 0
+    const seen = new Set<string>();
+    return lines
+      .sort((a, b) => a.day - b.day)
+      .filter(l => {
+        const k = `${l.day}-${l.kind}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+  }, [data]);
+
   // For the chart, x-axis range = max days across selected cycles
   const maxDay = useMemo(() => {
     if (!data?.series?.length) return 0;
@@ -868,6 +903,18 @@ function OverlayTab() {
                     label={{ value: '% return', angle: -90, position: 'insideLeft', fill: '#888', fontSize: 11 }}
                   />
                   <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
+                  {/* Cycle marker lines — halving (blue), top (orange), bottom (red).
+                      Positioned at each event's day offset within its cycle's section. */}
+                  {overlayMarkerLines.map((m, i) => (
+                    <ReferenceLine
+                      key={`overlay-marker-${m.kind}-${m.day}-${i}`}
+                      x={m.day}
+                      stroke={m.color}
+                      strokeWidth={1}
+                      strokeDasharray={m.kind === 'halving' ? '0' : '4 4'}
+                      ifOverflow="extendDomain"
+                    />
+                  ))}
                   <RTooltip
                     contentStyle={{ background: '#1a1a1a', border: '1px solid #444', fontSize: 12 }}
                     labelStyle={{ color: '#fb923c' }}
@@ -1024,6 +1071,30 @@ function AssetOverlayTab() {
       }
     }
     return Array.from(dayMap.values()).sort((a, b) => a.day - b.day);
+  }, [data]);
+
+  // Vertical marker lines for halving/top/bottom events that fall within
+  // the selected cycle's section. Single-cycle anchor so day offset is
+  // straightforward from data.section.from.date.
+  const assetMarkerLines = useMemo(() => {
+    if (!data?.section || !data?.eventCatalog) return [];
+    const startMs = Date.parse(data.section.from.date + 'T00:00:00Z');
+    const endMs = Date.parse(data.section.to.date + 'T00:00:00Z');
+    return data.eventCatalog
+      .filter(ev => ev.kind === 'halving' || ev.kind === 'top' || ev.kind === 'bottom')
+      .filter(ev => {
+        const evMs = Date.parse(ev.date + 'T00:00:00Z');
+        return evMs >= startMs && evMs <= endMs;
+      })
+      .map(ev => {
+        const evMs = Date.parse(ev.date + 'T00:00:00Z');
+        const day = Math.round((evMs - startMs) / 86400000);
+        return {
+          day,
+          kind: ev.kind as 'halving' | 'top' | 'bottom',
+          color: MARKER_COLORS[ev.kind as keyof typeof MARKER_COLORS],
+        };
+      });
   }, [data]);
 
   const maxDay = useMemo(() => {
@@ -1251,6 +1322,19 @@ function AssetOverlayTab() {
                     label={{ value: '% return', angle: -90, position: 'insideLeft', fill: '#888', fontSize: 11 }}
                   />
                   <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
+                  {/* Cycle marker lines — halving (blue), top (orange), bottom (red).
+                      Single-cycle anchor so each event maps to a day offset within
+                      the section window. ATHs omitted (too dense). */}
+                  {assetMarkerLines.map((m, i) => (
+                    <ReferenceLine
+                      key={`asset-marker-${m.kind}-${m.day}-${i}`}
+                      x={m.day}
+                      stroke={m.color}
+                      strokeWidth={1}
+                      strokeDasharray={m.kind === 'halving' ? '0' : '4 4'}
+                      ifOverflow="extendDomain"
+                    />
+                  ))}
                   <RTooltip
                     contentStyle={{ background: '#1a1a1a', border: '1px solid #444', fontSize: 12 }}
                     labelStyle={{ color: '#fb923c' }}
