@@ -461,20 +461,14 @@ function AnnotatedTab() {
 
                 {/* Vertical marker lines — all SOLID matching Tyler's TradingView reference.
                     x uses unix-ms timestamps so they line up on the time-scaled axis
-                    even when the exact event date isn't in the downsampled data. */}
+                    even when the exact event date isn't in the downsampled data.
+                    New-ATH events deliberately have NO vertical line — just dots
+                    below — so they don't pile up at every daily close. */}
                 {data.events.filter(e => showMarkers[e.kind as keyof typeof showMarkers]).map((e, i) => (
                   <ReferenceLine
                     key={`v-${e.kind}-${e.cycle}-${i}`}
                     x={Date.parse(e.date + 'T00:00:00Z')}
                     stroke={MARKER_COLORS[e.kind as keyof typeof MARKER_COLORS]}
-                    strokeWidth={1.5}
-                  />
-                ))}
-                {showMarkers.ath && data.athBreaks.slice(0, 30).map((ab, i) => (
-                  <ReferenceLine
-                    key={`ath-${i}`}
-                    x={Date.parse(ab.date + 'T00:00:00Z')}
-                    stroke={MARKER_COLORS.ath}
                     strokeWidth={1.5}
                   />
                 ))}
