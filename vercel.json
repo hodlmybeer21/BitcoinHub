@@ -18,42 +18,42 @@
       ]
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/dca-simulator",
-      "dest": "/api/dca-simulator"
+      "source": "/api/dca-simulator",
+      "destination": "/api/dca-simulator"
     },
     {
-      "src": "/api/dca-simulator/",
-      "dest": "/api/dca-simulator"
+      "source": "/api/dca-simulator/",
+      "destination": "/api/dca-simulator"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index"
+      "source": "/api/(.*)",
+      "destination": "/api/index"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+      "source": "/assets/(.*)",
+      "destination": "/assets/$1"
     },
     {
-      "src": "/slides/(.*)",
-      "dest": "/slides/$1"
+      "source": "/slides/(.*)",
+      "destination": "/slides/$1"
     },
     {
-      "src": "/cycle/compare",
-      "dest": "/index.html"
+      "source": "/cycle/compare",
+      "destination": "/index.html"
     },
     {
-      "src": "/cycle/compare/",
-      "dest": "/index.html"
+      "source": "/cycle/compare/",
+      "destination": "/index.html"
     },
     {
-      "src": "/cycle/(.*)",
-      "dest": "/cycle/$1"
+      "source": "/cycle/(.*)",
+      "destination": "/cycle/$1"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
