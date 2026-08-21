@@ -136,9 +136,33 @@ const Home = () => {
               <span className="text-primary">Built by a Human + AI Team</span>
             </motion.h1>
 
+            {/* Satoshi §1 quote — the thesis BitcoinHub is built around */}
+            <motion.blockquote
+              variants={fadeInUp}
+              className="max-w-3xl mx-auto border-l-2 border-primary/60 pl-4 pr-2 italic text-muted-foreground"
+            >
+              <p className="text-base sm:text-lg leading-relaxed">
+                &ldquo;A purely peer-to-peer version of electronic cash would allow online payments
+                to be sent directly from one party to another without going through a financial
+                institution.&rdquo;
+              </p>
+              <footer className="text-[11px] text-muted-foreground/70 mt-2 not-italic">
+                — Satoshi Nakamoto,{' '}
+                <a
+                  href="https://bitcoin.org/bitcoin.txt"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground/80"
+                >
+                  <em>Bitcoin: A Peer-to-Peer Electronic Cash System</em>
+                </a>{' '}
+                (2008), §1
+              </footer>
+            </motion.blockquote>
+
             <motion.p variants={fadeInUp} className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Most Bitcoin sites speculate on price. We teach you how money actually works — 
-              through 13 interactive games, real purchasing power data, and a founding story 
+              Most Bitcoin sites speculate on price. We teach you how money actually works —
+              through 13 interactive games, real purchasing power data, and a founding story
               that proves this isn't just another crypto blog.
             </motion.p>
 

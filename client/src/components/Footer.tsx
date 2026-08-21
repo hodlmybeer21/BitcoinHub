@@ -15,7 +15,7 @@ const Footer: React.FC = () => {
               <span className="text-sm font-semibold text-foreground">BitcoinHub</span>
               <span className="text-sm text-muted-foreground">© 2026</span>
             </div>
-            
+
             {/* Legal links */}
             <div className="flex items-center gap-4 text-sm">
               <Link href="/privacy">
@@ -31,10 +31,10 @@ const Footer: React.FC = () => {
               </Link>
             </div>
           </div>
-          
+
           {/* Social links */}
           <div className="flex items-center gap-4">
-            <a 
+            <a
               href="https://twitter.com/hodlmybeer21"
               target="_blank"
               rel="noopener noreferrer"
@@ -45,6 +45,20 @@ const Footer: React.FC = () => {
             </a>
           </div>
         </div>
+
+        {/* White-paper citation — anchors every page + every screenshot */}
+        <p className="mt-4 text-[11px] text-muted-foreground/70 italic text-center md:text-left">
+          Satoshi Nakamoto,{' '}
+          <a
+            href="https://bitcoin.org/bitcoin.txt"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground/90 not-italic"
+          >
+            <em>Bitcoin: A Peer-to-Peer Electronic Cash System</em>
+          </a>{' '}
+          (2008). We teach the same thesis; we cite it everywhere.
+        </p>
       </div>
     </footer>
   );
