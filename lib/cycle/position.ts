@@ -34,6 +34,19 @@ const HISTORICAL_TOP_DAYS = [
   { cycleId: 'c3', days: 548 },
 ];
 
+// ── Halving-to-bottom days per cycle (apples-to-apples phase anchor) ────
+// c2: 2016-07-09 → 2018-12-15 = 889d
+// c3: 2020-05-11 → 2022-11-21 = 924d
+// c4 estimate: 906d = midpoint of c2/c3 range. Editorial Q4 2026 bottom
+// window (windowOpen 2026-08-01 per /api/cycle/state) is now open, so the
+// actual bottom is imminent but not yet confirmed. Once c4 prints a bottom
+// we should update ESTIMATED_C4_HALVING_TO_BOTTOM_DAYS to the real value.
+const HALVING_TO_BOTTOM_DAYS_BY_CYCLE: Record<'c2' | 'c3', number> = {
+  c2: 889,
+  c3: 924,
+};
+const ESTIMATED_C4_HALVING_TO_BOTTOM_DAYS = 906;
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 function daysBetween(aISO: string, bISO: string): number {
   const a = Date.parse(aISO.length === 10 ? aISO + 'T00:00:00Z' : aISO);
@@ -89,18 +102,32 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     const daysSinceLastAth = daysBetween(lastAth.date, last.date);
     const drawdownPctFromTop = ((currentPrice - lastAth.price) / lastAth.price) * 100;
 
-    // Mini-strip: BTC at daysSinceHalving4 in each prior cycle.
+    // Mini-strip: BTC at the same % through each cycle's halving-to-bottom
+    // phase — NOT at the same absolute day-count from halving. The latter
+    // mixes phases (c4 day 853 is post-top, but arbitrarily-picked day N for
+    // a prior cycle could land anywhere in its 0–924d halving-to-bottom span).
+    // We anchor on cycle 4's current % through its projected h2b phase and
+    // look up the same % position in each prior cycle.
+    const cycle4PctThroughH2b =
+      daysSinceHalving4 / ESTIMATED_C4_HALVING_TO_BOTTOM_DAYS;
+    const cycle4PctLabel = Math.round(cycle4PctThroughH2b * 100);
+
     const miniStrip: any[] = PRIOR_CYCLES.map(c => {
-      const target = new Date(Date.parse(c.halvingDate + 'T00:00:00Z') + daysSinceHalving4 * 86400000);
+      const cH2b = HALVING_TO_BOTTOM_DAYS_BY_CYCLE[c.cycleId as 'c2' | 'c3'];
+      const daysFromHalving = Math.round(cH2b * cycle4PctThroughH2b);
+      const target = new Date(
+        Date.parse(c.halvingDate + 'T00:00:00Z') + daysFromHalving * 86400000
+      );
       const dateStr = target.toISOString().slice(0, 10);
       const price = findClosestPrice(hist, dateStr);
       return {
         cycleId: c.cycleId,
         cycleLabel: c.label,
-        daysFromHalving: daysSinceHalving4,
+        daysFromHalving,
         date: dateStr,
         price,
         fromHalvingPct: price != null ? ((price - c.halvingPrice) / c.halvingPrice) * 100 : null,
+        phasePct: cycle4PctLabel,
       };
     });
     miniStrip.push({
@@ -111,7 +138,16 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       price: currentPrice,
       fromHalvingPct: priceSinceHalvingPct,
       current: true,
+      phasePct: cycle4PctLabel,
     });
+
+    const estimatedC4BottomDate = (() => {
+      const d = new Date(
+        Date.parse(HALVING4_DATE + 'T00:00:00Z') +
+          ESTIMATED_C4_HALVING_TO_BOTTOM_DAYS * 86400000
+      );
+      return d.toISOString().slice(0, 10);
+    })();
 
     const data = {
       asOf: last.date,
@@ -129,6 +165,11 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       daysSinceLastAth,
       drawdownPctFromTop,
       historicalTopDays: HISTORICAL_TOP_DAYS,
+      cycle4PctThroughHalvingToBottom: cycle4PctLabel,
+      estimatedC4HalvingToBottomDays: ESTIMATED_C4_HALVING_TO_BOTTOM_DAYS,
+      estimatedC4BottomDate,
+      daysBeforeEstimatedC4Bottom:
+        ESTIMATED_C4_HALVING_TO_BOTTOM_DAYS - daysSinceHalving4,
       miniStrip,
     };
 

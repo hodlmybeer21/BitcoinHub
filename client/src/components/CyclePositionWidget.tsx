@@ -25,6 +25,7 @@ interface MiniStripRow {
   price: number | null;
   fromHalvingPct: number | null;
   current?: boolean;
+  phasePct?: number;          // % through each cycle's halving-to-bottom phase
 }
 
 interface CyclePosition {
@@ -43,6 +44,10 @@ interface CyclePosition {
   daysSinceLastAth: number;
   drawdownPctFromTop: number;
   historicalTopDays: Array<{ cycleId: string; days: number }>;
+  cycle4PctThroughHalvingToBottom: number;
+  estimatedC4HalvingToBottomDays: number;
+  estimatedC4BottomDate: string;
+  daysBeforeEstimatedC4Bottom: number;
   miniStrip: MiniStripRow[];
 }
 
@@ -215,8 +220,11 @@ export function CyclePositionWidget() {
 
         {/* ── Right: mini-strip + CTA ── */}
         <div>
-          <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
-            BTC price on day {data.daysSinceHalving4} of the cycle
+          <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">
+            BTC at ~{data.cycle4PctThroughHalvingToBottom}% through halving-to-bottom
+          </div>
+          <div className="text-[11px] text-muted-foreground/70 mb-3">
+            Same point in each cycle's halving-to-bottom phase — apples to apples.
           </div>
           <div className="space-y-2 mb-5">
             {data.miniStrip.map((row) => (
