@@ -3878,6 +3878,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const path = (req.url || "").split("?")[0];
 
   try {
+    if (path === '/api/_echo-path' || path === '/api/_echo-path/') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ path, reqUrl: req.url, method: req.method });
+    }
     if (path === '/api/health' || path === '/api/health/') return handleHealth(req, res);
     if (path === '/api/auth/me' || path === '/api/auth/me/') return handleAuthMe(req, res);
     if (path === '/api/auth/login' || path === '/api/auth/login/') return handleAuthDisabled('login')(req, res);
@@ -3956,6 +3961,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // /api/cycle/position → light hero-widget payload: days-since-halving-4,
     // days-to-next-halving, drawdown from cycle top, mini-strip showing BTC
     // at the same days-post-halving in cycles 2/3/4. 5-min server cache.
+    // DIAGNOSTIC (remove after fix): probe right next to position to confirm
+    // whether the dispatcher ever reaches this exact insertion point.
+    if (path === '/api/_probe-position' || path === '/api/_probe-position/') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ path, reachable: true });
+    }
     if (path === '/api/cycle/position' || path === '/api/cycle/position/') {
       const { default: h } = await import('../lib/cycle/position.js');
       return h(req, res);
