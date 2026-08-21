@@ -53,6 +53,12 @@ export const FRED_SERIES: FredSeriesDef[] = [
     description: 'M1 money supply — weekly. The narrowest money aggregate.',
     frequency: 'weekly', transform: 'none',
   },
+  {
+    id: 'M2SL', name: 'M2 Money Supply',
+    category: 'liquidity', unit: 'B USD',
+    description: 'M2 money supply — weekly (FRED). Tyler’s headline liquidity tracker: M2 YoY is the cleanest macro signal for BTC.',
+    frequency: 'weekly', transform: 'none',
+  },
 
   // ─── Rates & yield curve ───────────────────────────────────────────
   {
@@ -79,6 +85,12 @@ export const FRED_SERIES: FredSeriesDef[] = [
     id: 'T5YIE', name: '5y5y Breakeven',
     category: 'rates', unit: '%',
     description: '5-year, 5-year-forward breakeven inflation — daily. Long-horizon inflation expectations.',
+    frequency: 'daily', transform: 'none',
+  },
+  {
+    id: 'DGS10', name: '10Y Treasury (DGS10)',
+    category: 'rates', unit: '%',
+    description: '10-year Treasury constant maturity yield — daily. Tyler’s TNX: cost-of-capital proxy for risk-asset multiples.',
     frequency: 'daily', transform: 'none',
   },
 

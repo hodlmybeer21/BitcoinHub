@@ -31,7 +31,6 @@ import {
   Repeat,
   Wrench,
   Wallet,
-  AlertCircle,
 } from 'lucide-react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import FearGreedWidget from '@/components/FearGreedWidget';
@@ -44,6 +43,14 @@ import {
   BMSTile,
   LiquidationZonesTile,
 } from '@/components/analytics/PulseStubs';
+import {
+  BtcMonthlyReturnsTile,
+  M2SupplyTile,
+  TnxTile,
+  FedWatchTile,
+  NuplProxyTile,
+  RealLiquidationsTile,
+} from '@/components/analytics/AtAGlanceTiles';
 
 export default function Dashboard() {
   return (
@@ -88,10 +95,10 @@ export default function Dashboard() {
             <CyclePulseStub />
           </section>
 
-          {/* ── Tier 3: At a glance — 4 indicator tiles ── */}
+          {/* ── Tier 3: At a glance — 4 indicator tiles (cycle signals) ── */}
           <section>
             <h2 className="text-[10px] uppercase tracking-widest text-white/[0.35] mb-3">
-              At a glance
+              At a glance · Cycle signals
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <MayerTile />
@@ -99,14 +106,20 @@ export default function Dashboard() {
               <BMSTile />
               <LiquidationZonesTile />
             </div>
-            <div className="mt-3 flex items-start gap-2 text-[11px] text-white/[0.45] px-1 leading-relaxed">
-              <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
-              <p>
-                M2 supply · 10Y TNX · CME FedWatch · BTC monthly returns all
-                live in /macro or /risk today. Adding them at a glance needs
-                new endpoints (queued in the next pass — say go when you want
-                them).
-              </p>
+          </section>
+
+          {/* ── Tier 3.5: At a glance — Macro & derivatives (6 tiles) ── */}
+          <section>
+            <h2 className="text-[10px] uppercase tracking-widest text-white/[0.35] mb-3">
+              At a glance · Macro & derivatives
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <BtcMonthlyReturnsTile />
+              <M2SupplyTile />
+              <TnxTile />
+              <FedWatchTile />
+              <NuplProxyTile />
+              <RealLiquidationsTile />
             </div>
           </section>
 

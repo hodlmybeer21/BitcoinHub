@@ -3961,6 +3961,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return h(req, res);
     }
 
+    // /api/btc/monthly → monthly BTC close + return series for the
+    // monthly-returns heatmap tile on /analytics. 10-min server cache.
+    if (path === '/api/btc/monthly' || path === '/api/btc/monthly/') {
+      const { default: h } = await import('../lib/btc/monthly.js');
+      return h(req, res);
+    }
+
+    // /api/fedwatch-effr → current EFFECTIVE federal funds rate + 30d trajectory.
+    // Free NY Fed public API. NOT a full CME FedWatch implied-probability matrix
+    // (that requires paid CME Fed Funds futures data). 30-min server cache.
+    if (path === '/api/fedwatch-effr' || path === '/api/fedwatch-effr/') {
+      const { default: h } = await import('../lib/fedwatch/effr.js');
+      return h(req, res);
+    }
+
+    // /api/btc/liquidations-recent → Deribit public options trades bucketed by
+    // strike distance from current BTC price. FREE-FIRST approximation for
+    // liquidation zones (actual realized-liquidations need CoinGlass/Coinalyze
+    // paid). 2-min server cache so recent trades stay fresh.
+    if (path === '/api/btc/liquidations-recent' || path === '/api/btc/liquidations-recent/' || path === '/api/btc/liquidations/recent' || path === '/api/btc/liquidations/recent/') {
+      const { default: h } = await import('../lib/btc/liquidations-recent.js');
+      return h(req, res);
+    }
+
     // ── Tier 1 analytics upgrades (2026-07-31) ────────────────────────
     // Inline handlers using direct fetches (matches existing api/index.ts pattern;
     // dynamic-import of ../server/api/*.ts modules caused bundler edge cases).
