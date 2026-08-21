@@ -3953,6 +3953,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: h } = await import('../lib/cycle/asset-overlay.js');
       return h(req, res);
     }
+    // /api/cycle/position → light hero-widget payload: days-since-halving-4,
+    // days-to-next-halving, drawdown from cycle top, mini-strip showing BTC
+    // at the same days-post-halving in cycles 2/3/4. 5-min server cache.
+    if (path === '/api/cycle/position' || path === '/api/cycle/position/') {
+      const { default: h } = await import('../lib/cycle/position.js');
+      return h(req, res);
+    }
 
     // ── Tier 1 analytics upgrades (2026-07-31) ────────────────────────
     // Inline handlers using direct fetches (matches existing api/index.ts pattern;

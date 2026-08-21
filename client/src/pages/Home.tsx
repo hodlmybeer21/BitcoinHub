@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { CyclePositionWidget } from '@/components/CyclePositionWidget';
 import { formatCurrency } from '@/lib/utils';
 
 interface MarketData {
@@ -176,6 +177,13 @@ const Home = () => {
         <motion.div className="absolute bottom-8 left-1/2 -translate-x-1/2" animate={{ y: [0, 8, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>
           <ChevronDown className="w-7 h-7 text-muted-foreground/50" />
         </motion.div>
+      </section>
+
+      {/* ─── CYCLE POSITION WIDGET ─── */}
+      <section className="py-10 sm:py-14 px-4 sm:px-6 lg:px-8 bg-card/30 border-y border-muted/10">
+        <div className="max-w-6xl mx-auto">
+          <CyclePositionWidget />
+        </div>
       </section>
 
       {/* ─── VALUE TRACKER STATS BAR ─── */}
