@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { FaTwitter, FaGithub } from "react-icons/fa";
+import { FaTwitter } from "react-icons/fa";
 import { BitcoinHubLogo } from "@/components/BitcoinHubLogo";
 
 const Footer: React.FC = () => {
@@ -42,15 +42,6 @@ const Footer: React.FC = () => {
               aria-label="Follow us on X (Twitter)"
             >
               <FaTwitter className="w-5 h-5" />
-            </a>
-            <a 
-              href="https://github.com/hodlmybeer21/BitcoinHub" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="View on GitHub"
-            >
-              <FaGithub className="w-5 h-5" />
             </a>
           </div>
         </div>
