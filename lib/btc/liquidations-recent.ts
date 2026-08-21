@@ -76,7 +76,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       return json(res, 502, { error: `Deribit trades upstream returned ${upstream.status}` }, 'MISS');
     }
     const payload = (await upstream.json()) as { result?: DeribitTrade[] };
-    const trades = payload.result ?? [];
+    const trades = payload.result?.trades ?? [];
 
     // Aggregate by bucket. Strike = 3rd token of instrument name like "BTC-27DEC24-100000-C".
     const stats = new Map<string, BucketStat>();
