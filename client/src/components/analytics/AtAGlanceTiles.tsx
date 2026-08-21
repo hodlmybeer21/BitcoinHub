@@ -84,8 +84,8 @@ export function BtcMonthlyReturnsTile() {
     staleTime: 10 * 60 * 1000,
   });
   const monthly = data?.monthly ?? [];
-  // Show last 36 months (3 rows × 12 months)
-  const recent = monthly.slice(-36);
+  // Show the full history; container scrolls vertically when needed.
+  const recent = monthly;
   // Group by year, ascending
   const byYear = new Map<number, MonthlyRow[]>();
   for (const m of recent) {
@@ -126,7 +126,7 @@ export function BtcMonthlyReturnsTile() {
           )}
         </div>
       </div>
-      <div className="flex-1 flex flex-col gap-1">
+      <div className="flex-1 min-h-0 max-h-[460px] overflow-y-auto flex flex-col gap-1">
         {/* Month labels */}
         <div className="grid grid-cols-[28px_repeat(12,1fr)] gap-1 text-[9px] text-white/[0.35]">
           <div />
