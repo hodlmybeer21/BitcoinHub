@@ -35,8 +35,8 @@ const Footer: React.FC = () => {
           {/* Social links */}
           <div className="flex items-center gap-4">
             <a 
-              href="https://twitter.com/bitcoinhub" 
-              target="_blank" 
+              href="https://twitter.com/hodlmybeer21"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Follow us on X (Twitter)"
