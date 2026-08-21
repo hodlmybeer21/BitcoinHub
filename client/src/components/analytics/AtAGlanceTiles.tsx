@@ -67,14 +67,14 @@ interface BtcMonthlyResp {
 }
 
 function pctColor(pct: number): string {
-  // green for positive, red for negative. opacity by magnitude.
-  const clamped = Math.max(-30, Math.min(30, pct));
-  if (clamped === 0) return 'bg-white/[0.06]';
-  const opacity = Math.min(0.85, Math.abs(clamped) / 30);
-  if (clamped > 0) {
-    return `bg-green-500/[${Math.round(opacity * 100)}]`;
-  }
-  return `bg-red-500/[${Math.round(opacity * 100)}]`;
+  // SOLID green/red by sign — no dynamic alpha. Tailwind's JIT scanner can't
+  // see dynamic class strings like `bg-green-500/[${n}]` at build time, so
+  // the previous magnitude-scaling rule never shipped in production CSS.
+  // Static classes are visible to the scanner and ship reliably.
+  // (Magnitude scaling can come back later via a safelist or inline-style path.)
+  if (pct > 0) return 'bg-green-600';
+  if (pct < 0) return 'bg-red-600';
+  return 'bg-white/[0.06]';
 }
 
 export function BtcMonthlyReturnsTile() {
@@ -146,7 +146,7 @@ export function BtcMonthlyReturnsTile() {
                     ? `${years[yi]}-${String(cell.month).padStart(2, '0')}: $${cell.endPrice.toFixed(0)} (${cell.returnPct >= 0 ? '+' : ''}${cell.returnPct.toFixed(1)}%)`
                     : ''
                 }
-                className={`h-5 rounded ${cell ? pctColor(cell.returnPct) : 'bg-white/[0.02]'} flex items-center justify-center text-[9px] font-mono`}
+                className={`h-5 rounded ${cell ? pctColor(cell.returnPct) : 'bg-white/[0.02]'} flex items-center justify-center text-[10px] font-mono font-semibold text-white`}
               >
                 {cell ? (cell.returnPct >= 0 ? '+' : '') + Math.round(cell.returnPct) : ''}
               </div>
