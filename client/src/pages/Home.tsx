@@ -179,15 +179,15 @@ const Home = () => {
               </Link>
             </motion.div>
 
-            <motion.div variants={fadeInUp} className="flex flex-wrap items-center justify-center gap-3">
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2 sm:gap-3">
               <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
                 Millennials worried about inflation
               </span>
-              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground hidden sm:inline" aria-hidden="true">•</span>
               <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
                 Retiring Boomers who lived through the system
               </span>
-              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground hidden sm:inline" aria-hidden="true">•</span>
               <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
                 Anyone protecting a family's purchasing power
               </span>
