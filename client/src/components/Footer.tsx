@@ -57,7 +57,19 @@ const Footer: React.FC = () => {
           >
             <em>Bitcoin: A Peer-to-Peer Electronic Cash System</em>
           </a>{' '}
-          (2008). We teach the same thesis; we cite it everywhere.
+          (2008). We teach the same thesis; we cite it everywhere.{' '}
+          <Link href="/thesis">
+            <span className="not-italic underline hover:text-foreground/90 cursor-pointer">
+              Read the thesis
+            </span>
+          </Link>{' '}
+          ·{' '}
+          <Link href="/sources">
+            <span className="not-italic underline hover:text-foreground/90 cursor-pointer">
+              See every data source
+            </span>
+          </Link>
+          .
         </p>
       </div>
     </footer>

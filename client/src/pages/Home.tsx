@@ -166,6 +166,20 @@ const Home = () => {
               that proves this isn't just another crypto blog.
             </motion.p>
 
+            <motion.div variants={fadeInUp} className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm">
+              <Link href="/thesis">
+                <span className="inline-flex items-center gap-1 text-primary hover:text-primary/80 cursor-pointer font-medium">
+                  Read the full Satoshi paper <ArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
+              <span className="text-muted-foreground/40">·</span>
+              <Link href="/sources">
+                <span className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer">
+                  See every data source <ArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
+            </motion.div>
+
             <motion.div variants={fadeInUp} className="flex flex-wrap items-center justify-center gap-3">
               <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
                 Millennials worried about inflation
