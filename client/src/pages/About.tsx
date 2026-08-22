@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
 import {
   BookOpen, Database, Sparkles, AlertCircle, Hammer,
-  TrendingUp, BarChart3, Layers,
+  TrendingUp, BarChart3, Layers, Shield,
 } from 'lucide-react';
 
 interface DataSource {
@@ -376,6 +376,47 @@ export default function About() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Privacy (§9 of the white paper) */}
+        <Card id="privacy">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-orange-500" />
+              Privacy
+            </CardTitle>
+            <CardDescription>
+              BitcoinHub's privacy stance, grounded in §9 of the white paper.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <blockquote className="border-l-2 border-primary/40 pl-4 italic text-muted-foreground/90">
+              "The traditional banking model achieves a level of privacy by limiting
+              access to information to the parties involved and the trusted third party.
+              The necessity to announce all transactions publicly precludes this method,
+              but privacy can still be maintained by breaking the flow of information
+              in another place: by keeping public keys anonymous. The public can see
+              that someone is sending an amount to someone else, but without information
+              linking the transaction to anyone. A new key pair should be used for each
+              transaction to keep them from being linked to a common owner."
+              <footer className="text-xs not-italic mt-2 text-muted-foreground/70">
+                — Satoshi Nakamoto, <em>Bitcoin: A Peer-to-Peer Electronic Cash System</em>, 2008, §9
+              </footer>
+            </blockquote>
+            <p>
+              Bitcoin is <strong className="text-foreground">pseudonymous, not anonymous</strong> —
+              addresses are public, identities are not. BitcoinHub itself is even
+              simpler: we run no third-party trackers, no advertising pixels, and no
+              analytics cookies. The only tracking on this site is first-party (Vercel
+              analytics) and we are happy to discuss the methodology or disable it
+              on request.
+            </p>
+            <p>
+              See <Link href="/sources"><span className="underline text-primary hover:text-primary/80 cursor-pointer">/sources</span></Link>{' '}
+              for a full audit of every public API endpoint that powers a number on
+              this site.
+            </p>
           </CardContent>
         </Card>
 

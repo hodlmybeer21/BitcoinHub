@@ -30,6 +30,8 @@ import WorkbenchBacktests from "@/pages/WorkbenchBacktests";
 import WorkbenchBacktestDetail from "@/pages/WorkbenchBacktestDetail";
 import WorkbenchOverlay from "@/pages/WorkbenchOverlay";
 import About from "@/pages/About";
+import Thesis from "@/pages/Thesis";
+import Sources from "@/pages/Sources";
 import RiskMetric from "@/pages/RiskMetric";
 import Macro from "@/pages/Macro";
 import NotFound from "@/pages/not-found";
@@ -66,6 +68,8 @@ function Router() {
         <Route path="/workbench/backtests/:id" component={WorkbenchBacktestDetail} />
         <Route path="/workbench/overlay" component={WorkbenchOverlay} />
         <Route path="/about" component={About} />
+        <Route path="/thesis" component={Thesis} />
+        <Route path="/sources" component={Sources} />
         <Route path="/risk">
           <ErrorBoundary label="Risk indicator">
             <RiskMetric />
