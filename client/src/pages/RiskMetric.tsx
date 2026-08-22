@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Activity, Gauge, Shield, TrendingUp, TrendingDown, Layers,
   BarChart3, Hammer, ArrowRight, Clock, AlertTriangle, CheckCircle2,
+  Target,
 } from "lucide-react";
 import {
   ComposedChart, Area, Bar, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -172,6 +173,59 @@ function useRiskCycles() {
   });
 }
 
+// ─── Phase 6b — Ben Cowen cycle-top threshold overlay (§9) ──────────────
+
+interface ThresholdCrossing {
+  cycleIndex: number;
+  threshold: number;
+  kind: 'historical' | 'projected';
+  cycleStart: string;
+  cycleEnd: string;
+  firstCrossDate: string | null;
+  firstCrossRisk: number | null;
+  peakDate: string;
+  peakRisk: number;
+  topDate: string | null;
+  daysAboveThreshold: number;
+  daysFromFirstCrossToPeak: number | null;
+  daysFromFirstCrossToTop: number | null;
+  currentCycle: boolean;
+  triggered: boolean;
+  status: 'below' | 'approaching' | 'above';
+}
+
+interface ThresholdsPayload {
+  symbol: string;
+  currentCycleIndex: number;
+  currentThreshold: number | null;
+  currentRisk: number;
+  status: 'below' | 'approaching' | 'above';
+  pctOfThreshold: number;
+  distanceToThreshold: number;
+  historical: ThresholdCrossing[];
+  asOf: string;
+  meta: { symbol: string; name: string; days: number; fetchedAt: string };
+}
+
+function useRiskThresholds(symbol: string = 'BTC') {
+  return useQuery<ThresholdsPayload>({
+    queryKey: ['/api/risk/thresholds', symbol],
+    queryFn: async () => {
+      const res = await fetch(`/api/risk/thresholds?symbol=${symbol}`);
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 60 * 60 * 1000,  // 1h — thresholds move slowly
+    staleTime: 60 * 1000,
+  });
+}
+
+function thresholdStatusColor(status: 'below' | 'approaching' | 'above'): string {
+  if (status === 'above') return '#dc2626';
+  if (status === 'approaching') return '#ca8a04';
+  return '#16a34a';
+}
+
 function useBandStats(symbol: string = 'BTC', days: number = 1460) {
   return useQuery<BandStatsPayload>({
     queryKey: ['/api/risk/bands-stats', symbol, days],
@@ -253,9 +307,10 @@ export default function RiskMetric() {
   const ind = useRiskIndicators();
   const cycles = useRiskCycles();
   const bands = useBandStats();
+  const thresholds = useRiskThresholds();
 
-  const isLoading = snapshot.isLoading || ts.isLoading || ind.isLoading || cycles.isLoading || bands.isLoading;
-  const hasError = snapshot.error || ts.error || ind.error || cycles.error || bands.error;
+  const isLoading = snapshot.isLoading || ts.isLoading || ind.isLoading || cycles.isLoading || bands.isLoading || thresholds.isLoading;
+  const hasError = snapshot.error || ts.error || ind.error || cycles.error || bands.error || thresholds.error;
 
   // Halving markers for the time series chart.
   const halvingMarkers = useMemo(() => {
@@ -313,7 +368,7 @@ export default function RiskMetric() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Risk Now</CardDescription>
@@ -344,6 +399,60 @@ export default function RiskMetric() {
                 </div>
               </>
             ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Phase 6b: Cycle Top Threshold card (Ben Cowen) */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <Target className="w-3 h-3" />
+              Cycle Top Threshold
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {thresholds.isLoading ? (
+              <Skeleton className="h-12 w-32" />
+            ) : thresholds.data && thresholds.data.currentThreshold !== null ? (
+              <>
+                <div
+                  className="text-4xl font-bold tabular-nums"
+                  style={{ color: thresholdStatusColor(thresholds.data.status) }}
+                >
+                  {thresholds.data.currentThreshold.toFixed(2)}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  This cycle's sell threshold (Ben Cowen)
+                </div>
+                {/* Progress bar showing currentRisk / threshold */}
+                <div className="mt-3 h-2 rounded-full overflow-hidden bg-muted/30 relative">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${Math.min(100, thresholds.data.pctOfThreshold * 100)}%`,
+                      backgroundColor: thresholdStatusColor(thresholds.data.status),
+                    }}
+                  />
+                  {/* threshold marker line */}
+                  <div
+                    className="absolute top-0 h-full w-px bg-foreground/60"
+                    style={{ left: '100%' }}
+                    title="threshold"
+                  />
+                </div>
+                <div className="mt-2 text-xs" style={{ color: thresholdStatusColor(thresholds.data.status) }}>
+                  {thresholds.data.status === 'above' ? (
+                    <>▲ Above threshold &mdash; {(thresholds.data.pctOfThreshold * 100).toFixed(0)}% of level</>
+                  ) : thresholds.data.status === 'approaching' ? (
+                    <>● Approaching &mdash; {Math.abs(thresholds.data.distanceToThreshold).toFixed(3)} below</>
+                  ) : (
+                    <>▼ Below &mdash; {Math.abs(thresholds.data.distanceToThreshold).toFixed(3)} below</>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-muted-foreground">BTC-only</div>
+            )}
           </CardContent>
         </Card>
 
@@ -457,9 +566,130 @@ export default function RiskMetric() {
                     strokeWidth={1.5}
                     dot={false}
                   />
+                  {/* Phase 6b: Cowen cycle-top threshold reference lines + peak dots */}
+                  {thresholds.data?.historical.map(h => (
+                    <ReferenceLine
+                      key={`thr-${h.cycleIndex}`}
+                      y={h.threshold}
+                      stroke={h.kind === 'projected' ? '#dc2626' : '#ea580c'}
+                      strokeDasharray={h.kind === 'projected' ? '3 3' : '6 4'}
+                      strokeWidth={1}
+                      label={{
+                        value: `${h.threshold.toFixed(1)} (cycle #${h.cycleIndex}${h.kind === 'projected' ? ' proj' : ''})`,
+                        position: 'right',
+                        fill: h.kind === 'projected' ? '#dc2626' : '#ea580c',
+                        fontSize: 10,
+                      }}
+                    />
+                  ))}
+                  {thresholds.data?.historical
+                    .filter(h => ts.data?.points.some(p => p.date === h.peakDate))
+                    .map(h => {
+                      const peakPoint = ts.data?.points.find(p => p.date === h.peakDate);
+                      return (
+                        <ReferenceDot
+                          key={`dot-${h.cycleIndex}`}
+                          x={h.peakDate}
+                          y={h.peakRisk}
+                          r={4}
+                          fill={peakPoint?.bandColor ?? '#ea580c'}
+                          stroke="#fff"
+                          strokeWidth={1}
+                        />
+                      );
+                    })}
                 </LineChart>
                 </ResponsiveContainer>
               </ErrorBoundary>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Historical Threshold Crossings (Phase 6b) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5" />
+            Historical Threshold Crossings
+          </CardTitle>
+          <CardDescription>
+            Ben Cowen's per-cycle cycle-top threshold (0.5 / 0.4 / 0.3). The
+            current-cycle row (⚑) uses a projected threshold and shows the
+            live status; historical rows reflect when the composite risk
+            crossed each cycle's threshold.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {thresholds.isLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : thresholds.data ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground border-b border-muted/30">
+                    <th className="py-2 pr-3">Cycle</th>
+                    <th className="py-2 pr-3">Threshold</th>
+                    <th className="py-2 pr-3">First cross</th>
+                    <th className="py-2 pr-3">Peak risk</th>
+                    <th className="py-2 pr-3">Days above</th>
+                    <th className="py-2 pr-3">Top date</th>
+                    <th className="py-2 pr-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {thresholds.data.historical.map(h => (
+                    <tr
+                      key={h.cycleIndex}
+                      className="border-b border-muted/20"
+                      style={h.currentCycle ? { backgroundColor: '#dc262608' } : undefined}
+                    >
+                      <td className="py-2 pr-3 font-mono">
+                        #{h.cycleIndex}
+                        {h.currentCycle && (
+                          <span className="ml-1 text-[10px]" title="current cycle">⚑</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 font-mono">
+                        {h.threshold.toFixed(2)}
+                        {h.kind === 'projected' && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">(proj)</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 font-mono">
+                        {h.firstCrossDate ?? <span className="text-muted-foreground">—</span>}
+                        {h.firstCrossRisk !== null && (
+                          <span className="text-muted-foreground ml-1">
+                            ({h.firstCrossRisk.toFixed(3)})
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 font-mono">
+                        {h.peakRisk.toFixed(3)}
+                        <span className="text-muted-foreground ml-1">
+                          on {h.peakDate}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-3 font-mono">{h.daysAboveThreshold}d</td>
+                      <td className="py-2 pr-3 font-mono">
+                        {h.topDate ?? <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                          style={{
+                            color: thresholdStatusColor(h.status),
+                            backgroundColor: `${thresholdStatusColor(h.status)}15`,
+                            border: `1px solid ${thresholdStatusColor(h.status)}44`,
+                          }}
+                        >
+                          {h.status === 'above' ? '▲' : h.status === 'approaching' ? '●' : '▼'} {h.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : null}
         </CardContent>

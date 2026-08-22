@@ -120,6 +120,14 @@ const TEMPLATES: Template[] = [
     formula: 'risk.band_stats * 0',  // placeholder — Workbench returns the 6 series; user can pick index 0
     range: { start: '2026-08-01', end: '2026-08-31' },
   },
+  // ─── Phase 6b — Cowen cycle-top threshold (2026-08-22) ────────────
+  {
+    id: 'risk_btc_vs_threshold',
+    name: 'BTC vs Cycle Top Threshold',
+    description: 'Current BTC risk divided by the current cycle\'s Cowen threshold (0.5 / 0.4 / 0.3). 1.0 = at threshold, >1 = above (cycle-top signal). Pair with risk.threshold_status for confirmation.',
+    formula: 'risk.metric / risk.threshold_current',
+    range: { start: '2026-08-01', end: '2026-08-31' },
+  },
   // ─── Macro suite templates (Phase 6b, 2026-08-19) ────────────────────────
   {
     id: 'macro_liquidity_snapshot',

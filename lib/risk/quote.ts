@@ -31,13 +31,16 @@ const ASSET_MAP: Record<string, AssetInfo> = {
 };
 
 const DEFAULT_DAYS = 3650; // 10 years for stable 4y z-score windows
+// Max fetch window. 15y is enough to satisfy the 1460-day z-score warmup
+// for cycle 2's window (2016-07 halving) — see lib/risk/thresholds.ts §9.6.
+const MAX_DAYS = 5475;
 
 /**
  * Fetch daily close prices for an asset symbol. Tries Yahoo first
  * (proven on Vercel), falls back to CoinGecko on failure.
  *
  * @param symbol Uppercase ticker (BTC, ETH)
- * @param days Lookback in days (capped 30..3650)
+ * @param days Lookback in days (capped 30..5475)
  */
 export async function fetchDailyCloses(
   symbol: string,
@@ -47,7 +50,7 @@ export async function fetchDailyCloses(
   const asset = ASSET_MAP[upper];
   if (!asset) throw new Error(`Unsupported symbol: ${symbol}. Supported: ${Object.keys(ASSET_MAP).join(', ')}`);
 
-  const safeDays = Math.max(30, Math.min(3650, Math.floor(days)));
+  const safeDays = Math.max(30, Math.min(MAX_DAYS, Math.floor(days)));
   const cacheKey = `${upper}:${safeDays}`;
   const hit = priceCache.get(cacheKey);
   if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {

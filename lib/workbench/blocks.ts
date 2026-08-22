@@ -35,6 +35,9 @@ const BLOCKS: BlockMeta[] = [
   { id: 'risk.pi_short',          label: 'Pi Cycle Short (111d)',  category: 'risk',     description: '111-day MA (top signal trigger)',                 unit: 'USD' },
   { id: 'risk.cycle_pos',         label: 'Halving Cycle Position', category: 'risk',     description: 'Position in 4-year halving cycle (0–1)',          unit: '0–1' },
   { id: 'risk.band_stats',        label: 'Time in Risk Bands',     category: 'risk',     description: '% of days BTC spent in each risk band (6 series)',unit: '0–1 each' },
+  { id: 'risk.threshold_current', label: 'Cycle Threshold (current)', category: 'risk',  description: 'Current cycle\'s Ben Cowen cycle-top threshold (0.5 / 0.4 / 0.3). BTC-only.', unit: '0–1' },
+  { id: 'risk.threshold_pct',     label: 'Risk vs Threshold %',    category: 'risk',     description: 'Current BTC risk as a fraction of the cycle threshold (1.0 = at threshold, >1 = above).', unit: 'ratio' },
+  { id: 'risk.threshold_status',  label: 'Threshold Status',       category: 'risk',     description: 'Numeric encoding: 0=below, 0.5=approaching, 1=above threshold. Compose with risk.threshold_pct for confirmation.', unit: '0/0.5/1' },
   // ─── Macro suite (Phase 6b, 2026-08-19) ───────────────────────────────
   { id: 'macro.fed_assets',        label: 'Fed Total Assets (WALCL)', category: 'macro',  description: 'Federal Reserve balance sheet — weekly',          unit: 'M USD' },
   { id: 'macro.onrrp',             label: 'O/N Reverse Repo',         category: 'macro',  description: 'Overnight reverse repo facility usage — daily',   unit: 'B USD' },

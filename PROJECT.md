@@ -63,6 +63,7 @@ verify with a curl before relying on it.
   `GET /api/workbench/backtests`, `GET /api/workbench/backtest/:id`) reusing the existing
   `anonymous_data` table + visibility/gallery fields. Demo roundtrip verified
   (8/8 smoke tests pass).
+- **Cycle Top Thresholds (Phase 6b)** — Ben Cowen's per-cycle sell threshold (0.5 / 0.4 / 0.3) overlaid on the /risk dashboard. New "Cycle Top Threshold" stat card (between Risk Now and Band), ReferenceLines at 0.5/0.4 (solid) and 0.3 (dashed) on the 4y chart, ReferenceDots at each cycle's peak risk, and a new "Historical Threshold Crossings" table card. New `/api/risk/thresholds` endpoint (one more branch in the existing `api/index.ts` dispatcher — no new serverless function). 3 new Workbench blocks (`risk.threshold_current`, `risk.threshold_pct`, `risk.threshold_status`) and 1 template (`BTC vs Cycle Top Threshold`). **Staged locally (pending deploy as of 2026-08-22 10:14 UTC)** — full code + build + validation done; awaiting `vercel --prod` push. 23/23 `scripts/test-thresholds.ts` pass (cycle 2 peak 0.867 ≥ 0.5, cycle 3 peak 0.916 ≥ 0.4, cycle 4 peak 0.706 ≥ 0.3 — §9.6 validation gate green). 46/46 `scripts/test-risk.ts` still pass (no regression). `vite build` clean.
 
 ### Recent commits (origin/main, newest first — today's session is at the top)
 
@@ -104,6 +105,19 @@ verify with a curl before relying on it.
 | `6fbe367` | **feat(workbench)**: valuation blocks (Puell, MVRV-Z, DXY corr, NVT). |
 | `19fd200` | **polish(workbench)**: 3 audit follow-ups — FRED downsampler, monthly-lag UX, 502→503 polish. |
 | `e20c401` | **fix(risk)**: wrap /risk route in ErrorBoundary so crashes show useful UI. |
+
+### Risk Metric Phase 6b status (Cycle Top Thresholds, 2026-08-22)
+
+| Slice | Status | Notes |
+|---|---|---|
+| **Spec — RISK_SPEC.md §9** | ✅ Done | 10-section addendum with provenance for every threshold line |
+| **Threshold config + math (`lib/risk/thresholds.ts`)** | ✅ Staged | `CYCLE_TOP_THRESHOLDS` (3 rows), `computeCycleCrossings`, `statusFor`, `APPROACHING_FACTOR=0.85` |
+| **API — `/api/risk/thresholds`** | ✅ Staged | New dispatcher branch in `api/index.ts` (no new serverless function) |
+| **Validation — `scripts/test-thresholds.ts`** | ✅ 23/23 pass | Cycle 2 peak 0.867 ≥ 0.5 ✓; Cycle 3 peak 0.916 ≥ 0.4 ✓; Cycle 4 first cross 2024-04-20 ✓ |
+| **UI — `RiskMetric.tsx`** | ✅ Staged | New stat card + ReferenceLines/ReferenceDots + history table; vite build clean |
+| **Workbench — 3 blocks + 1 template** | ✅ Staged | `risk.threshold_current`, `risk.threshold_pct`, `risk.threshold_status` + "BTC vs Cycle Top Threshold" template |
+| **Fetch window bump — `quote.ts` `MAX_DAYS=5475`** | ✅ Staged | Needed for cycle 2 validation (10y fetch misses cycle 2's warmup window) |
+| **Deploy to prod** | ⏳ Awaiting `vercel --prod` | All code local + committed-ready |
 
 ### MPT Phase 2 status
 

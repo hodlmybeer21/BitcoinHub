@@ -4093,6 +4093,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: h } = await import('../lib/risk/bands-stats.js');
       return h(req, res);
     }
+    if (path === '/api/risk/thresholds' || path === '/api/risk/thresholds/') {
+      const { default: h } = await import('../lib/risk/thresholds.js');
+      return h(req, res);
+    }
 
     // ─── FRED Macro Suite (Phase 6b, 2026-08-19) ────────────────────────────
     // Single dispatcher for /api/fred/{series,categories,data}.

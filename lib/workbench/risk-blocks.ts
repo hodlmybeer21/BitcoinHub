@@ -91,3 +91,55 @@ export const RISK_BLOCK_FETCHERS: Record<string, () => Promise<Series[]>> = {
   'risk.cycle_pos':  fetchCyclePos,
   'risk.band_stats': fetchBandStats,
 };
+
+// ─── Phase 6b — Cowen cycle-top threshold blocks (2026-08-22) ──────
+
+async function fetchThresholdCurrent(): Promise<Series[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const { default: axios } = await import('axios');
+  const res = await axios.get('https://bitcoinhub.goodbotai.tech/api/risk/thresholds?symbol=BTC', { timeout: 25000 });
+  const v = res.data?.currentThreshold;
+  if (typeof v !== 'number') throw new Error('No currentThreshold returned (BTC-only)');
+  return [{ date: today, value: v }];
+}
+
+async function fetchThresholdPct(): Promise<Series[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const { default: axios } = await import('axios');
+  const res = await axios.get('https://bitcoinhub.goodbotai.tech/api/risk/thresholds?symbol=BTC', { timeout: 25000 });
+  const v = res.data?.pctOfThreshold;
+  if (typeof v !== 'number') throw new Error('No pctOfThreshold returned');
+  return [{ date: today, value: v }];
+}
+
+/**
+ * Numeric encoding of the threshold status for Workbench compatibility
+ * (the evaluator only does numeric comparisons):
+ *   below       → 0.0
+ *   approaching → 0.5
+ *   above       → 1.0
+ *
+ * So `risk.threshold_status >= 1` means "above threshold (cycle-top signal)".
+ */
+async function fetchThresholdStatus(): Promise<Series[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const { default: axios } = await import('axios');
+  const res = await axios.get('https://bitcoinhub.goodbotai.tech/api/risk/thresholds?symbol=BTC', { timeout: 25000 });
+  const s: string = res.data?.status;
+  let encoded = 0;
+  if (s === 'approaching') encoded = 0.5;
+  else if (s === 'above') encoded = 1.0;
+  return [{ date: today, value: encoded }];
+}
+
+export const THRESHOLD_BLOCK_FETCHERS: Record<string, () => Promise<Series[]>> = {
+  'risk.threshold_current': fetchThresholdCurrent,
+  'risk.threshold_pct':     fetchThresholdPct,
+  'risk.threshold_status':  fetchThresholdStatus,
+};
+
+// Combined map for evaluate.ts convenience — both groups under one import.
+export const ALL_RISK_BLOCK_FETCHERS: Record<string, () => Promise<Series[]>> = {
+  ...RISK_BLOCK_FETCHERS,
+  ...THRESHOLD_BLOCK_FETCHERS,
+};
