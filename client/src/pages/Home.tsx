@@ -247,7 +247,7 @@ const Home = () => {
               <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Built by Someone Living It</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Tyler isn't a VC or a "crypto influencer." He's an inventory manager in Concord, New Hampshire —
-                married, two kids, on the CPA path. He built this because he couldn't find Bitcoin
+                married, two kids. He built this because he couldn't find Bitcoin
                 education that actually taught him how money works.
               </p>
             </motion.div>
@@ -261,7 +261,7 @@ const Home = () => {
                     </div>
                     <div>
                       <h3 className="text-xl font-semibold text-foreground mb-1">Tyler, Founder</h3>
-                      <p className="text-sm text-muted-foreground">Inventory Manager · Concord, NH · CPA-path Dad of 2</p>
+                      <p className="text-sm text-muted-foreground">Inventory Manager · Concord, NH · Dad of 2</p>
                     </div>
                   </div>
                   <div className="space-y-4 text-muted-foreground leading-relaxed">
@@ -335,7 +335,7 @@ const Home = () => {
                   </div>
                   <ul className="space-y-3 text-sm text-muted-foreground">
                     {[
-                      "Real-world financial experience (CPA-path)",
+                      "Real-world experience watching how money actually works",
                       "Family of 4 managing real purchasing power concerns",
                       "Research direction: what matters to real families",
                       "Quality control: is this actually useful?",
