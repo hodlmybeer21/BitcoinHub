@@ -11,6 +11,7 @@ import FreshnessIndicator from "@/components/legislation/FreshnessIndicator";
 import FilterBar, { type LegislationFilters } from "@/components/legislation/FilterBar";
 import BillCard from "@/components/legislation/BillCard";
 import RecentActionsTimeline from "@/components/legislation/RecentActionsTimeline";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface BillData {
   slug: string;
@@ -135,22 +136,24 @@ const Legislation = () => {
         {/* Filters */}
         <FilterBar filters={filters} onChange={setFilters} />
 
-        {/* Bill cards */}
-        <div className="grid lg:grid-cols-2 gap-5 mb-6">
-          {filteredBills.length === 0 ? (
-            <Card className="col-span-full">
-              <CardContent className="p-8 text-center">
-                <p className="text-muted-foreground">
-                  No bills match the current filters. Try resetting them.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredBills.map(bill => (
-              <BillCard key={bill.slug} bill={bill} />
-            ))
-          )}
-        </div>
+        {/* Bill cards — wrapped in ErrorBoundary so a single bad bill can't take down the whole page */}
+        <ErrorBoundary label="Legislation bill cards">
+          <div className="grid lg:grid-cols-2 gap-5 mb-6">
+            {filteredBills.length === 0 ? (
+              <Card className="col-span-full">
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">
+                    No bills match the current filters. Try resetting them.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredBills.map(bill => (
+                <BillCard key={bill.slug} bill={bill} />
+              ))
+            )}
+          </div>
+        </ErrorBoundary>
 
         {/* Recent actions timeline */}
         {!isFallback && data.bills.some(b => b.actions.length > 0) && (
