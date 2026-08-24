@@ -1395,62 +1395,183 @@ async function handleInflation(_: VercelRequest, res: VercelResponse) {
   });
 }
 
-// ─── Legislation ──────────────────────────────────────────────────────────────
+// Inlined editorial overlay — MUST stay in sync with client/src/lib/legislation-data.ts.
+// Server can't import from client bundle (Vercel bundles them separately).
+// When editing either side, mirror the change here.
 
-const legislationFallback = {
-  bills: [
-    {
-      id: "genius-act",
-      billName: "GENIUS Act",
-      billNumber: "S.2393",
-      description: "Stablecoin Regulatory Framework Act establishing federal licensing for stablecoin issuers and reserve requirements.",
-      currentStatus: "Passed Senate Banking Committee",
-      nextSteps: "Floor vote pending in Senate",
-      passageChance: 72,
-      whatsNext: "Awaiting Senate floor action. Monitor congress.gov for vote scheduling.",
-      lastAction: "Markup completed November 2025",
-      sponsor: "Sen. Bill Hagerty (R-TN)",
-      category: "stablecoin",
-      priority: "high"
-    },
-    {
-      id: "fit21",
-      billName: "FIT21 Act",
-      billNumber: "HR.4763",
-      description: "Financial Innovation and Technology for the 21st Century Act establishing CFTC primary regulator for digital assets.",
-      currentStatus: "Passed House (311-104)",
-      nextSteps: "Awaiting Senate consideration",
-      passageChance: 65,
-      whatsNext: "Senate Banking Committee review expected Q2 2026.",
-      lastAction: "House passage June 2025",
-      sponsor: "Rep. Patrick McHenry (R-NC)",
-      category: "regulation",
-      priority: "high"
-    },
-    {
-      id: "clarity-act",
-      billName: "CLARITY Act",
-      billNumber: "S.2286",
-      description: "Establishes CFTC as primary regulator for digital commodities including Bitcoin, creates clear registration path.",
-      currentStatus: "Senate Banking Committee",
-      nextSteps: "Markup expected Q2 2026",
-      passageChance: 55,
-      whatsNext: "Bipartisan negotiations ongoing. May be combined with FIT21 provisions.",
-      lastAction: "Introduced July 2025",
-      sponsor: "Sen. Cynthia Lummis (R-WY)",
-      category: "regulation",
-      priority: "high"
-    }
-  ],
-  lastUpdated: new Date().toISOString(),
-  summary: "Current crypto legislation tracking. 3 active bills in Congress affecting cryptocurrency regulation.",
-  nextMajorEvent: "GENIUS Act floor vote expected Q2 2026"
-};
+const LEGISLATION_EDITORIAL = [
+  {
+    slug: 'genius-act',
+    billName: 'GENIUS Act',
+    billType: 's',
+    billNumber: '1582',
+    congress: '119',
+    category: 'stablecoin',
+    priority: 'high',
+    whyItMatters:
+      "Indirect for BTC, but high signal for the broader crypto market. Establishes federal licensing for stablecoin issuers with reserve + audit requirements — takes stablecoins out of the SEC's enforcement-by-letters gray zone. A clean US stablecoin framework removes a regulatory-overhang line item from every crypto company's risk register, and signals Congress can legislate on digital assets without it becoming partisan warfare.",
+    whatsNext:
+      'Watch the Senate floor vote — expected Q2 2026. Key amendments: reserve-asset composition, audit cadence, foreign-issuer registration path.',
+    passageChance: 70,
+  },
+  {
+    slug: 'fit21',
+    billName: 'FIT21 Act',
+    billType: 'hr',
+    billNumber: '4763',
+    congress: '118',
+    category: 'regulation',
+    priority: 'high',
+    whyItMatters:
+      "Direct for BTC. Puts Bitcoin in CFTC's jurisdiction (not SEC's). Passed the House 311-104 in 2024 — a rare bipartisan vote on crypto. If it ever becomes law, US-registered exchanges and custodians get a clear path to handle BTC without the current SEC-by-enforcement regime that's hung over the industry since the 2017-2018 ICO era.",
+    whatsNext:
+      'Languishing in the Senate since 2024. The 119th Congress chose to start fresh with CLARITY rather than pick up FIT21 — but FIT21 is still alive procedurally and could be revived as the vehicle for a House-Senate compromise.',
+    passageChance: 45,
+    sponsorNote: 'Rep. Patrick McHenry (R-NC) + Rep. Glenn Thompson (R-PA) + House Democrats',
+  },
+  {
+    slug: 'clarity-act',
+    billName: 'CLARITY Act',
+    billType: 'hr',
+    billNumber: '3633',
+    congress: '119',
+    category: 'regulation',
+    priority: 'high',
+    whyItMatters:
+      "The 119th Congress's answer to FIT21. Same goal — CFTC primary jurisdiction for digital commodities, SEC for securities — but a fresh start with the new majority. Defines digital commodities in statute (what BTC needs), establishes registration paths for exchanges and custodians, and creates a joint SEC-CFTC advisory committee for edge cases.",
+    whatsNext:
+      'Early-stage — subcommittee hearings expected first, then markup. Likely combined with stablecoin provisions from GENIUS into a single market-structure package.',
+    passageChance: 50,
+    sponsorNote: 'Rep. French Hill (R-AR) + bipartisan working group',
+  },
+];
 
-async function handleLegislation(_: VercelRequest, res: VercelResponse) {
-  ok(res, legislationFallback);
+// Best-effort heuristic to derive pipeline stage from latestAction.text.
+// congress.gov doesn't expose a machine-readable status field.
+function deriveStageLocal(text: string | undefined): string {
+  if (!text) return 'introduced';
+  const t = text.toLowerCase();
+  if (t.includes('became public law') || t.includes('signed by president')) return 'signed';
+  if (t.includes('vetoed')) return 'vetoed';
+  if (t.includes('pocket veto') || t.includes('died') || t.includes('withdrawn')) return 'dead';
+  if (t.includes('conference')) return 'conference';
+  if (t.includes('passed senate') || t.includes('passed house')) return 'passed_chamber';
+  if (t.includes('reported') || t.includes('committee') || t.includes('markup')) return 'committee';
+  return 'introduced';
 }
 
+// Tiny in-memory cache — survives warm starts, resets on cold start.
+// Caches the merged response for 30 min; congress.gov doesn't change by the minute.
+let _legCache: { data: any; expires: number } | null = null;
+const LEG_CACHE_MS = 30 * 60 * 1000;
+
+async function handleLegislation(_: VercelRequest, res: VercelResponse) {
+  if (_legCache && Date.now() < _legCache.expires) {
+    return ok(res, _legCache.data);
+  }
+
+  const fetchedAt = new Date().toISOString();
+  const apiKey = process.env.CONGRESS_API_KEY;
+
+  if (!apiKey) {
+    const bills = LEGISLATION_EDITORIAL.map(e => ({
+      ...e,
+      billSlug: `${e.congress}-${e.billType}-${e.billNumber}`,
+      currentStatus: 'CONGRESS_API_KEY not set — configure in Vercel env to enable live data',
+      lastActionDate: '',
+      stage: 'introduced',
+      sponsor: e.sponsorNote || 'Unknown',
+      originChamber: '',
+      updateDate: '',
+      actions: [],
+    }));
+    const data = {
+      bills,
+      lastUpdated: fetchedAt,
+      summary: 'Editorial overview — congress.gov API key not configured. Set CONGRESS_API_KEY in Vercel env to enable live bill data.',
+      nextMajorEvent: 'GENIUS Act Senate floor vote (Q2 2026)',
+      source: 'fallback',
+      fetchedAt,
+    };
+    _legCache = { data, expires: Date.now() + LEG_CACHE_MS };
+    return ok(res, data);
+  }
+
+  // Fetch all bills + actions in parallel
+  const fetches = LEGISLATION_EDITORIAL.map(async (e) => {
+    const slug = `${e.congress}-${e.billType}-${e.billNumber}`;
+    try {
+      const billUrl = `https://api.congress.gov/v3/bill/${e.congress}/${e.billType}/${e.billNumber}?api_key=${apiKey}&format=json`;
+      const billResp = await fetchJson(billUrl, 8000);
+      const bill = billResp?.bill;
+      if (!bill) throw new Error('no bill in response');
+
+      const actionsUrl = `https://api.congress.gov/v3/bill/${e.congress}/${e.billType}/${e.billNumber}/actions?api_key=${apiKey}&limit=10&format=json`;
+      const actionsResp = await fetchJson(actionsUrl, 8000);
+      const actions = (actionsResp?.actions || []).map((a: any) => ({
+        date: a.actionDate || '',
+        text: a.text || '',
+      }));
+
+      const latest = bill.latestAction || {};
+      return {
+        ...e,
+        billSlug: slug,
+        currentStatus: latest.text || 'No action yet',
+        lastActionDate: latest.actionDate || '',
+        stage: deriveStageLocal(latest.text),
+        sponsor: e.sponsorNote || (bill.sponsors?.[0]?.fullName) || 'Unknown',
+        originChamber: bill.originChamber || '',
+        updateDate: bill.updateDate || '',
+        actions,
+      };
+    } catch (err: any) {
+      console.warn(`legislation fetch failed for ${slug}:`, err.message);
+      return null;
+    }
+  });
+
+  const results = await Promise.allSettled(fetches);
+  const bills = LEGISLATION_EDITORIAL.map((e, idx) => {
+    const slug = `${e.congress}-${e.billType}-${e.billNumber}`;
+    const result = results[idx];
+    if (result && result.status === 'fulfilled' && result.value) {
+      return result.value;
+    }
+    return {
+      ...e,
+      billSlug: slug,
+      currentStatus: 'Live data temporarily unavailable',
+      lastActionDate: '',
+      stage: 'introduced',
+      sponsor: e.sponsorNote || 'Unknown',
+      originChamber: '',
+      updateDate: '',
+      actions: [],
+    };
+  });
+
+  const okCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+  const source: 'congress.gov' | 'partial' | 'fallback' =
+    okCount === 0 ? 'fallback' :
+    okCount === LEGISLATION_EDITORIAL.length ? 'congress.gov' :
+    'partial';
+
+  const data = {
+    bills,
+    lastUpdated: fetchedAt,
+    summary: source === 'congress.gov'
+      ? 'Live bill data from api.congress.gov, merged with editorial commentary from BitcoinHub team.'
+      : source === 'partial'
+      ? 'Partial — congress.gov data temporarily unavailable for some bills. Editorial commentary still current.'
+      : 'Editorial overview — congress.gov temporarily unavailable.',
+    nextMajorEvent: 'GENIUS Act Senate floor vote (Q2 2026)',
+    source,
+    fetchedAt,
+  };
+  _legCache = { data, expires: Date.now() + LEG_CACHE_MS };
+  return ok(res, data);
+}
 const catalystsData = {
   catalysts: [
     {

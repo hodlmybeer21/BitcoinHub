@@ -1,93 +1,71 @@
+// BitcoinHub — /legislation page
+// Live bill data from api.congress.gov, merged with editorial commentary.
+// Status pipeline + recent actions timeline + filters + freshness indicator.
+
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Scale, Calendar, TrendingUp, AlertCircle } from "lucide-react";
+import { Scale, Calendar, AlertCircle, BookOpen } from "lucide-react";
+import type { BillStage, LegislationCategory, LegislationPriority } from "@/lib/legislation-data";
+import FreshnessIndicator from "@/components/legislation/FreshnessIndicator";
+import FilterBar, { type LegislationFilters } from "@/components/legislation/FilterBar";
+import BillCard from "@/components/legislation/BillCard";
+import RecentActionsTimeline from "@/components/legislation/RecentActionsTimeline";
 
-interface LegislationBill {
-  id: string;
+interface BillData {
+  slug: string;
   billName: string;
+  billSlug: string;
+  billType: string;
   billNumber: string;
-  description: string;
-  currentStatus: string;
-  nextSteps: string;
-  passageChance: number;
+  congress: string;
+  category: LegislationCategory;
+  priority: LegislationPriority;
+  whyItMatters: string;
   whatsNext: string;
-  lastAction: string;
+  passageChance: number;
+  currentStatus: string;
+  lastActionDate: string;
+  stage: BillStage;
   sponsor: string;
-  category: 'regulation' | 'taxation' | 'stablecoin' | 'innovation' | 'enforcement';
-  priority: 'high' | 'medium' | 'low';
-}
-
-interface CryptoCatalyst {
-  id: string;
-  event: string;
-  description: string;
-  probability: number;
-  nextSteps: string[];
-  category: 'policy' | 'regulatory' | 'market' | 'legal' | 'defi' | 'etf';
-  impact: 'high' | 'medium' | 'low';
-  dueDate?: string;
-}
-
-interface CatalystsData {
-  catalysts: CryptoCatalyst[];
-  lastUpdated: string;
-  marketImpact: string;
-  riskFactors: string;
+  originChamber: string;
+  updateDate: string;
+  actions: Array<{ date: string; text: string }>;
+  sponsorNote?: string;
 }
 
 interface LegislationData {
-  bills: LegislationBill[];
+  bills: BillData[];
   lastUpdated: string;
   summary: string;
   nextMajorEvent: string;
+  source: 'congress.gov' | 'partial' | 'fallback';
+  fetchedAt: string;
 }
 
 const Legislation = () => {
-  const { data: legislationData, isLoading, error } = useQuery<LegislationData>({
+  const [filters, setFilters] = useState<LegislationFilters>({
+    category: new Set(),
+    priority: new Set(),
+    stage: new Set(),
+  });
+
+  const { data, isLoading, error } = useQuery<LegislationData>({
     queryKey: ['/api/legislation'],
-    refetchInterval: 6 * 60 * 60 * 1000, // Refetch every 6 hours (matches LegiScan cache)
+    refetchInterval: 30 * 60 * 1000, // 30 min — server caches the same window
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: catalystsData } = useQuery<CatalystsData>({
-    queryKey: ['/api/legislation/catalysts'],
-    refetchInterval: 60 * 60 * 1000, // Refetch every hour
-  });
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'regulation': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
-      case 'taxation': return 'bg-red-500/10 text-red-600 border-red-500/20';
-      case 'stablecoin': return 'bg-green-500/10 text-green-600 border-green-500/20';
-      case 'innovation': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
-      case 'enforcement': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-      default: return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500 text-white';
-      case 'medium': return 'bg-yellow-500 text-white';
-      case 'low': return 'bg-green-500 text-white';
-      default: return 'bg-gray-500 text-white';
-    }
-  };
-
-  const getImpactColor = (impact: string) => {
-    switch (impact) {
-      case 'high': return 'bg-red-500/10 text-red-600 border-red-500/20';
-      case 'medium': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
-      case 'low': return 'bg-green-500/10 text-green-600 border-green-500/20';
-      default: return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
-    }
-  };
-
-  const getChanceColor = (chance: number) => {
-    if (chance >= 70) return 'text-green-600 font-bold';
-    if (chance >= 40) return 'text-yellow-600 font-bold';
-    return 'text-red-600 font-bold';
-  };
+  // Apply filters client-side
+  const filteredBills = useMemo(() => {
+    if (!data?.bills) return [];
+    return data.bills.filter(b => {
+      if (filters.category.size > 0 && !filters.category.has(b.category)) return false;
+      if (filters.priority.size > 0 && !filters.priority.has(b.priority)) return false;
+      if (filters.stage.size > 0 && !filters.stage.has(b.stage)) return false;
+      return true;
+    });
+  }, [data, filters]);
 
   if (isLoading) {
     return (
@@ -95,23 +73,23 @@ const Legislation = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <h2 className="text-xl font-semibold text-muted-foreground">Loading legislation data...</h2>
-            <p className="text-muted-foreground mt-2">Analyzing current crypto bills in Congress</p>
+            <h2 className="text-xl font-semibold text-muted-foreground">Loading legislation data…</h2>
+            <p className="text-muted-foreground mt-2 text-sm">Fetching live bill status from api.congress.gov</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (error || !legislationData) {
+  if (error || !data) {
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
           <Card className="max-w-md mx-auto">
             <CardContent className="text-center p-6">
               <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Failed to Load Legislation Data</h2>
-              <p className="text-muted-foreground mb-4">Unable to fetch current crypto legislation from LegiScan</p>
+              <h2 className="text-xl font-semibold mb-2">Failed to load legislation data</h2>
+              <p className="text-muted-foreground text-sm">Try refreshing the page in a moment.</p>
             </CardContent>
           </Card>
         </div>
@@ -119,125 +97,99 @@ const Legislation = () => {
     );
   }
 
+  const isFallback = data.source === 'fallback';
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Scale className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">US Crypto Legislation</h1>
-                <p className="text-muted-foreground">Live data from LegiScan - tracking congressional bills affecting cryptocurrency</p>
-              </div>
+          <div className="flex items-center gap-3 mb-3">
+            <Scale className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">US Crypto Legislation</h1>
+              <p className="text-muted-foreground">
+                Live bill status from congress.gov, with editorial framing for what it means for Bitcoin.
+              </p>
             </div>
           </div>
 
-          {/* Summary Card */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Congressional Summary</h3>
-                  <p className="text-muted-foreground">{legislationData.summary}</p>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Next Major Event</h3>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-primary" />
-                    <span className="text-muted-foreground">{legislationData.nextMajorEvent}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Last updated: {new Date(legislationData.lastUpdated).toLocaleDateString()}
-                  </p>
+          <div className="bg-card border border-muted/20 rounded-lg p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+              <div>
+                <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Summary</h3>
+                <p className="text-sm text-foreground leading-relaxed">{data.summary}</p>
+              </div>
+              <div>
+                <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Next major event</h3>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-foreground">{data.nextMajorEvent}</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <FreshnessIndicator fetchedAt={data.fetchedAt} source={data.source} />
+          </div>
         </div>
 
-        {/* Bills Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Active Crypto Bills in Congress
+        {/* Filters */}
+        <FilterBar filters={filters} onChange={setFilters} />
+
+        {/* Bill cards */}
+        <div className="grid lg:grid-cols-2 gap-5 mb-6">
+          {filteredBills.length === 0 ? (
+            <Card className="col-span-full">
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  No bills match the current filters. Try resetting them.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredBills.map(bill => (
+              <BillCard key={bill.slug} bill={bill} />
+            ))
+          )}
+        </div>
+
+        {/* Recent actions timeline */}
+        {!isFallback && data.bills.some(b => b.actions.length > 0) && (
+          <div className="mb-6">
+            <RecentActionsTimeline bills={data.bills} />
+          </div>
+        )}
+
+        {/* Footer — methodology + source attribution */}
+        <Card className="bg-yellow-500/5 border-yellow-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-yellow-500" />
+              Methodology &amp; sources
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b bg-muted/30">
-                  <tr>
-                    <th className="text-left p-4 font-semibold">Bill</th>
-                    <th className="text-left p-4 font-semibold">Status</th>
-                    <th className="text-left p-4 font-semibold">Next Steps</th>
-                    <th className="text-center p-4 font-semibold">Passage Chance</th>
-                    <th className="text-left p-4 font-semibold">What's Next</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {legislationData.bills.map((bill, index) => (
-                    <tr key={bill.id} className={`border-b hover:bg-muted/20 ${index % 2 === 0 ? 'bg-muted/5' : ''}`}>
-                      <td className="p-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-foreground">{bill.billName}</span>
-                            <Badge className={getPriorityColor(bill.priority)}>
-                              {bill.priority}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-muted-foreground mb-1">{bill.billNumber}</div>
-                          <Badge variant="outline" className={getCategoryColor(bill.category)}>
-                            {bill.category}
-                          </Badge>
-                          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                            {bill.description}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Sponsor: {bill.sponsor}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm">
-                          <div className="font-medium text-foreground mb-1">{bill.currentStatus}</div>
-                          <div className="text-xs text-muted-foreground">{bill.lastAction}</div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm text-muted-foreground max-w-xs">
-                          {bill.nextSteps}
-                        </div>
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className={`text-2xl font-bold ${getChanceColor(bill.passageChance)}`}>
-                          {bill.passageChance}%
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm text-muted-foreground max-w-xs">
-                          {bill.whatsNext}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <CardContent className="text-xs text-muted-foreground space-y-2 leading-relaxed">
+            <p>
+              <strong className="text-foreground/90">Live data</strong>: Bill metadata, latest action, and the action timeline come from
+              {' '}
+              <a href="https://api.congress.gov" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                api.congress.gov
+              </a>
+              {' '}
+              (free, no API key required beyond the signup). Pipeline stage is derived heuristically from
+              the latest action text — it's a best-effort visualization, not an authoritative status.
+            </p>
+            <p>
+              <strong className="text-foreground/90">Editorial overlay</strong>: The "Why this matters for BTC" notes are
+              Tyler's (BitcoinHub founder) read, updated periodically. The passage-chance estimates are Tyler's best
+              guesses based on co-sponsors, committee votes, and the political cycle — not predictions.
+            </p>
+            <p>
+              <strong className="text-foreground/90">Caveats</strong>: congress.gov's action history only goes back so far;
+              very recent bills may have minimal history. If a bill becomes law (signed), it stops being the most
+              actionable signal — we keep it visible but mark it as signed.
+            </p>
           </CardContent>
         </Card>
-
-        {/* Footer Disclaimer */}
-        <div className="mt-6 p-4 bg-yellow-500/10 rounded-lg">
-          <p className="text-xs text-muted-foreground">
-            <AlertCircle className="h-3 w-3 inline mr-1" />
-            Legislative data is analyzed daily using Grok AI and publicly available congressional records. 
-            Passage probabilities are estimates based on current political climate and bill progress. 
-            For official information, consult Congress.gov.
-          </p>
-        </div>
       </div>
     </div>
   );
