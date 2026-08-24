@@ -225,6 +225,28 @@ export const LAWS: LawCard[] = [
     sourceLink: 'https://en.wikipedia.org/wiki/Stock_to_flow',
     sourceLabel: 'PlanB (2019)',
   },
+  {
+    id: 'nakamoto',
+    name: "Nakamoto's Law",
+    emoji: '⛏️',
+    tagline: "Bitcoin's security budget compounds — hashrate doubles roughly every 2 years.",
+    formula: 'Hashrate(t) ≈ Hashrate(t₀) · 2^((t−t₀) / doubling_period)',
+    whyItMatters:
+      'Every halving, the per-block reward halves — yet miners keep investing more in proof-of-work compute. The result: BTC network hashrate has compounded for 17 years straight, mirroring Moore\'s Law for transistors. We chart the actual curve and measure the doubling period.',
+    sourceLink: 'https://github.com/bitcoin/bitcoin',
+    sourceLabel: 'Hashrate data · mempool.space',
+  },
+  {
+    id: 'perez',
+    name: "Perez's Techno-Economic Revolutions",
+    emoji: '🌀',
+    tagline: 'Every ~50 years, a new technology reshapes the entire economy.',
+    formula: 'Surge (front-loaded) → Installation period → Deployment period → Maturity',
+    whyItMatters:
+      "Carlota Perez's framework maps 5 historical revolutions: steam (1771), steel & railways (1829), electricity & heavy engineering (1875), mass production & automobiles (1908), information & telecom (1971). Bitcoin's 2009 launch fits the pattern — potentially the 6th, with the monetary infrastructure missing from prior revolutions.",
+    sourceLink: 'https://en.wikipedia.org/wiki/Carlota_Perez',
+    sourceLabel: 'Perez (2002, 2015)',
+  },
 ];
 
 // ── Phase 2 baked datasets ───────────────────────────────────────────────────
@@ -340,3 +362,110 @@ export const HALVINGS: HalvingEra[] = [
 export function s2fForEra(era: HalvingEra): number {
   return era.startSupplyM / era.annualFlowM;
 }
+
+// ── Phase 3 baked datasets ─────────────────────────────────────────────────────
+
+export interface HashratePoint {
+  date: string;         // YYYY-MM-DD (monthly sample)
+  hashrateEh: number;   // EH/s
+}
+
+// BTC network hashrate annual averages (EH/s) — fallback if mempool.space API
+// is unreachable. Sourced from BTC.com / Blockchain.com public historical
+// archives. Values are approximate end-of-year averages.
+export const HASHRATE_HISTORY: HashratePoint[] = [
+  { date: '2010-12-31', hashrateEh: 0.0001 },   // ~100 GH/s
+  { date: '2011-12-31', hashrateEh: 0.001 },    // ~1 TH/s
+  { date: '2012-12-31', hashrateEh: 0.01 },     // ~10 TH/s
+  { date: '2013-12-31', hashrateEh: 0.05 },     // ~50 TH/s (first ASICs ship)
+  { date: '2014-12-31', hashrateEh: 0.15 },
+  { date: '2015-12-31', hashrateEh: 0.4 },
+  { date: '2016-12-31', hashrateEh: 1.5 },
+  { date: '2017-12-31', hashrateEh: 4 },
+  { date: '2018-12-31', hashrateEh: 35 },       // big ASIC expansion
+  { date: '2019-12-31', hashrateEh: 75 },
+  { date: '2020-12-31', hashrateEh: 120 },
+  { date: '2021-12-31', hashrateEh: 165 },
+  { date: '2022-12-31', hashrateEh: 225 },
+  { date: '2023-12-31', hashrateEh: 400 },
+  { date: '2024-12-31', hashrateEh: 625 },
+  { date: '2025-12-31', hashrateEh: 830 },
+  { date: '2026-08-24', hashrateEh: 1000 },     // ~1 ZH/s
+];
+
+export interface PerezRevolution {
+  index: number;          // 1-5 historical, 6 = BTC (proposed)
+  name: string;
+  startYear: number;
+  endYear: number | null; // null = ongoing
+  duration: string;
+  coreCountry: string;
+  technologies: string[];
+  summary: string;
+}
+
+// Carlota Perez's 5 historical techno-economic revolutions + BTC as proposed 6th.
+// Source: Perez, "Technological Revolutions and Financial Capital" (2002),
+// updated in "Capitalism in Transformation" (2015).
+export const PEREZ_REVOLUTIONS: PerezRevolution[] = [
+  {
+    index: 1,
+    name: 'Age of Steam',
+    startYear: 1771,
+    endYear: 1840,
+    duration: '~70 years',
+    coreCountry: 'United Kingdom',
+    technologies: ['Steam engines', 'Iron', 'Railways', 'Canal transport'],
+    summary: 'The first industrial revolution. Watt\'s improved steam engine (1776) and the locomotive (Stockton & Darlington, 1825) unlocked manufacturing and continental transport.',
+  },
+  {
+    index: 2,
+    name: 'Age of Steel & Railways',
+    startYear: 1829,
+    endYear: 1890,
+    duration: '~60 years',
+    coreCountry: 'UK · Germany · US',
+    technologies: ['Bessemer steel', 'Transcontinental railroads', 'Telegraph', 'Steamships'],
+    summary: 'The railway boom: every major nation built rail networks simultaneously. Steel replaced iron; telegraph wired the continents. The first truly global capital cycle.',
+  },
+  {
+    index: 3,
+    name: 'Age of Electricity & Heavy Engineering',
+    startYear: 1875,
+    endYear: 1920,
+    duration: '~45 years',
+    coreCountry: 'US · Germany',
+    technologies: ['AC/DC power', 'Internal combustion', 'Chemicals', 'Telephone'],
+    summary: 'Electrification of factories and cities; chemicals industry; the early auto industry. Edison, Tesla, Daimler, BASF, Bayer — the modern corporation takes shape.',
+  },
+  {
+    index: 4,
+    name: 'Age of Mass Production & Automobiles',
+    startYear: 1908,
+    endYear: 1940,
+    duration: '~30+ years',
+    coreCountry: 'United States',
+    technologies: ['Ford assembly line', 'Petrochemicals', 'Highways', 'Suburbanization'],
+    summary: 'Ford\'s assembly line (Model T, 1908) generalized mass production. Cheap oil + highways + suburbs = the mid-century American lifestyle. Deployed globally post-WWII.',
+  },
+  {
+    index: 5,
+    name: 'Age of Information & Telecom',
+    startYear: 1971,
+    endYear: 2000,
+    duration: '~50 years',
+    coreCountry: 'US · Japan · Taiwan',
+    technologies: ['Microprocessor', 'PC', 'Internet', 'Mobile', 'Satellite'],
+    summary: 'Intel 4004 (1971), then the IBM PC (1981), the web (1991), and the smartphone. Information goes from scarce to abundant; every prior industry gets re-engineered.',
+  },
+  {
+    index: 6,
+    name: 'Age of Decentralization (proposed)',
+    startYear: 2009,
+    endYear: null,         // ongoing
+    duration: '~17+ years so far',
+    coreCountry: 'Distributed',
+    technologies: ['Bitcoin', 'Lightning Network', 'Stablecoins', 'ZK proofs', 'DeFi'],
+    summary: 'Decentralized monetary infrastructure. The first revolution to address money itself. Still in the "installation" phase — infrastructure is being built, broad adoption is the next stage.',
+  },
+];

@@ -15,6 +15,8 @@ import LindySection from "@/components/laws/LindySection";
 import ReedSection from "@/components/laws/ReedSection";
 import PowerLawSection from "@/components/laws/PowerLawSection";
 import S2FSection from "@/components/laws/S2FSection";
+import NakamotoSection from "@/components/laws/NakamotoSection";
+import PerezSection from "@/components/laws/PerezSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { LAWS } from "@/lib/laws-data";
 
@@ -89,7 +91,7 @@ export default function Laws() {
                 <CardContent className="pt-4 pb-4">
                   <Network className="w-5 h-5 text-amber-500 mx-auto mb-1" />
                   <div className="text-xs text-muted-foreground uppercase tracking-wider">Laws charted</div>
-                  <div className="text-2xl font-bold font-mono">6</div>
+                  <div className="text-2xl font-bold font-mono">8</div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -129,7 +131,7 @@ export default function Laws() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
-              Six laws. One story.
+              Eight laws. One story.
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Each law explains a different angle on Bitcoin's growth — and each has a chart with
@@ -175,6 +177,16 @@ export default function Laws() {
       {/* ─── STOCK-TO-FLOW ─── */}
       <ErrorBoundary label="Stock-to-Flow section">
         <S2FSection />
+      </ErrorBoundary>
+
+      {/* ─── NAKAMOTO'S LAW ─── */}
+      <ErrorBoundary label="Nakamoto's Law section">
+        <NakamotoSection />
+      </ErrorBoundary>
+
+      {/* ─── PEREZ REVOLUTIONS ─── */}
+      <ErrorBoundary label="Perez revolutions section">
+        <PerezSection />
       </ErrorBoundary>
 
       {/* ─── DATA SOURCES ─── */}

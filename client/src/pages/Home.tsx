@@ -459,9 +459,9 @@ const Home = () => {
                 Networks, adoption curves, and time itself
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                People say Bitcoin is "the internet of money." We took that literally. Six classical
-                laws — Metcalfe, Bass Diffusion, Lindy, Reed's, Power Law, and Stock-to-Flow —
-                charted against live on-chain data.
+                People say Bitcoin is "the internet of money." We took that literally. Eight classical
+                laws — Metcalfe, Bass Diffusion, Lindy, Reed's, Power Law, Stock-to-Flow,
+                Nakamoto's, and Perez's revolutions — charted against live on-chain data.
               </p>
             </motion.div>
 
@@ -469,10 +469,12 @@ const Home = () => {
               {[
                 { id: 'metcalfe', emoji: '🔗', name: "Metcalfe's Law", tagline: 'Value grows with users². The internet proved it; BTC tracks the same curve.', color: 'amber' },
                 { id: 'bass',     emoji: '📈', name: 'Bass / S-Curve',  tagline: 'Innovators → majority → laggards. BTC adoption maps onto the web\'s, year for year.', color: 'purple' },
-                { id: 'lindy',    emoji: '🪨', name: 'The Lindy Effect', tagline: '17 years alive, ~480 "deaths" — and still climbing. Death is fertilizer.', color: 'emerald' },
+                { id: 'lindy',    emoji: '🪸', name: 'The Lindy Effect', tagline: '17 years alive, ~480 "deaths" — and still climbing. Death is fertilizer.', color: 'emerald' },
                 { id: 'reed',     emoji: '🕸️', name: "Reed's Law",      tagline: 'Lightning enables 2ⁿ possible subgroups. Group-formation grows exponentially.', color: 'fuchsia' },
                 { id: 'power',    emoji: '⚖️', name: 'Power Law',       tagline: 'Top 1K addresses hold ~35%. Top 4 pools mine ~75%. Same shape, different scale.', color: 'cyan' },
                 { id: 's2f',      emoji: '🏆', name: 'Stock-to-Flow',   tagline: 'Scarcity = value. PlanB nailed 2013→2021, broke 2022→2024. We chart both honestly.', color: 'orange' },
+                { id: 'nakamoto', emoji: '⛏️', name: "Nakamoto's Law",  tagline: 'Hashrate doubles ~every 2 years — security budget compounds like Moore\'s Law.', color: 'cyan' },
+                { id: 'perez',    emoji: '🌀', name: 'Perez Revolutions', tagline: '5 historical tech revolutions, ~50-year cycles. BTC fits as a potential 6th.', color: 'violet' },
               ].map((law) => (
                 <motion.div key={law.id} variants={fadeInUp}>
                   <Link href={`/laws#${law.id}`}>
@@ -493,7 +495,7 @@ const Home = () => {
             <motion.div variants={fadeInUp} className="text-center">
               <Link href="/laws">
                 <Button size="lg" variant="outline" className="font-semibold px-8 border-muted/30 hover:border-primary/50">
-                  Open all 6 laws <ArrowRight className="ml-2 w-5 h-5" />
+                  Open all 8 laws <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
             </motion.div>

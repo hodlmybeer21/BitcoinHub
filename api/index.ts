@@ -4193,6 +4193,110 @@ async function handleLawsS2F(_req: VercelRequest, res: VercelResponse) {
     points,
   });
 }
+
+// ── Phase 3 handlers (Nakamoto hashrate + Perez revolutions) ──────────────────
+// Nakamoto's Law: BTC network hashrate compounded for 17 years. mempool.space
+// exposes the full daily history since genesis via
+// /api/v1/mining/hashrate/all — we sample monthly and return.
+
+interface LawsNakamotoPoint {
+  date: string;          // YYYY-MM-DD
+  hashrateEh: number;     // EH/s
+}
+
+async function handleLawsNakamoto(_req: VercelRequest, res: VercelResponse) {
+  try {
+    // mempool.space returns array of {timestamp, avgHashrate} in H/s.
+    // Values are huge ints (e.g. 1e21 for current ~1 ZH/s).
+    const r = await fetchJson('https://mempool.space/api/v1/mining/hashrate/3y', 15000);
+    const hashrates: Array<{ timestamp: number; avgHashrate: number }> = r?.hashrates ?? [];
+    if (hashrates.length === 0) throw new Error('empty hashrate data');
+
+    // Bucket by month (last entry per month)
+    const lastByMonth = new Map<string, number>();
+    for (const h of hashrates) {
+      if (typeof h.avgHashrate !== 'number' || h.avgHashrate <= 0) continue;
+      const month = new Date(h.timestamp * 1000).toISOString().slice(0, 7);
+      lastByMonth.set(month, h.avgHashrate);
+    }
+
+    // Convert to EH/s (1 EH/s = 1e18 H/s) and produce last-day-of-month dates
+    const points: LawsNakamotoPoint[] = [];
+    for (const [month, hps] of [...lastByMonth.entries()].sort()) {
+      const eh = hps / 1e18;
+      points.push({
+        date: month + '-28',
+        hashrateEh: Math.round(eh * 100) / 100,
+      });
+    }
+
+    return // for
+      ok(res, {
+        asOf: new Date().toISOString(),
+        source: 'live',
+        count: points.length,
+        points,
+      });
+  } catch (e: any) {
+    console.warn('laws/nakamoto live fetch failed (falling back to baked):', e.message);
+    // Fall back to baked HASHRATE_HISTORY (annual points)
+    // We don't import HASHRATE_HISTORY because client/server bundles differ;
+    // inline the same data shape here.
+    const BAKED_HASHRATE: LawsNakamotoPoint[] = [
+      { date: '2010-12-31', hashrateEh: 0.0001 },
+      { date: '2011-12-31', hashrateEh: 0.001 },
+      { date: '2012-12-31', hashrateEh: 0.01 },
+      { date: '2013-12-31', hashrateEh: 0.05 },
+      { date: '2014-12-31', hashrateEh: 0.15 },
+      { date: '2015-12-31', hashrateEh: 0.4 },
+      { date: '2016-12-31', hashrateEh: 1.5 },
+      { date: '2017-12-31', hashrateEh: 4 },
+      { date: '2018-12-31', hashrateEh: 35 },
+      { date: '2019-12-31', hashrateEh: 75 },
+      { date: '2020-12-31', hashrateEh: 120 },
+      { date: '2021-12-31', hashrateEh: 165 },
+      { date: '2022-12-31', hashrateEh: 225 },
+      { date: '2023-12-31', hashrateEh: 400 },
+      { date: '2024-12-31', hashrateEh: 625 },
+      { date: '2025-12-31', hashrateEh: 830 },
+      { date: '2026-08-24', hashrateEh: 1000 },
+    ];
+    return ok(res, {
+      asOf: new Date().toISOString(),
+      source: 'fallback',
+      count: BAKED_HASHRATE.length,
+      points: BAKED_HASHRATE,
+    });
+  }
+}
+
+// Perez's techno-economic revolutions. All static — no live API needed.
+async function handleLawsPerez(_req: VercelRequest, res: VercelResponse) {
+  // Inlined here (same as HASHRATE fallback) — server can't import from
+  // client/src/lib due to Vercel's separate bundle.
+  const PEREZ: Array<{
+    index: number;
+    name: string;
+    startYear: number;
+    endYear: number | null;
+    duration: string;
+    coreCountry: string;
+    technologies: string[];
+    summary: string;
+  }> = [
+    { index: 1, name: 'Age of Steam',          startYear: 1771, endYear: 1840,  duration: '~70 years', coreCountry: 'United Kingdom',   technologies: ['Steam engines', 'Iron', 'Railways', 'Canal transport'],                  summary: 'The first industrial revolution. Watt\'s improved steam engine (1776) and the locomotive (Stockton & Darlington, 1825) unlocked manufacturing and continental transport.' },
+    { index: 2, name: 'Age of Steel & Railways', startYear: 1829, endYear: 1890, duration: '~60 years', coreCountry: 'UK · Germany · US', technologies: ['Bessemer steel', 'Transcontinental railroads', 'Telegraph', 'Steamships'],         summary: 'The railway boom: every major nation built rail networks simultaneously. Steel replaced iron; telegraph wired the continents.' },
+    { index: 3, name: 'Age of Electricity & Heavy Engineering', startYear: 1875, endYear: 1920, duration: '~45 years', coreCountry: 'US · Germany', technologies: ['AC/DC power', 'Internal combustion', 'Chemicals', 'Telephone'],           summary: 'Electrification of factories and cities; chemicals industry; the early auto industry. Edison, Tesla, Daimler, BASF.' },
+    { index: 4, name: 'Age of Mass Production & Automobiles', startYear: 1908, endYear: 1940, duration: '~30+ years', coreCountry: 'United States',  technologies: ['Ford assembly line', 'Petrochemicals', 'Highways', 'Suburbanization'],     summary: 'Ford\'s assembly line (Model T, 1908) generalized mass production. Cheap oil + highways + suburbs = the mid-century American lifestyle.' },
+    { index: 5, name: 'Age of Information & Telecom', startYear: 1971, endYear: 2000, duration: '~50 years', coreCountry: 'US · Japan · Taiwan', technologies: ['Microprocessor', 'PC', 'Internet', 'Mobile', 'Satellite'], summary: 'Intel 4004 (1971), then the IBM PC (1981), the web (1991), and the smartphone. Information goes from scarce to abundant.' },
+    { index: 6, name: 'Age of Decentralization (proposed)', startYear: 2009, endYear: null, duration: '~17+ years so far', coreCountry: 'Distributed', technologies: ['Bitcoin', 'Lightning Network', 'Stablecoins', 'ZK proofs', 'DeFi'], summary: 'Decentralized monetary infrastructure. The first revolution to address money itself. Still in the "installation" phase.' },
+  ];
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: 'baked',
+    revolutions: PEREZ,
+  });
+}
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -4268,6 +4372,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/laws/reed' || path === '/api/laws/reed/') return handleLawsReed(req, res);
     if (path === '/api/laws/power' || path === '/api/laws/power/') return handleLawsPower(req, res);
     if (path === '/api/laws/s2f' || path === '/api/laws/s2f/') return handleLawsS2F(req, res);
+    if (path === '/api/laws/nakamoto' || path === '/api/laws/nakamoto/') return handleLawsNakamoto(req, res);
+    if (path === '/api/laws/perez' || path === '/api/laws/perez/') return handleLawsPerez(req, res);
 
     // ── Cycle Compare (2026-08-20) ────────────────────────────────────────
     // /api/cycle/markers → static events + computed ATH breaks + full BTC daily series.
