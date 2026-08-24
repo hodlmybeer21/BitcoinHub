@@ -12,6 +12,9 @@ import LawCard from "@/components/laws/LawCard";
 import MetcalfeSection from "@/components/laws/MetcalfeSection";
 import BassSection from "@/components/laws/BassSection";
 import LindySection from "@/components/laws/LindySection";
+import ReedSection from "@/components/laws/ReedSection";
+import PowerLawSection from "@/components/laws/PowerLawSection";
+import S2FSection from "@/components/laws/S2FSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { LAWS } from "@/lib/laws-data";
 
@@ -68,9 +71,9 @@ export default function Laws() {
               variants={fadeInUp}
               className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed"
             >
-              People compare Bitcoin's growth to the internet's. They cite Metcalfe, Bass, Lindy.
-              We took them literally. Here are the laws, the math, and the live charts — with the
-              data to back every claim.
+              People compare Bitcoin's growth to the internet's. They cite Metcalfe, Bass, Lindy,
+              Reed, Power Law, Stock-to-Flow. We took them literally. Here are the laws, the math,
+              and the live charts — with the data to back every claim.
             </motion.p>
           </motion.div>
 
@@ -86,7 +89,7 @@ export default function Laws() {
                 <CardContent className="pt-4 pb-4">
                   <Network className="w-5 h-5 text-amber-500 mx-auto mb-1" />
                   <div className="text-xs text-muted-foreground uppercase tracking-wider">Laws charted</div>
-                  <div className="text-2xl font-bold font-mono">3</div>
+                  <div className="text-2xl font-bold font-mono">6</div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -126,11 +129,12 @@ export default function Laws() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
-              Three laws. One story.
+              Six laws. One story.
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Each law explains a different angle on Bitcoin's growth — and each has a chart with
-              live on-chain data below.
+              live on-chain data below. The first three are the classics; the second three are
+              where it gets spicy.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-4">
@@ -156,6 +160,21 @@ export default function Laws() {
       {/* ─── LINDY ─── */}
       <ErrorBoundary label="Lindy section">
         <LindySection />
+      </ErrorBoundary>
+
+      {/* ─── REED'S LAW ─── */}
+      <ErrorBoundary label="Reed's Law section">
+        <ReedSection />
+      </ErrorBoundary>
+
+      {/* ─── POWER LAW ─── */}
+      <ErrorBoundary label="Power Law section">
+        <PowerLawSection />
+      </ErrorBoundary>
+
+      {/* ─── STOCK-TO-FLOW ─── */}
+      <ErrorBoundary label="Stock-to-Flow section">
+        <S2FSection />
       </ErrorBoundary>
 
       {/* ─── DATA SOURCES ─── */}

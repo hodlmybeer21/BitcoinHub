@@ -4105,6 +4105,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/laws/metcalfe' || path === '/api/laws/metcalfe/') return handleLawsMetcalfe(req, res);
     if (path === '/api/laws/bass' || path === '/api/laws/bass/') return handleLawsBass(req, res);
     if (path === '/api/laws/lindy' || path === '/api/laws/lindy/') return handleLawsLindy(req, res);
+    if (path === '/api/laws/reed' || path === '/api/laws/reed/') return handleLawsReed(req, res);
+    if (path === '/api/laws/power' || path === '/api/laws/power/') return handleLawsPower(req, res);
+    if (path === '/api/laws/s2f' || path === '/api/laws/s2f/') return handleLawsS2F(req, res);
 
     // ── Cycle Compare (2026-08-20) ────────────────────────────────────────
     // /api/cycle/markers → static events + computed ATH breaks + full BTC daily series.
