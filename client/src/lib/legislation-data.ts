@@ -31,12 +31,12 @@ export interface EditorialOverlay {
   slug: string;
   /** Full bill name as it should appear on the page */
   billName: string;
-  /** congress.gov bill type code, e.g. "s" or "hr" */
-  billType: 's' | 'hr' | 'sjres' | 'hjres';
-  /** Bill number, as a string (preserves leading zeros) */
-  billNumber: string;
-  /** congress.gov congress number, e.g. "119" */
-  congress: string;
+  /** congress.gov bill type code, e.g. "s" or "hr". Optional for editorial-only bills (no congress.gov ID yet). */
+  billType?: 's' | 'hr' | 'sjres' | 'hjres';
+  /** Bill number, as a string. Optional for editorial-only bills. */
+  billNumber?: string;
+  /** congress.gov congress number, e.g. "119". Optional for editorial-only bills. */
+  congress?: string;
   /** category + priority tags */
   category: LegislationCategory;
   priority: LegislationPriority;
@@ -46,42 +46,53 @@ export interface EditorialOverlay {
   whatsNext: string;
   /** Tyler's estimate of passage chance (0-100) — based on committee votes, co-sponsors, election cycle */
   passageChance: number;
+  /** Editorial status — shown when live congress.gov fetch fails or bill is editorial-only. */
+  currentStatus?: string;
+  /** Editorial stage — shown when live stage can't be derived. */
+  stage?: BillStage;
   /** Optional override for sponsor display (if live data is sparse) */
   sponsorNote?: string;
   /** Whether to render this bill at all — defaults true */
   retired?: boolean;
 }
 
-// Curated as of 2026-08-24. Bill IDs verified against api.congress.gov.
+// Curated as of 2026-08-24. 3 bills have live congress.gov IDs (GENIUS, FIT21, CLARITY).
+// 3 bills are editorial-only (no live IDs yet) — SEC/CFTC rulebook, Anti-CBDC, SAB 121.
+
 export const LEGISLATION_EDITORIAL: EditorialOverlay[] = [
   {
     slug: 'genius-act',
-    billName: 'GENIUS Act',
+    billName: 'GENIUS Act (signed)',
     billType: 's',
     billNumber: '1582',
     congress: '119',
     category: 'stablecoin',
     priority: 'high',
+    stage: 'signed',
+    currentStatus: 'Became Public Law 119-27 — signed July 2025',
     whyItMatters:
-      "Indirect for BTC, but high signal for the broader crypto market. The bill establishes federal licensing for stablecoin issuers (USDC, USDT, PYUSD) with reserve + audit requirements — taking stablecoins out of the SEC's enforcement-by-letters gray zone. A clean US stablecoin framework removes a regulatory-overhang line item from every crypto company's risk register, and signals that Congress <em>can</em> legislate on digital assets without it becoming partisan warfare.",
+      "Indirect for BTC, but high signal for the broader crypto market. Established federal licensing for stablecoin issuers (USDC, USDT, PYUSD) with reserve + audit requirements — takes stablecoins out of the SEC's enforcement-by-letters gray zone. A clean US stablecoin framework removes a regulatory-overhang line item from every crypto company's risk register, and signals that Congress <em>can</em> legislate on digital assets without it becoming partisan warfare. Also: USDC and USDT are the on-ramp that 80%+ of BTC purchases use, so a healthier US stablecoin regime is indirectly bullish for BTC liquidity.",
     whatsNext:
-      'Watch the Senate floor vote — expected Q2 2026. Key amendments to track: reserve-asset composition (T-bills only vs. broader), audit cadence (monthly vs. annual), and whether foreign-issued stablecoins get a federal registration path.',
-    passageChance: 70,
+      'Watch how the new federal regime reshapes USDC vs Tether competitive dynamics. Treasury guidance on reserve-asset composition is the next major milestone — likely Q4 2026.',
+    passageChance: 100,
   },
   {
     slug: 'fit21',
-    billName: 'FIT21 Act',
+    billName: 'FIT21 Act (retired)',
     billType: 'hr',
     billNumber: '4763',
     congress: '118',
     category: 'regulation',
     priority: 'high',
+    stage: 'dead',
+    currentStatus: 'Died at end of 118th Congress — succeeded by CLARITY in 119th',
     whyItMatters:
-      "Direct for BTC. This is the bill that puts Bitcoin in CFTC's jurisdiction (not SEC's). Passed the House 311-104 in 2024 — a rare bipartisan vote on crypto. If it ever becomes law, US-registered exchanges and custodians would have a clear path to handle BTC without the current SEC-by-enforcement regime that's hung over the industry since the 2017-2018 ICO era.",
+      "Passed House 311-104 in 2024 — a rare bipartisan vote that established CFTC-as-primary-regulator as the policy consensus for digital commodities including BTC. Died in the Senate. The 119th Congress chose to start fresh with CLARITY rather than pick up FIT21. The principles live on; the bill vehicle does not.",
     whatsNext:
-      'Languishing in the Senate since 2024. The 119th Congress chose to start fresh with CLARITY rather than pick up FIT21 — but FIT21 is still alive procedurally and could be revived as the vehicle for a House-Senate compromise.',
-    passageChance: 45,
+      'Monitor only if CLARITY stalls — FIT21 could be revived as a compromise vehicle, but the current path is CLARITY forward.',
+    passageChance: 0,
     sponsorNote: 'Rep. Patrick McHenry (R-NC) + Rep. Glenn Thompson (R-PA) + House Democrats',
+    retired: true,
   },
   {
     slug: 'clarity-act',
@@ -91,12 +102,54 @@ export const LEGISLATION_EDITORIAL: EditorialOverlay[] = [
     congress: '119',
     category: 'regulation',
     priority: 'high',
+    stage: 'committee',
+    currentStatus: 'Cloture motion on motion to proceed presented in Senate (Aug 2026) — closest a crypto market-structure bill has been to a floor vote',
     whyItMatters:
-      "The 119th Congress's answer to FIT21. Same goal — CFTC primary jurisdiction for digital commodities, SEC for securities — but a fresh start with the new majority. Defines digital commodities in statute (which is what BTC needs), establishes registration paths for exchanges and custodians, and creates a joint SEC-CFTC advisory committee to handle edge cases.",
+      "Direct for BTC. Defines digital commodities in statute (what BTC needs), establishes CFTC primary jurisdiction (not SEC's), creates a clear registration path for exchanges and custodians. The August 2026 cloture motion means the bill is actively being debated on the Senate floor — the closest a digital commodities bill has been to a Senate vote. If it passes, US-registered exchanges and custodians get a clear path to handle BTC without the current SEC-by-enforcement regime that's hung over the industry since the 2017-2018 ICO era.",
     whatsNext:
-      'Early-stage — subcommittee hearings expected first, then markup. Likely combined with stablecoin provisions from GENIUS into a single market-structure package. Best-case: passed House by end of 2026, Senate in 2027.',
-    passageChance: 50,
+      'Senate floor vote likely Q4 2026. Watch for amendments on the SEC/CFTC advisory committee scope — broader scope = more protection from jurisdictional turf wars between the agencies.',
+    passageChance: 60,
     sponsorNote: 'Rep. French Hill (R-AR) + bipartisan working group',
+  },
+  // ── Editorial-only (no congress.gov bill ID yet) ──
+  {
+    slug: 'sec-cftc-unified-rulebook',
+    billName: 'SEC/CFTC Unified Rulebook',
+    category: 'regulation',
+    priority: 'high',
+    stage: 'committee',
+    currentStatus: 'Joint framework expected after 2025 roundtables — Q4 2026 release window',
+    whyItMatters:
+      "The two regulators are finally publishing a unified framework after 2025's joint roundtables. This is the more granular, day-to-day version of what CLARITY would lock in — even without legislation, this changes how exchanges and custodians operate. Concrete asks: which tokens are securities vs commodities, custody requirements, disclosure standards.",
+    whatsNext:
+      'Joint draft expected Q4 2026. Watch for the industry comment period — exchanges and custodians will signal what they want preserved.',
+    passageChance: 70,
+  },
+  {
+    slug: 'anti-cbdc-surveillance',
+    billName: 'Anti-CBDC Surveillance State Act',
+    category: 'regulation',
+    priority: 'medium',
+    stage: 'passed_chamber',
+    currentStatus: 'Passed House twice (118th + 119th) — Senate Commerce Committee vote likely Q4 2026',
+    whyItMatters:
+      "Direct for BTC's monetary thesis. Prohibits the Fed from issuing a retail CBDC (central bank digital currency). If passed, it removes a credible Fed alternative to BTC and locks in the 'digital dollar = BTC' framing for retail. Otherwise, a Fed-issued retail CBDC competes with BTC on payments rails and could draw liquidity.",
+    whatsNext:
+      'Senate Commerce Committee markup. Watch for administration signals — a hostile White House stance on retail CBDCs (likely) helps this bill.',
+    passageChance: 40,
+  },
+  {
+    slug: 'sab121-repeal',
+    billName: 'SAB 121 Repeal Joint Resolution',
+    category: 'regulation',
+    priority: 'medium',
+    stage: 'committee',
+    currentStatus: 'House passed repeal resolution (2024) — Senate Banking Committee has not scheduled a vote',
+    whyItMatters:
+      "Indirect but high-leverage. SEC's SAB 121 forced banks to mark crypto custody as a liability on the balance sheet — which functionally prevented US banks from custodying BTC. Repealing it unlocks institutional custody infrastructure. Pension funds, RIAs, and the big banks could then offer BTC exposure without weird workarounds. Estimated impact: $1-3T of institutional capital that can't currently touch BTC.",
+    whatsNext:
+      'Senate Banking Committee vote. Banking lobby is actively opposed (huge fee revenue at stake). Watch for SEC leadership signals or administration pressure to break the logjam.',
+    passageChance: 30,
   },
 ];
 
