@@ -446,6 +446,57 @@ const Home = () => {
         </div>
       </section>
 
+      {/* ─── THROUGH THE LAWS ─── */}
+      <section className="py-20 bg-card/40">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div initial="initial" whileInView="animate" viewport={{ once: true, margin: "-80px" }} variants={staggerContainer}>
+            <motion.div variants={fadeInUp} className="text-center mb-12">
+              <Badge variant="outline" className="mb-4 border-primary/30 text-primary bg-primary/5">
+                <BookOpen className="w-3 h-3 mr-1.5 inline-block" />
+                Through the Laws
+              </Badge>
+              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
+                Networks, adoption curves, and time itself
+              </h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                People say Bitcoin is "the internet of money." We took that literally. Three classical
+                laws — Metcalfe, Bass Diffusion, and the Lindy Effect — charted against live on-chain data.
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-4 mb-10">
+              {[
+                { id: 'metcalfe', emoji: '🔗', name: "Metcalfe's Law", tagline: 'Value grows with users². The internet proved it; BTC tracks the same curve.', color: 'amber' },
+                { id: 'bass',     emoji: '📈', name: 'Bass / S-Curve',  tagline: 'Innovators → majority → laggards. BTC adoption maps onto the web\'s, year for year.', color: 'purple' },
+                { id: 'lindy',    emoji: '🪨', name: 'The Lindy Effect', tagline: '17 years alive, ~480 "deaths" — and still climbing. Death is fertilizer.', color: 'emerald' },
+              ].map((law) => (
+                <motion.div key={law.id} variants={fadeInUp}>
+                  <Link href={`/laws#${law.id}`}>
+                    <Card className="bg-card border-muted/20 hover:border-primary/40 transition-all p-6 h-full cursor-pointer group">
+                      <div className="text-4xl mb-3">{law.emoji}</div>
+                      <h3 className="text-lg font-semibold text-foreground mb-2">{law.name}</h3>
+                      <p className="text-sm text-muted-foreground leading-snug">{law.tagline}</p>
+                      <div className="flex items-center gap-1 text-sm text-primary mt-4 group-hover:gap-2 transition-all">
+                        <span>See the chart</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </div>
+                    </Card>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+
+            <motion.div variants={fadeInUp} className="text-center">
+              <Link href="/laws">
+                <Button size="lg" variant="outline" className="font-semibold px-8 border-muted/30 hover:border-primary/50">
+                  Open all 3 laws <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ─── NEWSLETTER ─── */}
       <section className="py-24 bg-card/40" id="newsletter">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">

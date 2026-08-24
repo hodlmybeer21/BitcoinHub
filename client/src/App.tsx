@@ -34,6 +34,7 @@ import Thesis from "@/pages/Thesis";
 import Sources from "@/pages/Sources";
 import RiskMetric from "@/pages/RiskMetric";
 import Macro from "@/pages/Macro";
+import Laws from "@/pages/Laws";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -76,6 +77,7 @@ function Router() {
           </ErrorBoundary>
         </Route>
         <Route path="/macro" component={Macro} />
+        <Route path="/laws" component={Laws} />
         <Route path="/forgot-password" component={() => (
           <div className="min-h-[60vh] flex items-center justify-center px-4">
             <div className="max-w-md w-full text-center space-y-3">

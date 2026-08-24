@@ -109,6 +109,13 @@ const Navbar = () => {
       comingSoon: false
     },
     {
+      href: "/laws",
+      label: "Bitcoin Through the Laws",
+      description: "Metcalfe, Bass diffusion, and the Lindy Effect — with live charts",
+      icon: BookOpen,
+      comingSoon: false
+    },
+    {
       href: "https://tracker.goodbotai.tech",
       label: "Value Tracker", 
       description: "Track purchasing power over time",

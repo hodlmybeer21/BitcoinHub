@@ -3872,6 +3872,167 @@ async function handleLearningPaths(_: VercelRequest, res: VercelResponse) {
   ok(res, learningPaths);
 }
 
+// ── /laws handlers (2026-08-24) ───────────────────────────────────────────────
+// Powering the "Bitcoin Through the Laws" section. Each handler returns only
+// the live BTC time series — the static reference data (internet users, bitcoin
+// obituary events) lives client-side in client/src/lib/laws-data.ts and is
+// combined in the page. Keeps the static dataset a single source of truth.
+
+interface LawsMetcalfePoint {
+  date: string;           // YYYY-MM-DD
+  activeAddresses: number;
+  marketCapUsd: number;
+}
+
+interface LawsBassAnnualPoint {
+  year: number;
+  addresses: number;      // millions, daily avg per year
+}
+
+interface LawsLindyPricePoint {
+  date: string;           // YYYY-MM-DD (monthly bucket — day is just a placeholder)
+  priceUsd: number;
+}
+
+async function handleLawsMetcalfe(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const [marketResp, addrResp] = await Promise.all([
+      fetchJson('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily', 12000),
+      fetchJson('https://api.blockchain.info/charts/n-unique-addresses?timespan=all&format=json', 12000),
+    ]);
+
+    const marketCaps: [number, number][] = (marketResp?.market_caps ?? []).filter((p: any) => Array.isArray(p) && p.length === 2);
+    const addrValues: { x: number; y: number }[] = (addrResp?.values ?? []);
+    if (marketCaps.length === 0 || addrValues.length === 0) throw new Error('empty upstream data');
+
+    // Bucket market caps by day (CoinGecko returns intraday points on recent dates)
+    const marketByDay = new Map<string, { sum: number; n: number }>();
+    for (const [ts, cap] of marketCaps) {
+      const day = new Date(ts).toISOString().slice(0, 10);
+      const b = marketByDay.get(day);
+      if (b) { b.sum += cap; b.n += 1; }
+      else marketByDay.set(day, { sum: cap, n: 1 });
+    }
+    const marketCapAvgByDay = new Map<string, number>();
+    for (const [day, b] of marketByDay) marketCapAvgByDay.set(day, b.sum / b.n);
+
+    // Active addresses by day
+    const addrByDay = new Map<string, number>();
+    for (const v of addrValues) {
+      const day = new Date(v.x * 1000).toISOString().slice(0, 10);
+      addrByDay.set(day, v.y);
+    }
+
+    // Monthly sampling: last day of each month that exists in both maps
+    const lastDayByMonth = new Map<string, string>();
+    for (const d of marketCapAvgByDay.keys()) {
+      if (!addrByDay.has(d)) continue;
+      const month = d.slice(0, 7);
+      const prev = lastDayByMonth.get(month);
+      if (!prev || d > prev) lastDayByMonth.set(month, d);
+    }
+    const points: LawsMetcalfePoint[] = [];
+    for (const m of [...lastDayByMonth.keys()].sort()) {
+      const day = lastDayByMonth.get(m)!;
+      points.push({
+        date: day,
+        activeAddresses: addrByDay.get(day)!,
+        marketCapUsd: Math.round(marketCapAvgByDay.get(day)!),
+      });
+    }
+
+    // Trim to 2014+ (address data more reliable post-$1K era)
+    const cutoff = '2014-01-01';
+    const trimmed = points.filter(p => p.date >= cutoff);
+
+    return ok(res, {
+      asOf: new Date().toISOString(),
+      source: 'live',
+      count: trimmed.length,
+      points: trimmed,
+    });
+  } catch (e: any) {
+    console.error('laws/metcalfe error:', e);
+    return ok(res, {
+      asOf: new Date().toISOString(),
+      source: 'fallback',
+      count: 0,
+      points: [],
+      error: e.message,
+    });
+  }
+}
+
+async function handleLawsBass(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const addrResp = await fetchJson('https://api.blockchain.info/charts/n-unique-addresses?timespan=all&format=json', 12000);
+    const addrValues: { x: number; y: number }[] = (addrResp?.values ?? []);
+    if (addrValues.length === 0) throw new Error('empty address data');
+
+    // Annual averages (year -> {sum, n})
+    const annual = new Map<number, { sum: number; n: number }>();
+    for (const v of addrValues) {
+      const year = new Date(v.x * 1000).getUTCFullYear();
+      const a = annual.get(year);
+      if (a) { a.sum += v.y; a.n += 1; }
+      else annual.set(year, { sum: v.y, n: 1 });
+    }
+    const bitcoin: LawsBassAnnualPoint[] = [];
+    for (const [year, a] of [...annual.entries()].sort()) {
+      if (year < 2010) continue;  // genesis was Jan 2009
+      bitcoin.push({ year, addresses: Math.round((a.sum / a.n) / 1_000_000 * 100) / 100 });
+    }
+
+    return ok(res, {
+      asOf: new Date().toISOString(),
+      source: 'live',
+      bitcoin,
+    });
+  } catch (e: any) {
+    console.error('laws/bass error:', e);
+    return ok(res, {
+      asOf: new Date().toISOString(),
+      source: 'fallback',
+      bitcoin: [],
+      error: e.message,
+    });
+  }
+}
+
+async function handleLawsLindy(_req: VercelRequest, res: VercelResponse) {
+  try {
+    const marketResp = await fetchJson('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily', 12000);
+    const prices: [number, number][] = (marketResp?.prices ?? []).filter((p: any) => Array.isArray(p) && p.length === 2);
+    if (prices.length === 0) throw new Error('empty price data');
+
+    // Monthly sampling (last price per month)
+    const lastByMonth = new Map<string, number>();
+    for (const [ts, px] of prices) {
+      const month = new Date(ts).toISOString().slice(0, 7);
+      lastByMonth.set(month, px);
+    }
+    const btcPrice: LawsLindyPricePoint[] = [];
+    for (const [month, px] of [...lastByMonth.entries()].sort()) {
+      const lastDay = month + '-28';  // any day in the month; the chart treats month as unit
+      btcPrice.push({ date: lastDay, priceUsd: px });
+    }
+
+    return ok(res, {
+      asOf: new Date().toISOString(),
+      source: 'live',
+      btcPrice,
+    });
+  } catch (e: any) {
+    console.error('laws/lindy error:', e);
+    return ok(res, {
+      asOf: new Date().toISOString(),
+      source: 'fallback',
+      btcPrice: [],
+      error: e.message,
+    });
+  }
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -3935,6 +4096,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return err(res, 500, e.message || 'Failed to fetch cycle score');
       }
     }
+
+    // ── /laws (2026-08-24) ────────────────────────────────────────────────
+    // Powers the "Bitcoin Through the Laws" page (/laws). Three handlers:
+    //   /api/laws/metcalfe — BTC market cap + active addresses (monthly)
+    //   /api/laws/bass     — BTC active addresses (annual averages)
+    //   /api/laws/lindy    — BTC price (monthly buckets)
+    if (path === '/api/laws/metcalfe' || path === '/api/laws/metcalfe/') return handleLawsMetcalfe(req, res);
+    if (path === '/api/laws/bass' || path === '/api/laws/bass/') return handleLawsBass(req, res);
+    if (path === '/api/laws/lindy' || path === '/api/laws/lindy/') return handleLawsLindy(req, res);
 
     // ── Cycle Compare (2026-08-20) ────────────────────────────────────────
     // /api/cycle/markers → static events + computed ATH breaks + full BTC daily series.

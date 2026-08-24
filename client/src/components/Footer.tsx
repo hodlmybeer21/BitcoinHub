@@ -29,6 +29,12 @@ const Footer: React.FC = () => {
                   Terms
                 </span>
               </Link>
+              <span className="text-muted-foreground">|</span>
+              <Link href="/laws">
+                <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                  Through the Laws
+                </span>
+              </Link>
             </div>
           </div>
 
