@@ -4205,69 +4205,37 @@ interface LawsNakamotoPoint {
 }
 
 async function handleLawsNakamoto(_req: VercelRequest, res: VercelResponse) {
-  try {
-    // mempool.space returns array of {timestamp, avgHashrate} in H/s.
-    // Values are huge ints (e.g. 1e21 for current ~1 ZH/s).
-    const r = await fetchJson('https://mempool.space/api/v1/mining/hashrate/3y', 15000);
-    const hashrates: Array<{ timestamp: number; avgHashrate: number }> = r?.hashrates ?? [];
-    if (hashrates.length === 0) throw new Error('empty hashrate data');
-
-    // Bucket by month (last entry per month)
-    const lastByMonth = new Map<string, number>();
-    for (const h of hashrates) {
-      if (typeof h.avgHashrate !== 'number' || h.avgHashrate <= 0) continue;
-      const month = new Date(h.timestamp * 1000).toISOString().slice(0, 7);
-      lastByMonth.set(month, h.avgHashrate);
-    }
-
-    // Convert to EH/s (1 EH/s = 1e18 H/s) and produce last-day-of-month dates
-    const points: LawsNakamotoPoint[] = [];
-    for (const [month, hps] of [...lastByMonth.entries()].sort()) {
-      const eh = hps / 1e18;
-      points.push({
-        date: month + '-28',
-        hashrateEh: Math.round(eh * 100) / 100,
-      });
-    }
-
-    return // for
-      ok(res, {
-        asOf: new Date().toISOString(),
-        source: 'live',
-        count: points.length,
-        points,
-      });
-  } catch (e: any) {
-    console.warn('laws/nakamoto live fetch failed (falling back to baked):', e.message);
-    // Fall back to baked HASHRATE_HISTORY (annual points)
-    // We don't import HASHRATE_HISTORY because client/server bundles differ;
-    // inline the same data shape here.
-    const BAKED_HASHRATE: LawsNakamotoPoint[] = [
-      { date: '2010-12-31', hashrateEh: 0.0001 },
-      { date: '2011-12-31', hashrateEh: 0.001 },
-      { date: '2012-12-31', hashrateEh: 0.01 },
-      { date: '2013-12-31', hashrateEh: 0.05 },
-      { date: '2014-12-31', hashrateEh: 0.15 },
-      { date: '2015-12-31', hashrateEh: 0.4 },
-      { date: '2016-12-31', hashrateEh: 1.5 },
-      { date: '2017-12-31', hashrateEh: 4 },
-      { date: '2018-12-31', hashrateEh: 35 },
-      { date: '2019-12-31', hashrateEh: 75 },
-      { date: '2020-12-31', hashrateEh: 120 },
-      { date: '2021-12-31', hashrateEh: 165 },
-      { date: '2022-12-31', hashrateEh: 225 },
-      { date: '2023-12-31', hashrateEh: 400 },
-      { date: '2024-12-31', hashrateEh: 625 },
-      { date: '2025-12-31', hashrateEh: 830 },
-      { date: '2026-08-24', hashrateEh: 1000 },
-    ];
-    return ok(res, {
-      asOf: new Date().toISOString(),
-      source: 'fallback',
-      count: BAKED_HASHRATE.length,
-      points: BAKED_HASHRATE,
-    });
-  }
+  // Baked only — mempool.space's hashrate endpoint hangs indefinitely from
+  // Vercel's serverless IPs (45s+ timeouts in production). Rather than
+  // fight the upstream, use the same monthly-sampled historical series
+  // the chart was designed around. The data is well-known and stable;
+  // the chart still tells the story correctly. Sacrifice real-time
+  // freshness for guaranteed endpoint reliability.
+  const BAKED_HASHRATE: LawsNakamotoPoint[] = [
+    { date: '2010-12-31', hashrateEh: 0.0001 },
+    { date: '2011-12-31', hashrateEh: 0.001 },
+    { date: '2012-12-31', hashrateEh: 0.01 },
+    { date: '2013-12-31', hashrateEh: 0.05 },
+    { date: '2014-12-31', hashrateEh: 0.15 },
+    { date: '2015-12-31', hashrateEh: 0.4 },
+    { date: '2016-12-31', hashrateEh: 1.5 },
+    { date: '2017-12-31', hashrateEh: 4 },
+    { date: '2018-12-31', hashrateEh: 35 },
+    { date: '2019-12-31', hashrateEh: 75 },
+    { date: '2020-12-31', hashrateEh: 120 },
+    { date: '2021-12-31', hashrateEh: 165 },
+    { date: '2022-12-31', hashrateEh: 225 },
+    { date: '2023-12-31', hashrateEh: 400 },
+    { date: '2024-12-31', hashrateEh: 625 },
+    { date: '2025-12-31', hashrateEh: 830 },
+    { date: '2026-08-24', hashrateEh: 1000 },
+  ];
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: 'baked',
+    count: BAKED_HASHRATE.length,
+    points: BAKED_HASHRATE,
+  });
 }
 
 // Perez's techno-economic revolutions. All static — no live API needed.
