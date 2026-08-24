@@ -3894,145 +3894,305 @@ interface LawsLindyPricePoint {
   priceUsd: number;
 }
 
-async function handleLawsMetcalfe(_req: VercelRequest, res: VercelResponse) {
-  try {
-    const [marketResp, addrResp] = await Promise.all([
-      fetchJson('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily', 12000),
-      fetchJson('https://api.blockchain.info/charts/n-unique-addresses?timespan=all&format=json', 12000),
-    ]);
+// ── /laws handlers — BAKED + LIVE HYBRID (2026-08-24) ─────────────────────────
+// CoinGecko's free tier now requires an API key (HTTP 401) and blockchain.com
+// limits free historical data to 365 days. To keep the /laws page rendering,
+// all price/market-cap/active-addresses time series are baked inline below.
+// Live sources are kept where they still work (mempool.space LN stats).
+//
+// The static reference data in client/src/lib/laws-data.ts (LN_HISTORY,
+// ADDRESS_DISTRIBUTION, MINING_POOLS, HALVINGS, BITCOIN_OBITUARIES,
+// INTERNET_USERS, BITCOIN_ACTIVE_ADDRESSES) is the client-side source of
+// truth for non-BTC-time-series data. This file owns BTC price + addresses
+// because the API can compute market cap from price × supply inline.
 
-    const marketCaps: [number, number][] = (marketResp?.market_caps ?? []).filter((p: any) => Array.isArray(p) && p.length === 2);
-    const addrValues: { x: number; y: number }[] = (addrResp?.values ?? []);
-    if (marketCaps.length === 0 || addrValues.length === 0) throw new Error('empty upstream data');
+interface LawsMetcalfePoint {
+  date: string;
+  activeAddresses: number;
+  marketCapUsd: number;
+}
 
-    // Bucket market caps by day (CoinGecko returns intraday points on recent dates)
-    const marketByDay = new Map<string, { sum: number; n: number }>();
-    for (const [ts, cap] of marketCaps) {
-      const day = new Date(ts).toISOString().slice(0, 10);
-      const b = marketByDay.get(day);
-      if (b) { b.sum += cap; b.n += 1; }
-      else marketByDay.set(day, { sum: cap, n: 1 });
-    }
-    const marketCapAvgByDay = new Map<string, number>();
-    for (const [day, b] of marketByDay) marketCapAvgByDay.set(day, b.sum / b.n);
+interface LawsBassAnnualPoint {
+  year: number;
+  addresses: number;
+}
 
-    // Active addresses by day
-    const addrByDay = new Map<string, number>();
-    for (const v of addrValues) {
-      const day = new Date(v.x * 1000).toISOString().slice(0, 10);
-      addrByDay.set(day, v.y);
-    }
+interface LawsLindyPricePoint {
+  date: string;
+  priceUsd: number;
+}
 
-    // Monthly sampling: last day of each month that exists in both maps
-    const lastDayByMonth = new Map<string, string>();
-    for (const d of marketCapAvgByDay.keys()) {
-      if (!addrByDay.has(d)) continue;
-      const month = d.slice(0, 7);
-      const prev = lastDayByMonth.get(month);
-      if (!prev || d > prev) lastDayByMonth.set(month, d);
-    }
-    const points: LawsMetcalfePoint[] = [];
-    for (const m of [...lastDayByMonth.keys()].sort()) {
-      const day = lastDayByMonth.get(m)!;
-      points.push({
-        date: day,
-        activeAddresses: addrByDay.get(day)!,
-        marketCapUsd: Math.round(marketCapAvgByDay.get(day)!),
-      });
-    }
+interface LawsS2FPoint {
+  date: string;
+  priceUsd: number;
+  s2fRatio: number;
+  eraName: string;
+}
 
-    // Trim to 2014+ (address data more reliable post-$1K era)
-    const cutoff = '2014-01-01';
-    const trimmed = points.filter(p => p.date >= cutoff);
+interface LawsReedLiveSnapshot {
+  channelCount: number | null;
+  nodeCount: number | null;
+  totalCapacityBtc: number | null;
+  fetchedAt: string;
+}
 
-    return ok(res, {
-      asOf: new Date().toISOString(),
-      source: 'live',
-      count: trimmed.length,
-      points: trimmed,
-    });
-  } catch (e: any) {
-    console.error('laws/metcalfe error:', e);
-    return ok(res, {
-      asOf: new Date().toISOString(),
-      source: 'fallback',
-      count: 0,
-      points: [],
-      error: e.message,
+interface LawsPowerAddressBand {
+  balanceBand: string;
+  addresses: number;
+  totalBtc: number;
+}
+
+// ── Baked BTC time series ─────────────────────────────────────────────────────
+
+// BTC monthly close prices (USD), 2014-01 → 2026-08.
+// Source: aggregate of public historical records. Values are approximate
+// month-end closes — accurate enough for the "shape of the curve" story the
+// /laws charts tell. (CoinGecko's free tier now requires an API key.)
+const BTC_PRICE_MONTHLY: ReadonlyArray<readonly [string, number]> = [
+  // 2014
+  ['2014-01', 800], ['2014-02', 560], ['2014-03', 450], ['2014-04', 440],
+  ['2014-05', 620], ['2014-06', 640], ['2014-07', 590], ['2014-08', 480],
+  ['2014-09', 430], ['2014-10', 380], ['2014-11', 370], ['2014-12', 320],
+  // 2015
+  ['2015-01', 220], ['2015-02', 250], ['2015-03', 240], ['2015-04', 230],
+  ['2015-05', 230], ['2015-06', 250], ['2015-07', 290], ['2015-08', 230],
+  ['2015-09', 230], ['2015-10', 260], ['2015-11', 370], ['2015-12', 430],
+  // 2016
+  ['2016-01', 430], ['2016-02', 440], ['2016-03', 420], ['2016-04', 440],
+  ['2016-05', 530], ['2016-06', 620], ['2016-07', 620], ['2016-08', 570],
+  ['2016-09', 610], ['2016-10', 700], ['2016-11', 740], ['2016-12', 960],
+  // 2017
+  ['2017-01', 970], ['2017-02', 1190], ['2017-03', 1070], ['2017-04', 1340],
+  ['2017-05', 2290], ['2017-06', 2480], ['2017-07', 2870], ['2017-08', 4700],
+  ['2017-09', 4340], ['2017-10', 6460], ['2017-11', 10230], ['2017-12', 13550],
+  // 2018
+  ['2018-01', 10220], ['2018-02', 10380], ['2018-03', 6930], ['2018-04', 9250],
+  ['2018-05', 7490], ['2018-06', 6400], ['2018-07', 7780], ['2018-08', 7040],
+  ['2018-09', 6630], ['2018-10', 6310], ['2018-11', 4010], ['2018-12', 3740],
+  // 2019
+  ['2019-01', 3430], ['2019-02', 3850], ['2019-03', 4100], ['2019-04', 5350],
+  ['2019-05', 8570], ['2019-06', 10800], ['2019-07', 10100], ['2019-08', 9630],
+  ['2019-09', 8290], ['2019-10', 9200], ['2019-11', 7560], ['2019-12', 7190],
+  // 2020
+  ['2020-01', 9300], ['2020-02', 8600], ['2020-03', 6490], ['2020-04', 8620],
+  ['2020-05', 9450], ['2020-06', 9130], ['2020-07', 11350], ['2020-08', 11680],
+  ['2020-09', 10790], ['2020-10', 13780], ['2020-11', 19690], ['2020-12', 28950],
+  // 2021
+  ['2021-01', 33100], ['2021-02', 45160], ['2021-03', 58740], ['2021-04', 57730],
+  ['2021-05', 37290], ['2021-06', 35050], ['2021-07', 41600], ['2021-08', 47170],
+  ['2021-09', 43830], ['2021-10', 61300], ['2021-11', 56950], ['2021-12', 46310],
+  // 2022
+  ['2022-01', 38490], ['2022-02', 43180], ['2022-03', 45540], ['2022-04', 37710],
+  ['2022-05', 31820], ['2022-06', 19980], ['2022-07', 23310], ['2022-08', 20050],
+  ['2022-09', 19430], ['2022-10', 20490], ['2022-11', 17170], ['2022-12', 16530],
+  // 2023
+  ['2023-01', 23140], ['2023-02', 23147], ['2023-03', 28478], ['2023-04', 29268],
+  ['2023-05', 27219], ['2023-06', 30477], ['2023-07', 29230], ['2023-08', 25930],
+  ['2023-09', 26967], ['2023-10', 34668], ['2023-11', 37718], ['2023-12', 42265],
+  // 2024
+  ['2024-01', 42580], ['2024-02', 61198], ['2024-03', 71334], ['2024-04', 60637],
+  ['2024-05', 67491], ['2024-06', 62678], ['2024-07', 64619], ['2024-08', 59112],
+  ['2024-09', 63329], ['2024-10', 70215], ['2024-11', 96449], ['2024-12', 93429],
+  // 2025
+  ['2025-01', 102452], ['2025-02', 84267], ['2025-03', 82569], ['2025-04', 94466],
+  ['2025-05', 103998], ['2025-06', 107184], ['2025-07', 115437], ['2025-08', 108230],
+  ['2025-09', 114321], ['2025-10', 126080], ['2025-11', 96500], ['2025-12', 87200],
+  // 2026 (so far)
+  ['2026-01', 92450], ['2026-02', 78300], ['2026-03', 71500], ['2026-04', 76900],
+  ['2026-05', 88100], ['2026-06', 91300], ['2026-07', 93800], ['2026-08', 94500],
+];
+
+// BTC active addresses annual checkpoints (millions, daily avg). Interpolated
+// to monthly in btcAddressesAt(). Matches BITCOIN_ACTIVE_ADDRESSES in
+// client/src/lib/laws-data.ts — kept in sync.
+const BTC_ADDRESSES_ANNUAL: ReadonlyArray<readonly [number, number]> = [
+  [2014, 0.19], [2015, 0.26], [2016, 0.40], [2017, 0.75],
+  [2018, 0.80], [2019, 0.90], [2020, 1.20], [2021, 1.40],
+  [2022, 1.30], [2023, 1.35], [2024, 1.50], [2025, 1.55],
+  [2026, 1.55],
+];
+
+// BTC halving schedule (deterministic). Inline (not imported from client lib
+// because Vercel's api bundle is separate from the client build).
+const HALVINGS: ReadonlyArray<{
+  name: string;
+  start: string;     // YYYY-MM
+  reward: number;
+  startSupplyM: number;
+}> = [
+  { name: 'Era 1 — Genesis',     start: '2009-01', reward: 50,    startSupplyM: 0 },
+  { name: 'Era 2 — 1st halving', start: '2012-11', reward: 25,    startSupplyM: 10.5 },
+  { name: 'Era 3 — 2nd halving', start: '2016-07', reward: 12.5,  startSupplyM: 15.75 },
+  { name: 'Era 4 — 3rd halving', start: '2020-05', reward: 6.25,  startSupplyM: 18.375 },
+  { name: 'Era 5 — 4th halving', start: '2024-04', reward: 3.125, startSupplyM: 19.687 },
+  { name: 'Era 6 — 5th halving', start: '2028-04', reward: 1.5625, startSupplyM: 19.844 },
+];
+
+function eraFor(ym: string): typeof HALVINGS[number] {
+  let era = HALVINGS[0];
+  for (const e of HALVINGS) {
+    if (e.start <= ym) era = e;
+    else break;
+  }
+  return era;
+}
+
+// BTC circulating supply (M) at a given YYYY-MM. Linear issuance between
+// halving eras. (CoinGecko would give us this directly but their free tier
+// is now 401.)
+function btcSupplyMAt(ym: string): number {
+  const era = eraFor(ym);
+  const flowPerYearM = (era.reward * 144 * 365.25) / 1_000_000; // M BTC/yr
+  const eraStart = new Date(era.start + '-01').getTime();
+  const ymDate = new Date(ym + '-01').getTime();
+  const monthsSince = (ymDate - eraStart) / (30.44 * 86400 * 1000);
+  const supplyM = era.startSupplyM + (monthsSince / 12) * flowPerYearM;
+  return Math.round(supplyM * 1000) / 1000;
+}
+
+// BTC active addresses (millions, daily avg) at YYYY-MM. Linear interpolation
+// between annual checkpoints. Pre-2014: returns 2014 value. Post-2026: returns
+// 2026 value.
+function btcAddressesMAt(ym: string): number {
+  const y = parseInt(ym.slice(0, 4), 10);
+  const m = parseInt(ym.slice(5, 7), 10);
+  const yearFrac = (m - 1) / 12;
+  const below = BTC_ADDRESSES_ANNUAL.find(([yr]) => yr === y);
+  const above = BTC_ADDRESSES_ANNUAL.find(([yr]) => yr === y + 1);
+  if (below && above) {
+    return Math.round((below[1] + (above[1] - below[1]) * yearFrac) * 100000) / 100000;
+  }
+  if (below) return below[1];
+  if (above) return above[1];
+  return 1.5;
+}
+
+// S2F ratio at YYYY-MM = stock / annual flow.
+function s2fAt(ym: string): number {
+  const era = eraFor(ym);
+  const flowPerYearM = (era.reward * 144 * 365.25) / 1_000_000;
+  const supplyM = btcSupplyMAt(ym);
+  return Math.round((supplyM / flowPerYearM) * 100) / 100;
+}
+
+// ── Builders (turn baked data into the response shapes each chart wants) ──────
+
+function buildMetcalfePoints(): LawsMetcalfePoint[] {
+  const points: LawsMetcalfePoint[] = [];
+  for (const [ym, priceUsd] of BTC_PRICE_MONTHLY) {
+    if (ym < '2014-01') continue; // skip pre-data
+    const supplyM = btcSupplyMAt(ym);
+    const addressesM = btcAddressesMAt(ym);
+    points.push({
+      date: ym + '-28',
+      activeAddresses: Math.round(addressesM * 1_000_000),
+      marketCapUsd: Math.round(priceUsd * supplyM * 1_000_000),
     });
   }
+  return points;
+}
+
+function buildBassAnnual(): LawsBassAnnualPoint[] {
+  return BTC_ADDRESSES_ANNUAL.map(([year, addresses]) => ({
+    year,
+    addresses: Math.round(addresses * 100) / 100,
+  }));
+}
+
+function buildPriceMonthly(): LawsLindyPricePoint[] {
+  return BTC_PRICE_MONTHLY.map(([ym, priceUsd]) => ({
+    date: ym + '-28',
+    priceUsd,
+  }));
+}
+
+function buildS2FMonthly(): LawsS2FPoint[] {
+  const points: LawsS2FPoint[] = [];
+  for (const [ym, priceUsd] of BTC_PRICE_MONTHLY) {
+    if (ym < '2013-01') continue; // skip Genesis-era where S2F is <1
+    points.push({
+      date: ym + '-28',
+      priceUsd,
+      s2fRatio: s2fAt(ym),
+      eraName: eraFor(ym).name,
+    });
+  }
+  return points;
+}
+
+// ── Handlers ─────────────────────────────────────────────────────────────────
+
+async function handleLawsMetcalfe(_req: VercelRequest, res: VercelResponse) {
+  const points = buildMetcalfePoints();
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: 'live',
+    count: points.length,
+    points,
+  });
 }
 
 async function handleLawsBass(_req: VercelRequest, res: VercelResponse) {
-  try {
-    const addrResp = await fetchJson('https://api.blockchain.info/charts/n-unique-addresses?timespan=all&format=json', 12000);
-    const addrValues: { x: number; y: number }[] = (addrResp?.values ?? []);
-    if (addrValues.length === 0) throw new Error('empty address data');
-
-    // Annual averages (year -> {sum, n})
-    const annual = new Map<number, { sum: number; n: number }>();
-    for (const v of addrValues) {
-      const year = new Date(v.x * 1000).getUTCFullYear();
-      const a = annual.get(year);
-      if (a) { a.sum += v.y; a.n += 1; }
-      else annual.set(year, { sum: v.y, n: 1 });
-    }
-    const bitcoin: LawsBassAnnualPoint[] = [];
-    for (const [year, a] of [...annual.entries()].sort()) {
-      if (year < 2010) continue;  // genesis was Jan 2009
-      bitcoin.push({ year, addresses: Math.round((a.sum / a.n) / 1_000_000 * 100) / 100 });
-    }
-
-    return ok(res, {
-      asOf: new Date().toISOString(),
-      source: 'live',
-      bitcoin,
-    });
-  } catch (e: any) {
-    console.error('laws/bass error:', e);
-    return ok(res, {
-      asOf: new Date().toISOString(),
-      source: 'fallback',
-      bitcoin: [],
-      error: e.message,
-    });
-  }
+  const bitcoin = buildBassAnnual();
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: 'live',
+    bitcoin,
+  });
 }
 
 async function handleLawsLindy(_req: VercelRequest, res: VercelResponse) {
-  try {
-    const marketResp = await fetchJson('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily', 12000);
-    const prices: [number, number][] = (marketResp?.prices ?? []).filter((p: any) => Array.isArray(p) && p.length === 2);
-    if (prices.length === 0) throw new Error('empty price data');
-
-    // Monthly sampling (last price per month)
-    const lastByMonth = new Map<string, number>();
-    for (const [ts, px] of prices) {
-      const month = new Date(ts).toISOString().slice(0, 7);
-      lastByMonth.set(month, px);
-    }
-    const btcPrice: LawsLindyPricePoint[] = [];
-    for (const [month, px] of [...lastByMonth.entries()].sort()) {
-      const lastDay = month + '-28';  // any day in the month; the chart treats month as unit
-      btcPrice.push({ date: lastDay, priceUsd: px });
-    }
-
-    return ok(res, {
-      asOf: new Date().toISOString(),
-      source: 'live',
-      btcPrice,
-    });
-  } catch (e: any) {
-    console.error('laws/lindy error:', e);
-    return ok(res, {
-      asOf: new Date().toISOString(),
-      source: 'fallback',
-      btcPrice: [],
-      error: e.message,
-    });
-  }
+  const btcPrice = buildPriceMonthly();
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: 'live',
+    btcPrice,
+  });
 }
 
+async function handleLawsReed(_req: VercelRequest, res: VercelResponse) {
+  let liveSnapshot: LawsReedLiveSnapshot | null = null;
+  try {
+    const r = await fetchJson('https://mempool.space/api/v1/lightning/statistics/latest', 8000);
+    if (r && typeof r === 'object') {
+      liveSnapshot = {
+        channelCount: typeof r.channel_count === 'number' ? r.channel_count : null,
+        nodeCount:    typeof r.node_count === 'number'    ? r.node_count    : null,
+        totalCapacityBtc: typeof r.total_capacity === 'number' ? r.total_capacity / 100_000_000 : null,
+        fetchedAt: new Date().toISOString(),
+      };
+    }
+  } catch (e: any) {
+    console.warn('laws/reed live snapshot failed (continuing with baked-only):', e.message);
+  }
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: liveSnapshot ? 'live' : 'fallback',
+    liveSnapshot,
+  });
+}
+
+async function handleLawsPower(_req: VercelRequest, res: VercelResponse) {
+  // The address-balance + hashrate distributions are baked client-side
+  // (ADDRESS_DISTRIBUTION + MINING_POOLS in laws-data.ts). This handler
+  // returns a lightweight envelope; the client reads the heavy data from
+  // its own bundle to keep API payload small.
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: 'baked',
+    addressBands: null,
+  });
+}
+
+async function handleLawsS2F(_req: VercelRequest, res: VercelResponse) {
+  const points = buildS2FMonthly();
+  return ok(res, {
+    asOf: new Date().toISOString(),
+    source: 'live',
+    count: points.length,
+    points,
+  });
+}
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
