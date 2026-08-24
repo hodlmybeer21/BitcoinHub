@@ -12,10 +12,10 @@ import StatusPipeline from "./StatusPipeline";
 interface BillData {
   slug: string;
   billName: string;
-  billSlug: string;        // e.g., "119-s-1582"
-  billType: string;
-  billNumber: string;
-  congress: string;
+  billSlug: string;        // e.g., "119-s-1582" or just slug for editorial-only
+  billType?: string;        // undefined for editorial-only bills (no congress.gov ID yet)
+  billNumber?: string;      // undefined for editorial-only bills
+  congress?: string;        // undefined for editorial-only bills
   category: string;
   priority: string;
   whyItMatters: string;
@@ -62,7 +62,10 @@ function passageColor(chance: number): string {
 }
 
 export default function BillCard({ bill }: Props) {
-  const congressUrl = `https://www.congress.gov/bill/${bill.congress}th-congress/${bill.billType === 's' ? 'senate-bill' : 'house-bill'}/${bill.billNumber}`;
+  const hasCongressId = !!bill.congress && !!bill.billType && !!bill.billNumber;
+  const congressUrl = hasCongressId
+    ? `https://www.congress.gov/bill/${bill.congress}th-congress/${bill.billType === 's' ? 'senate-bill' : 'house-bill'}/${bill.billNumber}`
+    : null;
 
   return (
     <Card id={bill.slug} className="bg-card border-muted/20">
@@ -80,17 +83,23 @@ export default function BillCard({ bill }: Props) {
               </Badge>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <a
-                href={congressUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono hover:text-primary hover:underline"
-              >
-                {bill.congress}-{bill.billType.toUpperCase()}-{bill.billNumber}
-              </a>
+              {hasCongressId ? (
+                <a
+                  href={congressUrl!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono hover:text-primary hover:underline"
+                >
+                  {bill.congress}-{bill.billType!.toUpperCase()}-{bill.billNumber}
+                </a>
+              ) : (
+                <Badge variant="outline" className="text-[10px] border-muted/30 text-muted-foreground bg-muted/5">
+                  Editorial pending live data
+                </Badge>
+              )}
               <span className="flex items-center gap-1">
                 <Building2 className="w-3 h-3" />
-                Originated in {bill.originChamber || (bill.billType === 's' ? 'Senate' : 'House')}
+                Originated in {bill.originChamber || (bill.billType === 's' ? 'Senate' : bill.billType === 'hr' ? 'House' : '—')}
               </span>
             </div>
           </div>
@@ -151,10 +160,16 @@ export default function BillCard({ bill }: Props) {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <FileText className="w-3 h-3" />
-            <span>Live: </span>
-            <a href={congressUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline">
-              congress.gov/{bill.congress}-{bill.billType}-{bill.billNumber}
-            </a>
+            {hasCongressId ? (
+              <>
+                <span>Live: </span>
+                <a href={congressUrl!} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline">
+                  congress.gov/{bill.congress}-{bill.billType}-{bill.billNumber}
+                </a>
+              </>
+            ) : (
+              <span>Source: Tyler + GoodBot editorial</span>
+            )}
           </div>
         </div>
       </CardContent>
