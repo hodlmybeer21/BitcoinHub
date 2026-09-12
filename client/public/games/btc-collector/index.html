@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>₿ Bitcoin Collector · BitcoinHub</title>
+  <title>₿ Bitcoin Empire · BitcoinHub</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -24,37 +24,111 @@
     }
     canvas { display: block; touch-action: none; }
 
+    /* Main HUD */
     #hud {
       position: absolute;
-      top: max(12px, env(safe-area-inset-top, 12px));
-      left: 12px;
+      top: max(14px, env(safe-area-inset-top, 14px));
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 10;
-      padding: 10px 14px;
-      background: rgba(0,0,0,0.55);
-      border: 2px solid #fbbf24;
-      border-radius: 6px;
-      font-size: 12px;
-      min-width: 200px;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      padding: 14px 22px;
+      text-align: center;
+      pointer-events: none;
     }
-    #hud h1 {
-      margin: 0 0 6px 0;
+    #amount-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: rgba(255,255,255,0.45);
+      text-transform: uppercase;
+    }
+    #amount {
+      font-size: 32px;
+      font-weight: 800;
       color: #fbbf24;
-      font-size: 14px;
-      letter-spacing: 2px;
-      text-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+      letter-spacing: 1px;
+      text-shadow: 0 0 18px rgba(251, 191, 36, 0.4);
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
     }
-    #hud .row { margin: 3px 0; font-size: 13px; }
-    #hud .row b { color: #fbbf24; }
-    #lives { font-size: 14px; letter-spacing: 3px; }
-    #lives .heart { color: #ef4444; text-shadow: 0 0 6px rgba(239,68,68,0.6); }
-    #lives .lost { color: #444; }
+    #amount-sub {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+    #halving-bar {
+      width: 220px;
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      margin: 10px auto 0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #halving-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22d3ee 0%, #fbbf24 100%);
+      transition: width 0.2s linear;
+    }
+    #halving-text {
+      font-size: 9px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 1px;
+      margin-top: 5px;
+    }
+
+    /* Stats corner */
+    #stats {
+      position: absolute;
+      top: max(14px, env(safe-area-inset-top, 14px));
+      left: 14px;
+      z-index: 10;
+      font-size: 10px;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+    #stats .stat {
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 4px;
+    }
+    #stats .stat b {
+      color: #a78bfa;
+      font-weight: 600;
+    }
+
+    /* Halving flash */
+    #halving-flash {
+      position: absolute;
+      inset: 0;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    #halving-flash.show { opacity: 1; }
+    #halving-flash .text {
+      font-size: 28px;
+      font-weight: 800;
+      color: #22d3ee;
+      letter-spacing: 4px;
+      text-shadow: 0 0 30px rgba(34, 211, 238, 0.8);
+      text-align: center;
+    }
+    #halving-flash .text small {
+      display: block;
+      font-size: 12px;
+      color: #fbbf24;
+      letter-spacing: 2px;
+      margin-top: 6px;
+    }
 
     /* BitcoinHub footer */
     #hub-footer {
       position: absolute;
-      bottom: max(8px, env(safe-area-inset-bottom, 8px));
+      bottom: max(10px, env(safe-area-inset-bottom, 10px));
       left: 50%;
       transform: translateX(-50%);
       z-index: 5;
@@ -66,23 +140,51 @@
     }
     #hub-footer a { color: #a78bfa; text-decoration: none; font-weight: 600; }
     #hub-footer .sep { color: rgba(255,255,255,0.18); margin: 0 6px; }
+
+    /* Tutorial overlay (dismissed on first tap) */
+    #tutorial {
+      position: absolute;
+      bottom: 18%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 12;
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 1px;
+      text-align: center;
+      pointer-events: none;
+      animation: fade-pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes fade-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
-  <div id="hud">
-    <h1>₿ TO THE MOON</h1>
-    <div class="row">Score: <b id="score">0</b></div>
-    <div class="row">Time: <b id="timer">60</b>s</div>
-    <div class="row">Status: <b id="status">Collect the satoshis</b></div>
-    <div class="row">Lives: <span id="lives"><span class="heart">♥</span><span class="heart">♥</span><span class="heart">♥</span></span></div>
+  <div id="stats">
+    <div class="stat">NODES <b id="nodes-count">0</b></div>
+    <div class="stat">RATE <b id="rate-display">1.0</b>/s</div>
   </div>
+
+  <div id="hud">
+    <div id="amount-label">YOUR HOLDINGS</div>
+    <div id="amount">0.00000000 ₿</div>
+    <div id="amount-sub">0 satoshis</div>
+    <div id="halving-bar"><div id="halving-fill"></div></div>
+    <div id="halving-text">Next halving: <span id="halving-count">60.0</span>s</div>
+  </div>
+
+  <div id="halving-flash"><div class="text">HALVING<div id="halving-multiplier">RATE ×0.5</div><small>The code is law</small></div></div>
+
+  <div id="tutorial">Tap anywhere to add a satoshi · Empower the network</div>
 
   <div id="hub-footer">
     <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener">bitcoinhub</a>
     <span class="sep">·</span>
-    <a href="https://bitcoinhub.goodbotai.tech/cycle" target="_blank" rel="noopener">Cycle</a>
-    <span class="sep">·</span>
     <a href="https://bitcoinhub.goodbotai.tech/laws" target="_blank" rel="noopener">Laws</a>
+    <span class="sep">·</span>
+    <a href="https://bitcoinhub.goodbotai.tech/cycle" target="_blank" rel="noopener">Cycle</a>
   </div>
 
   <canvas id="game"></canvas>
@@ -90,23 +192,21 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
     }
   }
   </script>
 
   <script type="module">
   import * as THREE from 'three';
-  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
   // ========== Scene ==========
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x02030a);
-  scene.fog = new THREE.FogExp2(0x02030a, 0.030);
+  scene.fog = new THREE.FogExp2(0x02030a, 0.012);
 
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-  camera.position.set(0, 0, 13);
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 0, 14);
   camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({
@@ -118,518 +218,338 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   // ========== Lighting ==========
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
-  keyLight.position.set(5, 8, 8);
+  scene.add(new THREE.AmbientLight(0x303040, 0.6));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  keyLight.position.set(5, 10, 8);
   scene.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(0xfbbf24, 0.5);
-  fillLight.position.set(-6, 4, 4);
-  scene.add(fillLight);
-  const rimLight = new THREE.DirectionalLight(0x60a5fa, 0.4);
-  rimLight.position.set(0, -4, -5);
-  scene.add(rimLight);
+  const warmRim = new THREE.DirectionalLight(0xfbbf24, 0.7);
+  warmRim.position.set(-5, 4, 4);
+  scene.add(warmRim);
+  const coolRim = new THREE.DirectionalLight(0x60a5fa, 0.4);
+  coolRim.position.set(0, -4, -5);
+  scene.add(coolRim);
 
-  // ========== Starfield ==========
+  // ========== Moon (target) ==========
+  const moonGeo = new THREE.SphereGeometry(1.5, 32, 32);
+  const moonMat = new THREE.MeshStandardMaterial({
+    color: 0xc8c4b8,
+    roughness: 0.95,
+    emissive: 0x6b6855,
+    emissiveIntensity: 0.15,
+  });
+  const moon = new THREE.Mesh(moonGeo, moonMat);
+  moon.position.set(0, 8, -22);
+  scene.add(moon);
+
+  // Moon glow halo
+  const moonHalo = new THREE.Mesh(
+    new THREE.SphereGeometry(2.0, 24, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xfbbf24, transparent: true, opacity: 0.12, side: THREE.BackSide,
+    })
+  );
+  moonHalo.position.copy(moon.position);
+  scene.add(moonHalo);
+
+  // ========== Stars ==========
   {
     const g = new THREE.BufferGeometry();
-    const N = 600;
+    const N = 800;
     const pos = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
-      pos[i*3 + 0] = (Math.random() - 0.5) * 50;
-      pos[i*3 + 1] = (Math.random() - 0.5) * 50;
-      pos[i*3 + 2] = -10 - Math.random() * 20;
+      pos[i*3+0] = (Math.random() - 0.5) * 80;
+      pos[i*3+1] = (Math.random() - 0.5) * 80;
+      pos[i*3+2] = -10 - Math.random() * 30;
     }
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     scene.add(new THREE.Points(g, new THREE.PointsMaterial({
-      color: 0xffffff, size: 0.12, sizeAttenuation: true,
-      transparent: true, opacity: 0.75,
+      color: 0xffffff, size: 0.12, transparent: true, opacity: 0.7, sizeAttenuation: true,
     })));
   }
 
-  // Distant planet
-  const planet = new THREE.Mesh(
-    new THREE.SphereGeometry(2.5, 24, 24),
-    new THREE.MeshStandardMaterial({
-      color: 0xd4a574, roughness: 0.85,
-      emissive: 0x442200, emissiveIntensity: 0.4,
-    })
-  );
-  planet.position.set(9, 6, -18);
-  scene.add(planet);
-
-  // ========== Bitcoin coin texture (canvas) ==========
+  // ========== Bitcoin coin (procedural, emissive) ==========
   function makeBitcoinTexture() {
     const c = document.createElement('canvas');
     c.width = c.height = 256;
     const ctx = c.getContext('2d');
-    const grad = ctx.createRadialGradient(128, 110, 20, 128, 128, 130);
+    const grad = ctx.createRadialGradient(128, 100, 20, 128, 128, 130);
     grad.addColorStop(0, '#fff5b8');
-    grad.addColorStop(0.5, '#fbbf24');
+    grad.addColorStop(0.4, '#fbbf24');
     grad.addColorStop(1, '#7c2d12');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 256, 256);
-    ctx.strokeStyle = '#7c2d12';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(8, 8, 240, 240);
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, 236, 236);
     ctx.fillStyle = '#1a1a1a';
-    ctx.font = 'bold 200px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.font = 'bold 180px "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('₿', 128, 138);
+    ctx.fillText('₿', 128, 140);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
 
-  // ========== Load ship (with procedural fallback) ==========
-  const loader = new GLTFLoader();
-  let ship = null, shipReady = false, shipIsFallback = false;
-  const SHIP_BASE_Y = -7.5;
-  const ARENA_X = 8;
-
-  function makeFallbackShip() {
-    // Procedural ship — used when the Blender .glb fails to load.
-    // All emissive gold/dark so it renders on any device without IBL.
-    const grp = new THREE.Group();
-    const gold = new THREE.MeshStandardMaterial({
-      color: 0xfbbf24, roughness: 0.45, metalness: 0.25,
-      emissive: 0xfbbf24, emissiveIntensity: 0.6,
-    });
-    const dark = new THREE.MeshStandardMaterial({
-      color: 0x2a2a2a, roughness: 0.55, metalness: 0.15,
-      emissive: 0x555555, emissiveIntensity: 0.25,
-    });
-    const glass = new THREE.MeshStandardMaterial({
-      color: 0x60a5fa, roughness: 0.1, metalness: 0.0,
-      emissive: 0x60a5fa, emissiveIntensity: 0.8,
-    });
-    const flame = new THREE.MeshBasicMaterial({
-      color: 0xfb923c, transparent: true, opacity: 0.85,
-    });
-
-    // Nose cone
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.6, 12), gold);
-    nose.position.y = 0.8;
-    grp.add(nose);
-
-    // Body cylinder
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.4, 12), gold);
-    body.rotation.x = Math.PI / 2;
-    grp.add(body);
-
-    // Cockpit dome
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), glass);
-    dome.position.set(0, 0.35, 0);
-    dome.rotation.x = -Math.PI / 2;
-    grp.add(dome);
-
-    // Wings
-    for (const x of [-1, 1]) {
-      const w = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.45), dark);
-      w.position.set(x * 0.7, -0.1, 0);
-      w.rotation.z = x * 0.18;
-      grp.add(w);
-      // Wingtip
-      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.25), gold);
-      tip.position.set(x * 1.05, -0.2, 0);
-      grp.add(tip);
-    }
-
-    // Engine glow
-    const engine = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.5, 8), flame);
-    engine.rotation.x = Math.PI / 2;
-    engine.position.y = -0.85;
-    grp.add(engine);
-
-    grp.position.set(0, SHIP_BASE_Y, 0);
-    return grp;
-  }
-
-  loader.load('assets/spaceship.glb', (gltf) => {
-    ship = gltf.scene;
-    ship.scale.set(0.85, 0.85, 0.85);
-    ship.position.set(0, SHIP_BASE_Y, 0);
-    scene.add(ship);
-
-    // Thrust particles
-    const tpCount = 40;
-    const tpGeo = new THREE.BufferGeometry();
-    const tpPos = new Float32Array(tpCount * 3);
-    const tpVel = [];
-    for (let i = 0; i < tpCount; i++) {
-      tpPos[i*3+0] = ship.position.x + (Math.random()-0.5) * 0.3;
-      tpPos[i*3+1] = ship.position.y - 1.0;
-      tpPos[i*3+2] = 0;
-      tpVel.push({ life: Math.random(), maxLife: 0.4 + Math.random() * 0.3 });
-    }
-    tpGeo.setAttribute('position', new THREE.BufferAttribute(tpPos, 3));
-    const thrust = new THREE.Points(tpGeo, new THREE.PointsMaterial({
-      color: 0xfb923c, size: 0.22, transparent: true, opacity: 0.85,
-      sizeAttenuation: true,
-    }));
-    scene.add(thrust);
-
-    shipReady = true;
-    shipIsFallback = false;
-    window.__ship = ship;
-    window.__thrust = thrust;
-    window.__tpVel = tpVel;
-    window.__tpCount = tpCount;
-    window.__tpPos = tpPos;
-  }, undefined, (err) => {
-    // Ship .glb failed — use procedural fallback so the game is still playable.
-    console.warn('Ship .glb failed, using procedural fallback:', err);
-    ship = makeFallbackShip();
-    scene.add(ship);
-
-    // Thrust for fallback ship too
-    const tpCount = 40;
-    const tpGeo = new THREE.BufferGeometry();
-    const tpPos = new Float32Array(tpCount * 3);
-    const tpVel = [];
-    for (let i = 0; i < tpCount; i++) {
-      tpPos[i*3+0] = ship.position.x + (Math.random()-0.5) * 0.3;
-      tpPos[i*3+1] = ship.position.y - 1.0;
-      tpPos[i*3+2] = 0;
-      tpVel.push({ life: Math.random(), maxLife: 0.4 + Math.random() * 0.3 });
-    }
-    tpGeo.setAttribute('position', new THREE.BufferAttribute(tpPos, 3));
-    const thrust = new THREE.Points(tpGeo, new THREE.PointsMaterial({
-      color: 0xfb923c, size: 0.22, transparent: true, opacity: 0.85,
-      sizeAttenuation: true,
-    }));
-    scene.add(thrust);
-
-    shipReady = true;
-    shipIsFallback = true;
-    window.__ship = ship;
-    window.__thrust = thrust;
-    window.__tpVel = tpVel;
-    window.__tpCount = tpCount;
-    window.__tpPos = tpPos;
-    statusEl.textContent = 'Fallback ship';
-    statusEl.style.color = '#fb923c';
-  });
-
-  // ========== Glow ring under ship ==========
-  const glowRing = new THREE.Mesh(
-    new THREE.RingGeometry(1.4, 1.9, 48),
-    new THREE.MeshBasicMaterial({
-      color: 0xfbbf24, transparent: true, opacity: 0.35,
-      side: THREE.DoubleSide,
-    })
-  );
-  glowRing.rotation.x = -Math.PI / 2;
-  glowRing.position.y = -1.0;
-  scene.add(glowRing);
-
-  // ========== Bitcoin coins ==========
-  const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.12, 28);
+  const coinGroup = new THREE.Group();
   const coinSideMat = new THREE.MeshStandardMaterial({
-    color: 0xd97706, roughness: 0.4, metalness: 0.4,
+    color: 0xd97706, roughness: 0.3, metalness: 0.6,
+    emissive: 0xd97706, emissiveIntensity: 0.4,
   });
   const coinFaceMat = new THREE.MeshStandardMaterial({
-    map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.3,
+    map: makeBitcoinTexture(),
+    roughness: 0.4, metalness: 0.4,
+    emissive: 0xfbbf24, emissiveIntensity: 0.3,
   });
-  const coins = [];
+  const coin = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.2, 1.2, 0.25, 48),
+    [coinSideMat, coinFaceMat, coinFaceMat]
+  );
+  coin.rotation.x = Math.PI / 2;
+  coinGroup.add(coin);
 
-  function spawnCoin() {
-    const coin = new THREE.Mesh(coinGeo, [coinSideMat, coinFaceMat, coinFaceMat]);
-    coin.position.set((Math.random() - 0.5) * (ARENA_X * 2), 9, 0);
-    coin.userData = { vy: -2.5 - Math.random() * 1.5, rotSpeed: 0.04 + Math.random() * 0.04 };
-    scene.add(coin);
-    coins.push(coin);
+  // Inner ring (decorative)
+  const coinRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.95, 0.04, 8, 48),
+    new THREE.MeshStandardMaterial({
+      color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.6,
+      roughness: 0.4, metalness: 0.6,
+    })
+  );
+  coinRing.position.z = 0.13;
+  coinGroup.add(coinRing);
+
+  const coinRing2 = coinRing.clone();
+  coinRing2.position.z = -0.13;
+  coinGroup.add(coinRing2);
+
+  // Glow halo around coin
+  const glowGeo = new THREE.RingGeometry(1.5, 2.4, 48);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xfbbf24, transparent: true, opacity: 0.18,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const coinGlow = new THREE.Mesh(glowGeo, glowMat);
+  scene.add(coinGlow);
+
+  scene.add(coinGroup);
+
+  // ========== Network nodes (empowered users) ==========
+  // Starts empty. Each tap adds a node in a sphere around the coin.
+  const nodes = [];
+  const nodeMat = new THREE.MeshStandardMaterial({
+    color: 0xa78bfa, emissive: 0xa78bfa, emissiveIntensity: 1.0,
+    roughness: 0.3, metalness: 0.5,
+  });
+  const nodeGeo = new THREE.IcosahedronGeometry(0.1, 0);
+
+  function addNode() {
+    const node = new THREE.Mesh(nodeGeo, nodeMat.clone());
+    // Random position on a sphere of radius 4-6
+    const phi = Math.random() * Math.PI * 2;
+    const theta = Math.acos(2 * Math.random() - 1);
+    const r = 4 + Math.random() * 2;
+    node.position.set(
+      r * Math.sin(theta) * Math.cos(phi),
+      r * Math.sin(theta) * Math.sin(phi),
+      r * Math.cos(theta)
+    );
+    node.userData = {
+      baseScale: 1,
+      phase: Math.random() * Math.PI * 2,
+    };
+    scene.add(node);
+    nodes.push(node);
+    document.getElementById('nodes-count').textContent = nodes.length;
   }
 
-  // ========== Asteroids ==========
-  const asteroidGeo = new THREE.IcosahedronGeometry(0.5, 1);
-  const aPos = asteroidGeo.attributes.position;
-  for (let i = 0; i < aPos.count; i++) {
-    const v = new THREE.Vector3().fromBufferAttribute(aPos, i);
-    v.multiplyScalar(1 + (Math.random() - 0.5) * 0.4);
-    aPos.setXYZ(i, v.x, v.y, v.z);
-  }
-  asteroidGeo.computeVertexNormals();
-  const asteroidMat = new THREE.MeshStandardMaterial({
-    color: 0x6b5d50, roughness: 0.95, flatShading: true,
-  });
-  const asteroids = [];
+  // ========== Tap particles ==========
+  const tapParticles = [];
+  const tapParticleGeo = new THREE.SphereGeometry(0.08, 8, 6);
 
-  function spawnAsteroid() {
-    const ast = new THREE.Mesh(asteroidGeo, asteroidMat);
-    const scale = 0.6 + Math.random() * 0.5;
-    ast.scale.set(scale, scale, scale);
-    ast.position.set((Math.random() - 0.5) * (ARENA_X * 2), 9, 0);
-    ast.userData = { vy: -2.5 - Math.random() * 1.5, vx: (Math.random() - 0.5) * 1.0, rotX: (Math.random() - 0.5) * 0.08, rotZ: (Math.random() - 0.5) * 0.08 };
-    scene.add(ast);
-    asteroids.push(ast);
+  function spawnTapParticle(targetX, targetY, targetZ, color = 0xfbbf24) {
+    for (let i = 0; i < 3; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+      const p = new THREE.Mesh(tapParticleGeo, mat);
+      // Start from random screen position-ish (use random offset around coin)
+      const a = Math.random() * Math.PI * 2;
+      const r = 3 + Math.random() * 2;
+      p.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+      p.userData = {
+        tx: targetX, ty: targetY, tz: targetZ,
+        life: 0.8, maxLife: 0.8,
+        vx: (targetX - p.position.x) * 0.08,
+        vy: (targetY - p.position.y) * 0.08,
+        vz: (targetZ - p.position.z) * 0.08,
+      };
+      scene.add(p);
+      tapParticles.push(p);
+    }
+  }
+
+  // ========== Bitcoin text particles (satoshi spawn) ==========
+  // When you tap, a stream of small particles shoots toward the coin
+  function spawnSatoshiToCoin() {
+    const mat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 1 });
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), mat);
+    // Random position outside the visible area
+    const a = Math.random() * Math.PI * 2;
+    const r = 6 + Math.random() * 2;
+    p.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+    p.userData = {
+      tx: 0, ty: 0, tz: 0,
+      life: 1.2, maxLife: 1.2,
+      vx: -p.position.x * 0.04,
+      vy: -p.position.y * 0.04,
+      vz: 0,
+    };
+    scene.add(p);
+    tapParticles.push(p);
   }
 
   // ========== Game state ==========
-  const state = {
-    score: 0,
-    lives: 3,
-    timeLeft: 60,
-    gameOver: false,
-    started: false,
-    invincible: false,
-    invincibleTimer: 0,
-    shake: 0,
-  };
+  const SAT_PER_BTC = 100_000_000;
+  let totalSats = 0;                  // accumulated satoshis
+  let baseRate = 1.0;                 // satoshis per second at current rate
+  let halvingCountdown = 60;         // seconds until next halving
+  let lastTime = performance.now();
+  let milestone = 1;                 // for triggering node growth
 
-  const spawn = { coin: 0, asteroid: 0 };
+  // ========== UI elements ==========
+  const amountEl = document.getElementById('amount');
+  const amountSubEl = document.getElementById('amount-sub');
+  const halvingFillEl = document.getElementById('halving-fill');
+  const halvingCountEl = document.getElementById('halving-count');
+  const rateDisplayEl = document.getElementById('rate-display');
+  const tutorialEl = document.getElementById('tutorial');
+  const halvingFlashEl = document.getElementById('halving-flash');
+  const halvingMultiplierEl = document.getElementById('halving-multiplier');
+
+  function formatBTC(sats) {
+    return (sats / SAT_PER_BTC).toFixed(8);
+  }
+  function updateHUD() {
+    amountEl.textContent = formatBTC(totalSats) + ' ₿';
+    amountSubEl.textContent = Math.floor(totalSats).toLocaleString() + ' satoshis';
+    rateDisplayEl.textContent = baseRate.toFixed(2);
+    halvingCountEl.textContent = halvingCountdown.toFixed(1);
+    halvingFillEl.style.width = ((60 - halvingCountdown) / 60 * 100) + '%';
+
+    // Coin grows with total holdings (logarithmic scale, max ~2.5x)
+    const targetScale = 1 + Math.min(1.5, Math.log10(1 + totalSats / 1000) * 0.6);
+    coin.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.03);
+
+    // Glow expands with holdings
+    coinGlow.scale.lerp(new THREE.Vector3(1 + targetScale * 0.3, 1 + targetScale * 0.3, 1), 0.03);
+    glowMat.opacity = 0.18 + Math.min(0.3, totalSats / 100000 * 0.05);
+  }
+
+  function triggerHalving() {
+    baseRate *= 0.5;
+    halvingMultiplierEl.textContent = 'RATE ×' + baseRate.toFixed(2);
+    halvingFlashEl.classList.add('show');
+    // Bright flash on the coin
+    coinFaceMat.emissiveIntensity = 2.0;
+    coinRing.material.emissiveIntensity = 2.0;
+    coinRing2.material.emissiveIntensity = 2.0;
+    setTimeout(() => {
+      halvingFlashEl.classList.remove('show');
+      coinFaceMat.emissiveIntensity = 0.3;
+      coinRing.material.emissiveIntensity = 0.6;
+      coinRing2.material.emissiveIntensity = 0.6;
+    }, 2500);
+    halvingCountdown = 60;
+  }
 
   // ========== Input ==========
-  const shipTarget = { x: 0 };
-  let touching = false;
-  const canvasEl = renderer.domElement;
-
-  function setTargetFromX(clientX) {
-    const norm = (clientX / window.innerWidth) * 2 - 1;
-    shipTarget.x = norm * ARENA_X;
+  let firstTap = true;
+  function onTap(clientX, clientY) {
+    if (firstTap) {
+      firstTap = false;
+      tutorialEl.style.display = 'none';
+    }
+    // Each tap = 1 satoshi (you "empower" the network by interacting)
+    totalSats += 1;
+    // Tap spawns: node + particles toward coin
+    addNode();
+    spawnSatoshiToCoin();
+    spawnTapParticle(0, 0, 0, 0xfbbf24);
   }
 
+  const canvasEl = renderer.domElement;
   canvasEl.addEventListener('touchstart', e => {
     e.preventDefault();
-    if (state.gameOver) return;
-    touching = true;
-    setTargetFromX(e.touches[0].clientX);
+    onTap(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: false });
-
-  canvasEl.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (!touching) return;
-    setTargetFromX(e.touches[0].clientX);
-  }, { passive: false });
-
-  canvasEl.addEventListener('touchend', e => {
-    e.preventDefault();
-    touching = false;
-  }, { passive: false });
-
-  canvasEl.addEventListener('touchcancel', () => { touching = false; });
-
-  canvasEl.addEventListener('mousemove', e => {
-    if (state.gameOver) return;
-    setTargetFromX(e.clientX);
+  canvasEl.addEventListener('mousedown', e => {
+    onTap(e.clientX, e.clientY);
   });
-
-  // Keyboard
-  const keys = {};
-  window.addEventListener('keydown', e => {
-    keys[e.key.toLowerCase()] = true;
-    if (['arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
-  });
-  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-
-  // ========== UI ==========
-  const scoreEl = document.getElementById('score');
-  const timerEl = document.getElementById('timer');
-  const statusEl = document.getElementById('status');
-  const livesEl = document.getElementById('lives');
-
-  function updateLives() {
-    let html = '';
-    for (let i = 0; i < 3; i++) {
-      html += i < state.lives ? '<span class="heart">♥</span>' : '<span class="lost">♥</span>';
-    }
-    livesEl.innerHTML = html;
-  }
-
-  function restart() {
-    state.score = 0;
-    state.lives = 3;
-    state.timeLeft = 60;
-    state.gameOver = false;
-    state.invincible = false;
-    state.invincibleTimer = 0;
-    state.shake = 0;
-    spawn.coin = 0;
-    spawn.asteroid = 0;
-    coins.forEach(c => scene.remove(c)); coins.length = 0;
-    asteroids.forEach(a => scene.remove(a)); asteroids.length = 0;
-    if (ship) ship.position.set(0, SHIP_BASE_Y, 0);
-    shipTarget.x = 0;
-    scoreEl.textContent = '0';
-    timerEl.textContent = '60';
-    statusEl.textContent = 'Collect the satoshis';
-    updateLives();
-  }
-
-  function gameOver() {
-    state.gameOver = true;
-    statusEl.innerHTML = '<span style="color:#ef4444">GAME OVER — tap to restart</span>';
-  }
-
-  canvasEl.addEventListener('click', () => { if (state.gameOver) restart(); });
-
-  // ========== Particles for explosions ==========
-  const particles = [];
-  const PARTICLE_GEO = new THREE.SphereGeometry(0.08, 6, 4);
-
-  function spawnParticles(pos, color, count, speed, life) {
-    for (let i = 0; i < count; i++) {
-      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
-      const p = new THREE.Mesh(PARTICLE_GEO, mat);
-      p.position.copy(pos);
-      const a = Math.random() * Math.PI * 2;
-      const e = (Math.random() - 0.3) * 2;
-      const s = speed * (0.5 + Math.random() * 0.7);
-      p.userData = { vx: Math.cos(a) * s, vy: Math.sin(e) * s * 0.5 + Math.random() * s, life: life * (0.5 + Math.random() * 0.5), maxLife: life };
-      scene.add(p);
-      particles.push(p);
-    }
-  }
-
-  // ========== Collision ==========
-  function shipCollides(obj, radius = 0.7) {
-    if (!ship || !shipReady) return false;
-    const dx = obj.position.x - ship.position.x;
-    const dy = obj.position.y - ship.position.y;
-    return Math.sqrt(dx*dx + dy*dy) < radius;
-  }
 
   // ========== Animation loop ==========
   const clock = new THREE.Clock();
   function animate() {
     requestAnimationFrame(animate);
-    const dt = Math.min(clock.getDelta(), 0.05);
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
 
-    // Background drift
+    // Background drift on stars
     scene.children.forEach(c => {
-      if (c.isPoints && c !== window.__thrust) {
+      if (c.isPoints) {
         const pos = c.geometry.attributes.position.array;
         for (let i = 1; i < pos.length; i += 3) {
-          pos[i] -= 4 * dt;
-          if (pos[i] < -22) pos[i] += 44;
+          pos[i] -= 1.5 * dt;
+          if (pos[i] < -25) pos[i] += 50;
         }
         c.geometry.attributes.position.needsUpdate = true;
       }
     });
-    planet.rotation.y = performance.now() * 0.00003;
-    glowRing.material.opacity = 0.30 + Math.sin(performance.now() * 0.002) * 0.10;
 
-    if (state.gameOver) { renderer.render(scene, camera); return; }
+    // Slow coin rotation
+    coin.rotation.y += dt * 0.3;
+    coinRing.rotation.z += dt * 0.5;
+    coinRing2.rotation.z -= dt * 0.5;
 
-    // === Ship movement (defensive — only run if ship exists) ===
-    if (ship) {
-      if (keys['a'] || keys['arrowleft'])  shipTarget.x -= 8 * dt;
-      if (keys['d'] || keys['arrowright']) shipTarget.x += 8 * dt;
-      shipTarget.x = Math.max(-ARENA_X, Math.min(ARENA_X, shipTarget.x));
-      ship.position.x += (shipTarget.x - ship.position.x) * 0.18;
+    // Subtle coin floating
+    coinGroup.position.y = Math.sin(now * 0.0008) * 0.15;
+    coinGlow.position.y = coinGroup.position.y;
 
-      // Ship bob + tilt
-      ship.position.y = SHIP_BASE_Y + Math.sin(performance.now() * 0.003) * 0.1;
-      const tilt = (shipTarget.x - ship.position.x) * 0.4;
-      ship.rotation.z += (-tilt - ship.rotation.z) * 0.1;
+    // Auto-accumulation (mining simulation)
+    totalSats += baseRate * dt;
 
-      // Invincibility blink
-      if (state.invincible) {
-        state.invincibleTimer -= dt;
-        ship.visible = Math.floor(state.invincibleTimer * 12) % 2 === 0;
-        if (state.invincibleTimer <= 0) {
-          state.invincible = false;
-          ship.visible = true;
-        }
-      }
+    // Halving countdown
+    halvingCountdown -= dt;
+    if (halvingCountdown <= 0) triggerHalving();
+
+    // Animate nodes (gentle float)
+    for (const node of nodes) {
+      const ud = node.userData;
+      node.position.y += Math.sin(now * 0.001 + ud.phase) * 0.002;
+      node.rotation.x += dt * 0.3;
+      node.rotation.y += dt * 0.4;
+      const s = ud.baseScale * (1 + Math.sin(now * 0.002 + ud.phase) * 0.15);
+      node.scale.setScalar(s);
     }
 
-    // Thrust trail (needs ship to anchor positions)
-    if (window.__thrust && ship) {
-      const pos = window.__thrust.geometry.attributes.position.array;
-      const vel = window.__tpVel;
-      for (let i = 0; i < window.__tpCount; i++) {
-        vel[i].life += dt;
-        if (vel[i].life > vel[i].maxLife) {
-          vel[i].life = 0;
-          pos[i*3+0] = ship.position.x + (Math.random()-0.5) * 0.3;
-          pos[i*3+1] = ship.position.y - 1.0;
-          pos[i*3+2] = (Math.random()-0.5) * 0.1;
-        }
-        pos[i*3+1] -= (3 + Math.random() * 2) * dt;
-        pos[i*3+0] += (Math.random() - 0.5) * 0.5 * dt;
-      }
-      window.__thrust.geometry.attributes.position.needsUpdate = true;
-    }
-
-    // === Spawn ===
-    spawn.coin += dt;
-    if (spawn.coin > 0.8) { spawn.coin = 0; spawnCoin(); }
-    spawn.asteroid += dt;
-    if (spawn.asteroid > 1.8 + Math.random()) { spawn.asteroid = 0; spawnAsteroid(); }
-
-    // === Update coins ===
-    for (let i = coins.length - 1; i >= 0; i--) {
-      const c = coins[i];
-      c.position.y += c.userData.vy * dt;
-      c.rotation.y += c.userData.rotSpeed;
-      if (c.position.y < -9) { scene.remove(c); coins.splice(i, 1); continue; }
-      if (shipCollides(c, 0.65)) {
-        state.score++;
-        scoreEl.textContent = state.score;
-        spawnParticles(c.position, 0xfbbf24, 8, 4, 0.5);
-        scene.remove(c); coins.splice(i, 1);
-        if (state.score % 10 === 0) statusEl.textContent = 'TO THE MOON!!';
-      }
-    }
-
-    // === Update asteroids ===
-    for (let i = asteroids.length - 1; i >= 0; i--) {
-      const a = asteroids[i];
-      a.position.y += a.userData.vy * dt;
-      a.position.x += a.userData.vx * dt;
-      a.rotation.x += a.userData.rotX;
-      a.rotation.z += a.userData.rotZ;
-      if (a.position.y < -9) { scene.remove(a); asteroids.splice(i, 1); continue; }
-      if (!state.invincible && shipCollides(a, 0.7)) {
-        state.lives--;
-        state.invincible = true;
-        state.invincibleTimer = 1.5;
-        state.shake = 0.5;
-        spawnParticles(ship.position, 0xef4444, 15, 5, 0.7);
-        updateLives();
-        scene.remove(a); asteroids.splice(i, 1);
-        if (state.lives <= 0) {
-          gameOver();
-        } else {
-          statusEl.innerHTML = '<span style="color:#ef4444">HIT!</span>';
-        }
-      }
-    }
-
-    // === Timer ===
-    state.timeLeft -= dt;
-    if (state.timeLeft <= 0) {
-      state.timeLeft = 0;
-      gameOver();
-    }
-    timerEl.textContent = Math.ceil(state.timeLeft);
-
-    // === Particles ===
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
+    // Update tap particles
+    for (let i = tapParticles.length - 1; i >= 0; i--) {
+      const p = tapParticles[i];
       const ud = p.userData;
       ud.life -= dt;
       if (ud.life <= 0) {
-        scene.remove(p); particles.splice(i, 1); continue;
+        scene.remove(p);
+        p.material.dispose();
+        tapParticles.splice(i, 1);
+        continue;
       }
-      p.position.x += ud.vx * dt;
-      p.position.y += ud.vy * dt;
+      p.position.x += ud.vx * dt * 6;
+      p.position.y += ud.vy * dt * 6;
+      p.position.z += ud.vz * dt * 6;
       p.material.opacity = Math.max(0, ud.life / ud.maxLife);
-      p.scale.setScalar(ud.life / ud.maxLife);
+      p.scale.setScalar(0.5 + ud.life / ud.maxLife * 0.5);
     }
 
-    // === Camera shake ===
-    if (state.shake > 0) {
-      state.shake *= 0.9;
-      camera.position.x = (Math.random() - 0.5) * state.shake;
-      camera.position.y = (Math.random() - 0.5) * state.shake;
-      if (state.shake < 0.01) state.shake = 0;
-    } else {
-      camera.position.x = 0;
-      camera.position.y = 0;
-    }
-
+    updateHUD();
     renderer.render(scene, camera);
   }
   animate();
