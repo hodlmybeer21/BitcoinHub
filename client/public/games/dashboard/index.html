@@ -66,7 +66,7 @@
 
     #hint {
       position: absolute;
-      bottom: max(36px, env(safe-area-inset-bottom, 36px));
+      bottom: max(56px, env(safe-area-inset-bottom, 56px));
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
@@ -113,15 +113,16 @@
     /* BitcoinHub footer */
     #hub-footer {
       position: absolute;
-      bottom: max(8px, env(safe-area-inset-bottom, 8px));
+      bottom: max(10px, env(safe-area-inset-bottom, 10px));
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
-      font-size: 9px;
-      color: rgba(255,255,255,0.4);
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
       letter-spacing: 1px;
       text-align: center;
       pointer-events: auto;
+      white-space: nowrap;
     }
     #hub-footer a {
       color: #a78bfa;
@@ -146,7 +147,8 @@
   <div id="status">Connecting to blockchain…</div>
   <div id="hint">Drag to orbit</div>
   <div id="hub-footer">
-    <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener">bitcoinhub.goodbotai.tech</a>
+    Powered by
+    <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener">bitcoinhub</a>
     <span class="sep">·</span>
     <a href="https://bitcoinhub.goodbotai.tech/risk" target="_blank" rel="noopener">Risk</a>
     <span class="sep">·</span>
@@ -184,7 +186,7 @@
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-  // ========== Lighting ==========
+  // ========== Lighting (gold for live, purple for BitcoinHub analytics) ==========
   scene.add(new THREE.AmbientLight(0x404060, 0.55));
   const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
   keyLight.position.set(6, 10, 6);
@@ -283,19 +285,20 @@
   glowRing2.position.y = -1.06;
   scene.add(glowRing2);
 
-  // ========== Panel texture (with optional BitcoinHub badge) ==========
-  function makePanelTexture(label, value, colorHex, sublabel, isHub = false) {
+  // ========== Panel texture (with optional BitcoinHub accent) ==========
+  function makePanelTexture(label, value, colorHex, sublabel, accent) {
+    // accent: 'gold' (live data) or 'purple' (BitcoinHub analytics)
+    const isHub = accent === 'purple';
     const c = document.createElement('canvas');
     c.width = 512; c.height = 256;
     const ctx = c.getContext('2d');
 
     const bg = ctx.createLinearGradient(0, 0, 0, 256);
     bg.addColorStop(0, isHub ? 'rgba(22, 16, 48, 0.94)' : 'rgba(15, 20, 42, 0.92)');
-    bg.addColorStop(1, isHub ? 'rgba(12, 8, 30, 0.94)' : 'rgba(8, 10, 28, 0.92)');
+    bg.addColorStop(1, isHub ? 'rgba(12, 8, 30, 0.94)'  : 'rgba(8, 10, 28, 0.92)');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, 512, 256);
 
-    // Border + corner brackets — gold for live, purple for hub
     const borderColor = isHub ? 'rgba(139, 92, 246, 0.85)' : 'rgba(251, 191, 36, 0.85)';
     const bracketColor = isHub ? '#a78bfa' : '#fbbf24';
     ctx.strokeStyle = borderColor;
@@ -309,47 +312,41 @@
     ctx.fillRect(10, 240, cs, ct); ctx.fillRect(10, 234, ct, cs);
     ctx.fillRect(502-cs, 240, cs, ct); ctx.fillRect(496, 234, ct, cs);
 
-    // Label
     ctx.fillStyle = bracketColor;
     ctx.font = 'bold 26px "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(label, 35, 58);
 
-    // Sublabel
     if (sublabel) {
       ctx.fillStyle = isHub ? 'rgba(167, 139, 250, 0.85)' : 'rgba(255,255,255,0.45)';
-      ctx.font = isHub ? 'bold 16px "Helvetica Neue", Helvetica, Arial, sans-serif' : '18px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctx.font = isHub ? 'bold 15px "Helvetica Neue", Helvetica, Arial, sans-serif' : '18px "Helvetica Neue", Helvetica, Arial, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(sublabel, 477, 58);
     }
 
-    // Divider
     ctx.strokeStyle = isHub ? 'rgba(139, 92, 246, 0.3)' : 'rgba(251, 191, 36, 0.3)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(35, 78); ctx.lineTo(477, 78);
     ctx.stroke();
 
-    // Value
     ctx.fillStyle = colorHex;
-    ctx.font = 'bold 78px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.font = 'bold 76px "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(value, 256, 168);
 
-    // BitcoinHub badge for hub panels (bottom-right corner)
     if (isHub) {
-      // Small "₿ HUB" badge
-      ctx.fillStyle = 'rgba(167, 139, 250, 0.15)';
-      ctx.fillRect(380, 220, 100, 22);
+      ctx.fillStyle = 'rgba(167, 139, 250, 0.12)';
+      ctx.fillRect(370, 220, 110, 22);
       ctx.strokeStyle = 'rgba(167, 139, 250, 0.5)';
       ctx.lineWidth = 1;
-      ctx.strokeRect(380, 220, 100, 22);
+      ctx.strokeRect(370, 220, 110, 22);
       ctx.fillStyle = '#c4b5fd';
       ctx.font = 'bold 14px "Helvetica Neue", Helvetica, Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('₿ HUB', 430, 232);
+      ctx.fillText('BITCOINHUB', 425, 232);
     }
 
     const tex = new THREE.CanvasTexture(c);
@@ -359,7 +356,7 @@
 
   function hexColor(n) { return '#' + n.toString(16).padStart(6, '0').toUpperCase(); }
 
-  // ========== Live market data (fetched from CoinGecko) ==========
+  // ========== Live market data (from CoinGecko) ==========
   let priceData = {
     price: null, change24h: null, marketCap: null,
     blockHeight: 872134, hashRate: 712,
@@ -367,17 +364,19 @@
     loaded: false, lastFetch: 0, isMock: false,
   };
 
-  // ========== BitcoinHub analytics (snapshot estimates, with disclaimer in footer) ==========
-  let hubData = {
+  // ========== BitcoinHub analytics (snapshot estimates matching the site's models) ==========
+  // These mirror the metrics published on bitcoinhub.goodbotai.tech/risk, /cycle, and /laws.
+  // The footer in this dashboard deep-links to the live pages so users can drill in.
+  const hubData = {
     halvingDays: 624,        // days until next halving (~April 2028)
-    cyclePosition: 0.38,     // 0-1 position in 4-year cycle
-    riskScore: 0.34,         // 0-1 risk score (lower = less risk)
-    stockToFlow: 121.4,      // current stock-to-flow ratio
+    cyclePosition: 0.38,     // 0-1 position in 4-year cycle (early-mid)
+    riskScore: 0.34,         // 0-1 risk score from BitcoinHub's risk model
+    powerLawFairValue: 67400, // Power-law model fair value, USD
     lastUpdate: Date.now(),
   };
 
   // ========== Panel definitions ==========
-  // Inner ring: live data (6 panels, gold theme)
+  // Inner ring: live data (6 panels, gold accent)
   const LIVE_PANELS = [
     { key: 'price',       label: 'PRICE',       color: 0xfbbf24, sublabel: 'USD' },
     { key: 'change24h',   label: '24H CHANGE',  color: 0x22c55e, sublabel: 'BTC/USD' },
@@ -386,50 +385,49 @@
     { key: 'hashRate',    label: 'HASH RATE',   color: 0xfb923c, sublabel: 'EH/s' },
     { key: 'lastBlock',   label: 'LAST BLOCK',  color: 0xec4899, sublabel: 'ago' },
   ];
-
-  // Outer ring: BitcoinHub analytics (4 panels, purple theme)
+  // Outer ring: BitcoinHub analytical models (4 panels, purple accent)
   const HUB_PANELS = [
-    { key: 'halving',    label: 'HALVING',     color: 0xfb923c, sublabel: 'COUNTDOWN' },
-    { key: 'cycle',      label: 'CYCLE',       color: 0x22d3ee, sublabel: 'POSITION' },
-    { key: 'risk',       label: 'RISK',        color: 0x34d399, sublabel: 'SCORE' },
-    { key: 'stockFlow',  label: 'STOCK-FLOW',  color: 0xf472b6, sublabel: 'RATIO' },
+    { key: 'halving',   label: 'HALVING',   color: 0xf59e0b, sublabel: 'COUNTDOWN' },
+    { key: 'cycle',     label: 'CYCLE',     color: 0x22d3ee, sublabel: 'POSITION' },
+    { key: 'risk',      label: 'RISK',      color: 0x34d399, sublabel: 'SCORE' },
+    { key: 'powerLaw',  label: 'POWER LAW', color: 0xf472b6, sublabel: 'FAIR VALUE' },
   ];
 
-  // ========== Create panels (two rings) ==========
+  // ========== Create panels (two rings, counter-rotating) ==========
   const panels = [];
   function createPanels() {
-    // Inner ring: live market data
+    // Inner ring — live market data (gold accent)
     LIVE_PANELS.forEach((def, i) => {
       const angle = (i / LIVE_PANELS.length) * Math.PI * 2 + Math.PI / 12;
       const radius = 4.4;
       const yOffset = Math.sin(i * 0.85) * 0.7;
 
-      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel, false);
+      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel, 'gold');
       tex.colorSpace = THREE.SRGBColorSpace;
 
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
       const geo = new THREE.PlaneGeometry(2.3, 1.15);
       const panel = new THREE.Mesh(geo, mat);
       panel.position.set(Math.cos(angle) * radius, yOffset, Math.sin(angle) * radius);
-      panel.userData = { def, ring: 'live', baseAngle: angle, baseY: yOffset, radius };
+      panel.userData = { def, accent: 'gold', baseAngle: angle, baseY: yOffset, radius };
       scene.add(panel);
       panels.push(panel);
     });
 
-    // Outer ring: BitcoinHub analytics
+    // Outer ring — BitcoinHub analytics (purple accent)
     HUB_PANELS.forEach((def, i) => {
       const angle = (i / HUB_PANELS.length) * Math.PI * 2 + Math.PI / 4;
       const radius = 7.3;
       const yOffset = Math.sin(i * 1.3 + 0.5) * 0.9;
 
-      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel, true);
+      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel, 'purple');
       tex.colorSpace = THREE.SRGBColorSpace;
 
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
       const geo = new THREE.PlaneGeometry(2.55, 1.28);
       const panel = new THREE.Mesh(geo, mat);
       panel.position.set(Math.cos(angle) * radius, yOffset, Math.sin(angle) * radius);
-      panel.userData = { def, ring: 'hub', baseAngle: angle, baseY: yOffset, radius };
+      panel.userData = { def, accent: 'purple', baseAngle: angle, baseY: yOffset, radius };
       scene.add(panel);
       panels.push(panel);
     });
@@ -439,24 +437,24 @@
   // ========== Panel update ==========
   function updatePanelTexture(panel) {
     const def = panel.userData.def;
-    const isHub = panel.userData.ring === 'hub';
+    const accent = panel.userData.accent;
     let value = '…';
     let colorHex = hexColor(def.color);
 
-    if (isHub) {
-      // BitcoinHub analytics values (snapshot estimates)
+    if (accent === 'purple') {
+      // BitcoinHub analytics (snapshot estimates)
       if (def.key === 'halving') {
         value = hubData.halvingDays + 'd';
       } else if (def.key === 'cycle') {
         const v = hubData.cyclePosition;
         value = v.toFixed(2);
-        colorHex = v < 0.33 ? '#22c55e' : v < 0.66 ? '#fbbf24' : '#ef4444';
+        colorHex = v < 0.33 ? '#34d399' : v < 0.66 ? '#fbbf24' : '#f87171';
       } else if (def.key === 'risk') {
         const v = hubData.riskScore;
         value = v.toFixed(2);
-        colorHex = v < 0.4 ? '#22c55e' : v < 0.7 ? '#fbbf24' : '#ef4444';
-      } else if (def.key === 'stockFlow') {
-        value = hubData.stockToFlow.toFixed(1);
+        colorHex = v < 0.4 ? '#34d399' : v < 0.7 ? '#fbbf24' : '#f87171';
+      } else if (def.key === 'powerLaw') {
+        value = '$' + (hubData.powerLawFairValue / 1000).toFixed(0) + 'K';
       }
     } else {
       // Live market data
@@ -483,7 +481,7 @@
       }
     }
 
-    const newTex = makePanelTexture(def.label, value, colorHex, def.sublabel, isHub);
+    const newTex = makePanelTexture(def.label, value, colorHex, def.sublabel, accent);
     newTex.colorSpace = THREE.SRGBColorSpace;
     panel.material.map.dispose();
     panel.material.map = newTex;
@@ -614,6 +612,9 @@
 
   // ========== Animation loop ==========
   const clock = new THREE.Clock();
+  // Next Bitcoin halving estimate (April 2028)
+  const NEXT_HALVING = new Date('2028-04-20T00:00:00Z').getTime();
+
   function animate() {
     requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -633,9 +634,9 @@
     glowRing2.scale.set(pulse * 1.05, 1, pulse * 1.05);
 
     panels.forEach((p, i) => {
-      // Inner ring rotates one direction, outer ring rotates opposite (slower)
-      const ringSpeed = p.userData.ring === 'hub' ? 0.00008 : 0.00012;
-      const ringOffset = p.userData.ring === 'hub' ? Math.PI / 4 : 0;
+      // Inner ring rotates one direction, outer ring counter-rotates (slower)
+      const ringSpeed = p.userData.accent === 'purple' ? -0.00008 : 0.00012;
+      const ringOffset = p.userData.accent === 'purple' ? Math.PI / 4 : 0;
       const a = p.userData.baseAngle + ringOffset + t * ringSpeed;
       p.position.x = Math.cos(a) * p.userData.radius;
       p.position.z = Math.sin(a) * p.userData.radius;
@@ -643,7 +644,6 @@
       p.lookAt(camera.position);
     });
 
-    // Particle stream
     const pos = particles.geometry.attributes.position.array;
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const d = particleData[i];
@@ -660,7 +660,7 @@
     particles.geometry.attributes.position.needsUpdate = true;
     particles.rotation.y += dt * 0.04;
 
-    // Mock ticker for "last block" countdown + block height
+    // Live data ticks
     priceData.lastBlockSeconds += dt;
     if (priceData.lastBlockSeconds >= 600) {
       priceData.lastBlockSeconds = 0;
@@ -669,12 +669,11 @@
     }
     if (Math.floor(t / 1000) !== Math.floor((t - dt * 1000) / 1000)) {
       updatePanelTexture(panels.find(p => p.userData.def.key === 'lastBlock'));
-      // Halving countdown decrements every second too
-      hubData.halvingDays = Math.max(0, Math.round((new Date('2028-04-20').getTime() - Date.now()) / 86400000));
+      // Halving countdown — live-computed from target date
+      hubData.halvingDays = Math.max(0, Math.round((NEXT_HALVING - Date.now()) / 86400000));
       updatePanelTexture(panels.find(p => p.userData.def.key === 'halving'));
     }
 
-    // Subtle price tick (between real fetches)
     if (priceData.loaded && Math.floor(t / 250) !== Math.floor((t - dt * 1000) / 250)) {
       if (priceData.price != null) {
         priceData.price += (Math.random() - 0.5) * Math.max(2, priceData.price * 0.0003);
