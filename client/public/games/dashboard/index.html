@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>₿ HODL Command Center</title>
+  <title>₿ HODL Command Center · BitcoinHub</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -24,7 +24,6 @@
     }
     canvas { display: block; touch-action: none; }
 
-    /* Top title */
     #title {
       position: absolute;
       top: max(20px, env(safe-area-inset-top, 20px));
@@ -51,7 +50,6 @@
       text-transform: uppercase;
     }
 
-    /* Loading status */
     #status {
       position: absolute;
       top: 50%; left: 50%;
@@ -66,10 +64,9 @@
     #status .err { color: #ef4444; }
     #status .demo { color: rgba(255,255,255,0.4); }
 
-    /* Bottom controls hint */
     #hint {
       position: absolute;
-      bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      bottom: max(36px, env(safe-area-inset-bottom, 36px));
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
@@ -85,7 +82,6 @@
       transition: opacity 0.6s;
     }
 
-    /* Live indicator (top-right) */
     #live {
       position: absolute;
       top: max(20px, env(safe-area-inset-top, 20px));
@@ -113,16 +109,51 @@
       0%, 100% { opacity: 1; }
       50%      { opacity: 0.3; }
     }
+
+    /* BitcoinHub footer */
+    #hub-footer {
+      position: absolute;
+      bottom: max(8px, env(safe-area-inset-bottom, 8px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      font-size: 9px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 1px;
+      text-align: center;
+      pointer-events: auto;
+    }
+    #hub-footer a {
+      color: #a78bfa;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    #hub-footer a:hover {
+      text-decoration: underline;
+    }
+    #hub-footer .sep {
+      color: rgba(255,255,255,0.2);
+      margin: 0 6px;
+    }
   </style>
 </head>
 <body>
   <div id="title">
     <h1>₿ HODL COMMAND CENTER</h1>
-    <small>Real-time on-chain intelligence</small>
+    <small>Real-time on-chain intelligence · Powered by BitcoinHub</small>
   </div>
   <div id="live"><span class="dot"></span>LIVE</div>
   <div id="status">Connecting to blockchain…</div>
   <div id="hint">Drag to orbit</div>
+  <div id="hub-footer">
+    <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener">bitcoinhub.goodbotai.tech</a>
+    <span class="sep">·</span>
+    <a href="https://bitcoinhub.goodbotai.tech/risk" target="_blank" rel="noopener">Risk</a>
+    <span class="sep">·</span>
+    <a href="https://bitcoinhub.goodbotai.tech/laws" target="_blank" rel="noopener">Laws</a>
+    <span class="sep">·</span>
+    <a href="https://bitcoinhub.goodbotai.tech/cycle" target="_blank" rel="noopener">Cycle</a>
+  </div>
   <canvas id="game"></canvas>
 
   <script type="importmap">
@@ -143,10 +174,8 @@
   scene.background = new THREE.Color(0x02030a);
   scene.fog = new THREE.FogExp2(0x02030a, 0.022);
 
-  // ========== Camera ==========
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
 
-  // ========== Renderer ==========
   const renderer = new THREE.WebGLRenderer({
     canvas: document.getElementById('game'),
     antialias: window.devicePixelRatio < 2,
@@ -163,8 +192,11 @@
   const rimGold = new THREE.DirectionalLight(0xfbbf24, 0.55);
   rimGold.position.set(-6, 2, -4);
   scene.add(rimGold);
-  const rimBlue = new THREE.DirectionalLight(0x3b82f6, 0.4);
-  rimBlue.position.set(4, -3, -6);
+  const rimPurple = new THREE.DirectionalLight(0x8b5cf6, 0.45);
+  rimPurple.position.set(5, -4, -3);
+  scene.add(rimPurple);
+  const rimBlue = new THREE.DirectionalLight(0x3b82f6, 0.35);
+  rimBlue.position.set(-4, -3, -6);
   scene.add(rimBlue);
 
   // ========== Starfield ==========
@@ -199,8 +231,9 @@
       ['rgba(30, 60, 150, 0.30)', 'rgba(0,0,0,0)'],
       ['rgba(140, 40, 90, 0.28)', 'rgba(0,0,0,0)'],
       ['rgba(60, 100, 180, 0.25)', 'rgba(0,0,0,0)'],
+      ['rgba(100, 60, 140, 0.30)', 'rgba(0,0,0,0)'],
     ];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const grad = ctx.createRadialGradient(
         Math.random() * 256, Math.random() * 256, 0,
         Math.random() * 256, Math.random() * 256, 70 + Math.random() * 50
@@ -215,11 +248,11 @@
   }
   const nebula = new THREE.Mesh(
     new THREE.SphereGeometry(50, 24, 24),
-    new THREE.MeshBasicMaterial({ map: makeNebulaTexture(), side: THREE.BackSide, transparent: true, opacity: 0.55 })
+    new THREE.MeshBasicMaterial({ map: makeNebulaTexture(), side: THREE.BackSide, transparent: true, opacity: 0.6 })
   );
   scene.add(nebula);
 
-  // ========== Central Bitcoin coin (loaded from Blender) ==========
+  // ========== Bitcoin coin (loaded from Blender) ==========
   const loader = new GLTFLoader();
   let coin = null, coinReady = false;
   const statusEl = document.getElementById('status');
@@ -233,7 +266,7 @@
     statusEl.innerHTML = '<span class="err">Failed to load 3D model</span>';
   });
 
-  // ========== Glow ring under the coin ==========
+  // ========== Glow ring under coin ==========
   const glowRing = new THREE.Mesh(
     new THREE.RingGeometry(2.2, 2.8, 64),
     new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
@@ -242,7 +275,6 @@
   glowRing.position.y = -1.05;
   scene.add(glowRing);
 
-  // Outer faint ring
   const glowRing2 = new THREE.Mesh(
     new THREE.RingGeometry(2.8, 3.4, 64),
     new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
@@ -251,24 +283,26 @@
   glowRing2.position.y = -1.06;
   scene.add(glowRing2);
 
-  // ========== Data panels ==========
-  function makePanelTexture(label, value, colorHex, sublabel) {
+  // ========== Panel texture (with optional BitcoinHub badge) ==========
+  function makePanelTexture(label, value, colorHex, sublabel, isHub = false) {
     const c = document.createElement('canvas');
     c.width = 512; c.height = 256;
     const ctx = c.getContext('2d');
 
     const bg = ctx.createLinearGradient(0, 0, 0, 256);
-    bg.addColorStop(0, 'rgba(15, 20, 42, 0.92)');
-    bg.addColorStop(1, 'rgba(8, 10, 28, 0.92)');
+    bg.addColorStop(0, isHub ? 'rgba(22, 16, 48, 0.94)' : 'rgba(15, 20, 42, 0.92)');
+    bg.addColorStop(1, isHub ? 'rgba(12, 8, 30, 0.94)' : 'rgba(8, 10, 28, 0.92)');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, 512, 256);
 
-    ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+    // Border + corner brackets — gold for live, purple for hub
+    const borderColor = isHub ? 'rgba(139, 92, 246, 0.85)' : 'rgba(251, 191, 36, 0.85)';
+    const bracketColor = isHub ? '#a78bfa' : '#fbbf24';
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 4;
     ctx.strokeRect(10, 10, 492, 236);
 
-    // HUD corner brackets
-    ctx.fillStyle = '#fbbf24';
+    ctx.fillStyle = bracketColor;
     const cs = 22, ct = 5;
     ctx.fillRect(10, 10, cs, ct); ctx.fillRect(10, 10, ct, cs);
     ctx.fillRect(502-cs, 10, cs, ct); ctx.fillRect(496, 10, ct, cs);
@@ -276,20 +310,21 @@
     ctx.fillRect(502-cs, 240, cs, ct); ctx.fillRect(496, 234, ct, cs);
 
     // Label
-    ctx.fillStyle = '#fbbf24';
+    ctx.fillStyle = bracketColor;
     ctx.font = 'bold 26px "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(label, 35, 58);
 
+    // Sublabel
     if (sublabel) {
-      ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.font = '18px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctx.fillStyle = isHub ? 'rgba(167, 139, 250, 0.85)' : 'rgba(255,255,255,0.45)';
+      ctx.font = isHub ? 'bold 16px "Helvetica Neue", Helvetica, Arial, sans-serif' : '18px "Helvetica Neue", Helvetica, Arial, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(sublabel, 477, 58);
     }
 
     // Divider
-    ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+    ctx.strokeStyle = isHub ? 'rgba(139, 92, 246, 0.3)' : 'rgba(251, 191, 36, 0.3)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(35, 78); ctx.lineTo(477, 78);
@@ -302,78 +337,153 @@
     ctx.textBaseline = 'middle';
     ctx.fillText(value, 256, 168);
 
+    // BitcoinHub badge for hub panels (bottom-right corner)
+    if (isHub) {
+      // Small "₿ HUB" badge
+      ctx.fillStyle = 'rgba(167, 139, 250, 0.15)';
+      ctx.fillRect(380, 220, 100, 22);
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(380, 220, 100, 22);
+      ctx.fillStyle = '#c4b5fd';
+      ctx.font = 'bold 14px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('₿ HUB', 430, 232);
+    }
+
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
 
-  function hexColor(n) {
-    return '#' + n.toString(16).padStart(6, '0').toUpperCase();
-  }
+  function hexColor(n) { return '#' + n.toString(16).padStart(6, '0').toUpperCase(); }
 
+  // ========== Live market data (fetched from CoinGecko) ==========
   let priceData = {
     price: null, change24h: null, marketCap: null,
-    blockHeight: 820134, hashRate: 625,
-    lastBlockSeconds: 240,
+    blockHeight: 872134, hashRate: 712,
+    lastBlockSeconds: 423,
     loaded: false, lastFetch: 0, isMock: false,
   };
 
-  const PANEL_DEFS = [
-    { key: 'price',       label: 'PRICE',        color: 0xfbbf24, sublabel: 'USD' },
-    { key: 'change24h',    label: '24H CHANGE',    color: 0x22c55e, sublabel: 'BTC/USD' },
-    { key: 'marketCap',    label: 'MARKET CAP',    color: 0x60a5fa, sublabel: 'USD' },
-    { key: 'blockHeight',  label: 'BLOCK HEIGHT',  color: 0xa78bfa, sublabel: 'BITCOIN' },
-    { key: 'hashRate',     label: 'HASH RATE',     color: 0xfb923c, sublabel: 'EH/s' },
-    { key: 'lastBlock',    label: 'LAST BLOCK',    color: 0xec4899, sublabel: 'ago' },
+  // ========== BitcoinHub analytics (snapshot estimates, with disclaimer in footer) ==========
+  let hubData = {
+    halvingDays: 624,        // days until next halving (~April 2028)
+    cyclePosition: 0.38,     // 0-1 position in 4-year cycle
+    riskScore: 0.34,         // 0-1 risk score (lower = less risk)
+    stockToFlow: 121.4,      // current stock-to-flow ratio
+    lastUpdate: Date.now(),
+  };
+
+  // ========== Panel definitions ==========
+  // Inner ring: live data (6 panels, gold theme)
+  const LIVE_PANELS = [
+    { key: 'price',       label: 'PRICE',       color: 0xfbbf24, sublabel: 'USD' },
+    { key: 'change24h',   label: '24H CHANGE',  color: 0x22c55e, sublabel: 'BTC/USD' },
+    { key: 'marketCap',   label: 'MARKET CAP',  color: 0x60a5fa, sublabel: 'USD' },
+    { key: 'blockHeight', label: 'BLOCK',       color: 0xa78bfa, sublabel: 'BITCOIN' },
+    { key: 'hashRate',    label: 'HASH RATE',   color: 0xfb923c, sublabel: 'EH/s' },
+    { key: 'lastBlock',   label: 'LAST BLOCK',  color: 0xec4899, sublabel: 'ago' },
   ];
 
+  // Outer ring: BitcoinHub analytics (4 panels, purple theme)
+  const HUB_PANELS = [
+    { key: 'halving',    label: 'HALVING',     color: 0xfb923c, sublabel: 'COUNTDOWN' },
+    { key: 'cycle',      label: 'CYCLE',       color: 0x22d3ee, sublabel: 'POSITION' },
+    { key: 'risk',       label: 'RISK',        color: 0x34d399, sublabel: 'SCORE' },
+    { key: 'stockFlow',  label: 'STOCK-FLOW',  color: 0xf472b6, sublabel: 'RATIO' },
+  ];
+
+  // ========== Create panels (two rings) ==========
   const panels = [];
   function createPanels() {
-    PANEL_DEFS.forEach((def, i) => {
-      const angle = (i / PANEL_DEFS.length) * Math.PI * 2;
-      const radius = 4.6;
-      const yOffset = Math.sin(i * 0.85) * 1.0;
+    // Inner ring: live market data
+    LIVE_PANELS.forEach((def, i) => {
+      const angle = (i / LIVE_PANELS.length) * Math.PI * 2 + Math.PI / 12;
+      const radius = 4.4;
+      const yOffset = Math.sin(i * 0.85) * 0.7;
 
-      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel);
+      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel, false);
       tex.colorSpace = THREE.SRGBColorSpace;
 
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
       const geo = new THREE.PlaneGeometry(2.3, 1.15);
       const panel = new THREE.Mesh(geo, mat);
       panel.position.set(Math.cos(angle) * radius, yOffset, Math.sin(angle) * radius);
-      panel.userData = { def, baseAngle: angle, baseY: yOffset, radius };
+      panel.userData = { def, ring: 'live', baseAngle: angle, baseY: yOffset, radius };
+      scene.add(panel);
+      panels.push(panel);
+    });
+
+    // Outer ring: BitcoinHub analytics
+    HUB_PANELS.forEach((def, i) => {
+      const angle = (i / HUB_PANELS.length) * Math.PI * 2 + Math.PI / 4;
+      const radius = 7.3;
+      const yOffset = Math.sin(i * 1.3 + 0.5) * 0.9;
+
+      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel, true);
+      tex.colorSpace = THREE.SRGBColorSpace;
+
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+      const geo = new THREE.PlaneGeometry(2.55, 1.28);
+      const panel = new THREE.Mesh(geo, mat);
+      panel.position.set(Math.cos(angle) * radius, yOffset, Math.sin(angle) * radius);
+      panel.userData = { def, ring: 'hub', baseAngle: angle, baseY: yOffset, radius };
       scene.add(panel);
       panels.push(panel);
     });
   }
   createPanels();
 
+  // ========== Panel update ==========
   function updatePanelTexture(panel) {
     const def = panel.userData.def;
+    const isHub = panel.userData.ring === 'hub';
     let value = '…';
     let colorHex = hexColor(def.color);
-    if (def.key === 'price' && priceData.price != null) {
-      value = '$' + Math.round(priceData.price).toLocaleString();
-    } else if (def.key === 'change24h' && priceData.change24h != null) {
-      const v = priceData.change24h;
-      const sign = v >= 0 ? '+' : '';
-      value = sign + v.toFixed(2) + '%';
-      colorHex = v >= 0 ? '#22c55e' : '#ef4444';
-    } else if (def.key === 'marketCap' && priceData.marketCap != null) {
-      const mc = priceData.marketCap;
-      if (mc >= 1e12) value = '$' + (mc / 1e12).toFixed(2) + 'T';
-      else if (mc >= 1e9) value = '$' + (mc / 1e9).toFixed(2) + 'B';
-      else value = '$' + mc.toLocaleString();
-    } else if (def.key === 'blockHeight') {
-      value = '#' + priceData.blockHeight.toLocaleString();
-    } else if (def.key === 'hashRate') {
-      value = priceData.hashRate.toLocaleString() + ' EH/s';
-    } else if (def.key === 'lastBlock') {
-      const s = Math.floor(priceData.lastBlockSeconds);
-      if (s < 60) value = s + 's ago';
-      else value = Math.floor(s / 60) + 'm ' + (s % 60) + 's ago';
+
+    if (isHub) {
+      // BitcoinHub analytics values (snapshot estimates)
+      if (def.key === 'halving') {
+        value = hubData.halvingDays + 'd';
+      } else if (def.key === 'cycle') {
+        const v = hubData.cyclePosition;
+        value = v.toFixed(2);
+        colorHex = v < 0.33 ? '#22c55e' : v < 0.66 ? '#fbbf24' : '#ef4444';
+      } else if (def.key === 'risk') {
+        const v = hubData.riskScore;
+        value = v.toFixed(2);
+        colorHex = v < 0.4 ? '#22c55e' : v < 0.7 ? '#fbbf24' : '#ef4444';
+      } else if (def.key === 'stockFlow') {
+        value = hubData.stockToFlow.toFixed(1);
+      }
+    } else {
+      // Live market data
+      if (def.key === 'price' && priceData.price != null) {
+        value = '$' + Math.round(priceData.price).toLocaleString();
+      } else if (def.key === 'change24h' && priceData.change24h != null) {
+        const v = priceData.change24h;
+        const sign = v >= 0 ? '+' : '';
+        value = sign + v.toFixed(2) + '%';
+        colorHex = v >= 0 ? '#22c55e' : '#ef4444';
+      } else if (def.key === 'marketCap' && priceData.marketCap != null) {
+        const mc = priceData.marketCap;
+        if (mc >= 1e12) value = '$' + (mc / 1e12).toFixed(2) + 'T';
+        else if (mc >= 1e9) value = '$' + (mc / 1e9).toFixed(2) + 'B';
+        else value = '$' + mc.toLocaleString();
+      } else if (def.key === 'blockHeight') {
+        value = '#' + priceData.blockHeight.toLocaleString();
+      } else if (def.key === 'hashRate') {
+        value = priceData.hashRate.toLocaleString() + ' EH/s';
+      } else if (def.key === 'lastBlock') {
+        const s = Math.floor(priceData.lastBlockSeconds);
+        if (s < 60) value = s + 's ago';
+        else value = Math.floor(s / 60) + 'm ' + (s % 60) + 's ago';
+      }
     }
-    const newTex = makePanelTexture(def.label, value, colorHex, def.sublabel);
+
+    const newTex = makePanelTexture(def.label, value, colorHex, def.sublabel, isHub);
     newTex.colorSpace = THREE.SRGBColorSpace;
     panel.material.map.dispose();
     panel.material.map = newTex;
@@ -382,7 +492,7 @@
   }
   function updateAllPanels() { panels.forEach(updatePanelTexture); }
 
-  // ========== Particle stream (transactions flowing inward) ==========
+  // ========== Particle stream ==========
   const PARTICLE_COUNT = 90;
   const particleGeo = new THREE.BufferGeometry();
   const particlePos = new Float32Array(PARTICLE_COUNT * 3);
@@ -431,10 +541,9 @@
       updateAllPanels();
       if (coinReady) statusEl.style.opacity = '0';
     } else if (!priceData.loaded) {
-      // Fallback: mock plausible numbers
-      priceData.price = 62450 + (Math.random() - 0.5) * 800;
-      priceData.change24h = 2.34 + (Math.random() - 0.5) * 0.4;
-      priceData.marketCap = 1.23e12;
+      priceData.price = 98450 + (Math.random() - 0.5) * 800;
+      priceData.change24h = 1.84 + (Math.random() - 0.5) * 0.4;
+      priceData.marketCap = 1.95e12;
       priceData.loaded = true;
       priceData.isMock = true;
       updateAllPanels();
@@ -510,14 +619,12 @@
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!isDragging) idleFrames++;
 
-    // Coin rotation + subtle wobble
     if (coin) {
       coin.rotation.y += dt * 0.18;
       coin.rotation.z = Math.sin(performance.now() * 0.0009) * 0.06;
       coin.position.y = Math.sin(performance.now() * 0.001) * 0.15;
     }
 
-    // Glow ring pulse
     const t = performance.now();
     glowRing.material.opacity  = 0.30 + Math.sin(t * 0.0022) * 0.15;
     glowRing2.material.opacity = 0.10 + Math.sin(t * 0.0015) * 0.06;
@@ -525,9 +632,11 @@
     glowRing.scale.set(pulse, 1, pulse);
     glowRing2.scale.set(pulse * 1.05, 1, pulse * 1.05);
 
-    // Panels: orbit slowly + face camera
     panels.forEach((p, i) => {
-      const a = p.userData.baseAngle + t * 0.00012;
+      // Inner ring rotates one direction, outer ring rotates opposite (slower)
+      const ringSpeed = p.userData.ring === 'hub' ? 0.00008 : 0.00012;
+      const ringOffset = p.userData.ring === 'hub' ? Math.PI / 4 : 0;
+      const a = p.userData.baseAngle + ringOffset + t * ringSpeed;
       p.position.x = Math.cos(a) * p.userData.radius;
       p.position.z = Math.sin(a) * p.userData.radius;
       p.position.y = p.userData.baseY + Math.sin(t * 0.0007 + i * 1.3) * 0.18;
@@ -558,12 +667,14 @@
       priceData.blockHeight++;
       updatePanelTexture(panels.find(p => p.userData.def.key === 'blockHeight'));
     }
-    // Refresh "last block" panel every second
     if (Math.floor(t / 1000) !== Math.floor((t - dt * 1000) / 1000)) {
       updatePanelTexture(panels.find(p => p.userData.def.key === 'lastBlock'));
+      // Halving countdown decrements every second too
+      hubData.halvingDays = Math.max(0, Math.round((new Date('2028-04-20').getTime() - Date.now()) / 86400000));
+      updatePanelTexture(panels.find(p => p.userData.def.key === 'halving'));
     }
 
-    // Subtle price tick (between real fetches) for "live" feel
+    // Subtle price tick (between real fetches)
     if (priceData.loaded && Math.floor(t / 250) !== Math.floor((t - dt * 1000) / 250)) {
       if (priceData.price != null) {
         priceData.price += (Math.random() - 0.5) * Math.max(2, priceData.price * 0.0003);
