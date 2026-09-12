@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Bitcoin Collector — To The Moon</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      background: #05060f;
+      color: #fff;
+    }
+    canvas { display: block; touch-action: none; }
+
+    /* HUD - top left */
+    #hud {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top, 12px));
+      left: 12px;
+      z-index: 10;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.65);
+      border: 2px solid #fbbf24;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    #hud h1 { margin: 0 0 6px 0; color: #fbbf24; font-size: 15px; letter-spacing: 0.5px; }
+    #hud .row { margin: 2px 0; }
+    #hud .row b { color: #fbbf24; }
+    #lives { display: inline-block; font-size: 18px; letter-spacing: 3px; }
+    #lives .heart { color: #ef4444; text-shadow: 0 0 6px rgba(239,68,68,0.6); }
+    #lives .lost { color: #444; }
+
+    /* Big score - top right */
+    #score-display {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top, 12px));
+      right: 12px;
+      z-index: 10;
+      padding: 8px 16px;
+      background: rgba(0,0,0,0.65);
+      border: 2px solid #fbbf24;
+      border-radius: 6px;
+      font-size: 26px;
+      font-weight: bold;
+      color: #fbbf24;
+      min-width: 60px;
+      text-align: center;
+      text-shadow: 0 0 12px rgba(251,191,36,0.4);
+    }
+
+    /* Desktop controls hint - hidden on touch */
+    #controls {
+      position: absolute; bottom: 12px; left: 12px; z-index: 10;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid #555;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    @media (pointer: coarse) {
+      #controls { display: none; }
+    }
+
+    /* Center message */
+    #message {
+      position: absolute;
+      top: 38%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      font-size: 26px; font-weight: bold;
+      text-align: center;
+      pointer-events: none;
+      text-shadow: 0 0 20px rgba(0,0,0,0.9);
+      color: #fbbf24;
+      max-width: 90vw;
+      line-height: 1.25;
+    }
+    #message small {
+      display: block;
+      font-size: 14px;
+      color: rgba(255,255,255,0.9);
+      margin-top: 10px;
+      font-weight: normal;
+    }
+    #message .tap-restart {
+      display: inline-block;
+      margin-top: 18px;
+      padding: 10px 20px;
+      background: rgba(251,191,36,0.18);
+      border: 1px solid #fbbf24;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #fbbf24;
+      pointer-events: auto;
+      cursor: pointer;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; transform: scale(1); }
+      50%      { opacity: 1;   transform: scale(1.04); }
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <h1>₿ TO THE MOON</h1>
+    <div class="row">Lives: <span id="lives"><span class="heart">♥</span><span class="heart">♥</span><span class="heart">♥</span></span></div>
+  </div>
+  <div id="score-display">0</div>
+
+  <div id="controls">
+    <span class="key">&larr;</span> <span class="key">&rarr;</span> Move
+  </div>
+
+  <div id="message">Loading…</div>
+  <canvas id="game"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+  // ========== Scene ==========
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05060f);
+  scene.fog = new THREE.Fog(0x05060f, 30, 80);
+
+  // ========== Arena ==========
+  const ARENA_WIDTH = 14;
+  const ARENA_HEIGHT = 20;
+
+  // ========== Camera ==========
+  // Side view, slightly elevated
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 2, 14);
+  camera.lookAt(0, 0, 0);
+
+  // ========== Renderer ==========
+  const renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('game'),
+    antialias: window.devicePixelRatio < 2,
+    powerPreference: 'high-performance',
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // ========== Lighting ==========
+  scene.add(new THREE.AmbientLight(0x9090a0, 0.6));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  keyLight.position.set(5, 10, 8);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0x4080ff, 0.35);
+  fillLight.position.set(-5, 5, 5);
+  scene.add(fillLight);
+
+  // ========== Starfield (parallax background) ==========
+  const starGeo = new THREE.BufferGeometry();
+  const starCount = 500;
+  const starPositions = new Float32Array(starCount * 3);
+  const starSizes = new Float32Array(starCount);
+  for (let i = 0; i < starCount; i++) {
+    starPositions[i*3 + 0] = (Math.random() - 0.5) * 70;
+    starPositions[i*3 + 1] = (Math.random() - 0.5) * 70;
+    starPositions[i*3 + 2] = -12 - Math.random() * 35;
+    starSizes[i] = 0.04 + Math.random() * 0.08;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+  starGeo.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+  const starMat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 0.08,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.85,
+  });
+  const stars = new THREE.Points(starGeo, starMat);
+  scene.add(stars);
+
+  // Distant moon
+  const moon = new THREE.Mesh(
+    new THREE.SphereGeometry(2.5, 32, 32),
+    new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.95, emissive: 0x1a1a25, emissiveIntensity: 0.3 })
+  );
+  moon.position.set(9, 5, -18);
+  scene.add(moon);
+
+  // ========== Load spaceship ==========
+  const loader = new GLTFLoader();
+  let ship = null;
+  let shipReady = false;
+
+  const messageEl = document.getElementById('message');
+  const scoreEl   = document.getElementById('score-display');
+  const livesEl   = document.getElementById('lives');
+
+  loader.load('assets/spaceship.glb', (gltf) => {
+    ship = gltf.scene;
+    ship.position.set(0, -ARENA_HEIGHT/2 + 1.5, 0);
+    scene.add(ship);
+    shipReady = true;
+    messageEl.textContent = '';
+  }, undefined, (err) => {
+    console.error('Failed to load ship:', err);
+    messageEl.textContent = 'Failed to load 3D model';
+  });
+
+  // ========== Bitcoin coin texture (canvas with ₿ symbol) ==========
+  function makeBitcoinTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    // Gold radial gradient
+    const grad = ctx.createRadialGradient(128, 110, 20, 128, 128, 130);
+    grad.addColorStop(0, '#fff5b8');
+    grad.addColorStop(0.4, '#fbbf24');
+    grad.addColorStop(0.9, '#b45309');
+    grad.addColorStop(1, '#7c2d12');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+    // Inner ring detail
+    ctx.strokeStyle = 'rgba(120, 53, 15, 0.55)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(128, 128, 100, 0, Math.PI * 2);
+    ctx.stroke();
+    // ₿ symbol
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = 'bold 210px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('₿', 128, 138);
+    // Outer rim
+    ctx.strokeStyle = '#7c2d12';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(128, 128, 124, 0, Math.PI * 2);
+    ctx.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  // ========== Bitcoin coin (procedural cylinder with ₿ texture) ==========
+  const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.12, 28);
+  const coinSideMat = new THREE.MeshStandardMaterial({
+    color: 0xd97706, roughness: 0.35, metalness: 0.85
+  });
+  const coinFaceMat = new THREE.MeshStandardMaterial({
+    map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.65
+  });
+  const coins = [];
+
+  function spawnCoin() {
+    const coin = new THREE.Mesh(coinGeo, [coinSideMat, coinFaceMat, coinFaceMat]);
+    coin.position.set(
+      (Math.random() - 0.5) * (ARENA_WIDTH - 2),
+      ARENA_HEIGHT/2 + 1,
+      0
+    );
+    coin.userData = {
+      vy: -2.2 - Math.random() * 1.5,
+      rotSpeed: 0.04 + Math.random() * 0.04,
+    };
+    scene.add(coin);
+    coins.push(coin);
+  }
+
+  // ========== Asteroid (procedural deformed icosphere) ==========
+  const asteroidGeo = new THREE.IcosahedronGeometry(0.5, 1);
+  const aPos = asteroidGeo.attributes.position;
+  for (let i = 0; i < aPos.count; i++) {
+    const v = new THREE.Vector3().fromBufferAttribute(aPos, i);
+    v.multiplyScalar(1 + (Math.random() - 0.5) * 0.35);
+    aPos.setXYZ(i, v.x, v.y, v.z);
+  }
+  asteroidGeo.computeVertexNormals();
+  const asteroidMat = new THREE.MeshStandardMaterial({
+    color: 0x6b5d50, roughness: 0.95, flatShading: true
+  });
+  const asteroids = [];
+
+  function spawnAsteroid() {
+    const ast = new THREE.Mesh(asteroidGeo, asteroidMat);
+    const scale = 0.55 + Math.random() * 0.55;
+    ast.scale.set(scale, scale, scale);
+    ast.position.set(
+      (Math.random() - 0.5) * (ARENA_WIDTH - 2),
+      ARENA_HEIGHT/2 + 1,
+      0
+    );
+    ast.userData = {
+      vy: -2.5 - Math.random() * 1.5,
+      vx: (Math.random() - 0.5) * 1.2,
+      rotX: (Math.random() - 0.5) * 0.08,
+      rotZ: (Math.random() - 0.5) * 0.08,
+    };
+    scene.add(ast);
+    asteroids.push(ast);
+  }
+
+  // ========== Game state ==========
+  let score = 0;
+  let lives = 3;
+  let gameOver = false;
+  let elapsed = 0;
+  let coinSpawnTimer = 0;
+  let asteroidSpawnTimer = 0;
+  let blinkTimer = 0;
+  let invincible = false;
+  let targetX = 0;
+  let touching = false;
+  const clock = new THREE.Clock();
+
+  function updateLives() {
+    let html = '';
+    for (let i = 0; i < 3; i++) {
+      html += i < lives ? '<span class="heart">♥</span>' : '<span class="lost">♥</span>';
+    }
+    livesEl.innerHTML = html;
+  }
+
+  function restart() {
+    score = 0;
+    lives = 3;
+    elapsed = 0;
+    coinSpawnTimer = 0;
+    asteroidSpawnTimer = 0;
+    gameOver = false;
+    invincible = false;
+    blinkTimer = 0;
+    for (const c of coins) scene.remove(c); coins.length = 0;
+    for (const a of asteroids) scene.remove(a); asteroids.length = 0;
+    scoreEl.textContent = '0';
+    updateLives();
+    messageEl.innerHTML = '';
+    if (ship) ship.position.set(0, -ARENA_HEIGHT/2 + 1.5, 0);
+  }
+
+  // ========== Input ==========
+  // Mobile: drag finger horizontally on canvas, ship follows finger X.
+  // Desktop: A/D or arrow keys.
+
+  const canvasEl = renderer.domElement;
+  function pointerToWorldX(clientX) {
+    const norm = (clientX / window.innerWidth) * 2 - 1;
+    return Math.max(-(ARENA_WIDTH/2 - 1), Math.min(ARENA_WIDTH/2 - 1, norm * (ARENA_WIDTH/2 - 1)));
+  }
+
+  canvasEl.addEventListener('touchstart', e => {
+    e.preventDefault();
+    touching = true;
+    targetX = pointerToWorldX(e.touches[0].clientX);
+    if (gameOver) restart();
+  }, { passive: false });
+
+  canvasEl.addEventListener('touchmove', e => {
+    e.preventDefault();
+    targetX = pointerToWorldX(e.touches[0].clientX);
+  }, { passive: false });
+
+  const endHandler = e => { e.preventDefault(); touching = false; };
+  canvasEl.addEventListener('touchend', endHandler, { passive: false });
+  canvasEl.addEventListener('touchcancel', endHandler);
+
+  canvasEl.addEventListener('mousemove', e => { targetX = pointerToWorldX(e.clientX); });
+
+  const keys = {};
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (['arrowleft','arrowright',' ','arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
+  });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  messageEl.addEventListener('click', () => { if (gameOver && shipReady) restart(); });
+
+  // ========== Game loop ==========
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+
+    renderer.render(scene, camera);
+
+    if (!shipReady || gameOver) return;
+
+    elapsed += dt;
+
+    // Difficulty ramps up: spawn intervals shorten over time.
+    const coinInterval     = Math.max(0.35, 0.95 - elapsed * 0.018);
+    const asteroidInterval = Math.max(0.55, 1.9  - elapsed * 0.035);
+
+    coinSpawnTimer += dt;
+    if (coinSpawnTimer >= coinInterval) { coinSpawnTimer = 0; spawnCoin(); }
+    asteroidSpawnTimer += dt;
+    if (asteroidSpawnTimer >= asteroidInterval) { asteroidSpawnTimer = 0; spawnAsteroid(); }
+
+    // Ship movement
+    let kbDir = 0;
+    if (keys['a'] || keys['arrowleft'])  kbDir -= 1;
+    if (keys['d'] || keys['arrowright']) kbDir += 1;
+    if (kbDir !== 0 && !touching) targetX += kbDir * 9 * dt;
+
+    // Smooth lerp ship toward target X
+    if (ship) ship.position.x += (targetX - ship.position.x) * 0.22;
+
+    // Update coins
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const coin = coins[i];
+      coin.position.y += coin.userData.vy * dt;
+      coin.rotation.y += coin.userData.rotSpeed;
+      if (coin.position.y < ship.position.y - 2) {
+        scene.remove(coin); coins.splice(i, 1); continue;
+      }
+      const dx = coin.position.x - ship.position.x;
+      const dy = coin.position.y - ship.position.y;
+      if (Math.hypot(dx, dy) < 0.85) {
+        score++;
+        scoreEl.textContent = score;
+        scene.remove(coin); coins.splice(i, 1);
+      }
+    }
+
+    // Invincibility blink
+    if (invincible) {
+      blinkTimer -= dt;
+      ship.visible = Math.floor(blinkTimer * 12) % 2 === 0;
+      if (blinkTimer <= 0) { invincible = false; ship.visible = true; }
+    }
+
+    // Update asteroids
+    for (let i = asteroids.length - 1; i >= 0; i--) {
+      const ast = asteroids[i];
+      ast.position.y += ast.userData.vy * dt;
+      ast.position.x += ast.userData.vx * dt;
+      ast.rotation.x += ast.userData.rotX;
+      ast.rotation.z += ast.userData.rotZ;
+      if (ast.position.x < -ARENA_WIDTH/2 + 0.3 || ast.position.x > ARENA_WIDTH/2 - 0.3) {
+        ast.userData.vx *= -1;
+      }
+      if (ast.position.y < -ARENA_HEIGHT/2 - 2) {
+        scene.remove(ast); asteroids.splice(i, 1); continue;
+      }
+      if (!invincible) {
+        const dx = ast.position.x - ship.position.x;
+        const dy = ast.position.y - ship.position.y;
+        if (Math.hypot(dx, dy) < 0.85) {
+          lives--;
+          updateLives();
+          scene.remove(ast); asteroids.splice(i, 1);
+          invincible = true;
+          blinkTimer = 2.0;
+          if (lives <= 0) {
+            gameOver = true;
+            messageEl.innerHTML =
+              `GAME OVER<br><small>₿ ${score} collected</small>` +
+              `<div class="tap-restart">Tap to play again</div>`;
+          }
+        }
+      }
+    }
+
+    // Subtle starfield drift
+    stars.rotation.z += dt * 0.006;
+  }
+  animate();
+
+  // ========== Resize ==========
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  </script>
+</body>
+</html>

@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>₿ HODL Command Center</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      background: #02030a;
+      color: #fff;
+    }
+    canvas { display: block; touch-action: none; }
+
+    /* Top title */
+    #title {
+      position: absolute;
+      top: max(20px, env(safe-area-inset-top, 20px));
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #title h1 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 5px;
+      color: #fbbf24;
+      text-shadow: 0 0 22px rgba(251, 191, 36, 0.45);
+    }
+    #title small {
+      display: block;
+      margin-top: 4px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Loading status */
+    #status {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      pointer-events: none;
+      text-align: center;
+      transition: opacity 0.5s;
+    }
+    #status .err { color: #ef4444; }
+    #status .demo { color: rgba(255,255,255,0.4); }
+
+    /* Bottom controls hint */
+    #hint {
+      position: absolute;
+      bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      padding: 6px 14px;
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(251,191,36,0.25);
+      border-radius: 14px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      pointer-events: none;
+      transition: opacity 0.6s;
+    }
+
+    /* Live indicator (top-right) */
+    #live {
+      position: absolute;
+      top: max(20px, env(safe-area-inset-top, 20px));
+      right: 14px;
+      z-index: 10;
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 10px;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+      pointer-events: none;
+    }
+    #live .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      margin-right: 6px;
+      animation: blink 1.6s ease-in-out infinite;
+      vertical-align: middle;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <div id="title">
+    <h1>₿ HODL COMMAND CENTER</h1>
+    <small>Real-time on-chain intelligence</small>
+  </div>
+  <div id="live"><span class="dot"></span>LIVE</div>
+  <div id="status">Connecting to blockchain…</div>
+  <div id="hint">Drag to orbit</div>
+  <canvas id="game"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+  // ========== Scene ==========
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x02030a);
+  scene.fog = new THREE.FogExp2(0x02030a, 0.022);
+
+  // ========== Camera ==========
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+
+  // ========== Renderer ==========
+  const renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('game'),
+    antialias: window.devicePixelRatio < 2,
+    powerPreference: 'high-performance',
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // ========== Lighting ==========
+  scene.add(new THREE.AmbientLight(0x404060, 0.55));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  keyLight.position.set(6, 10, 6);
+  scene.add(keyLight);
+  const rimGold = new THREE.DirectionalLight(0xfbbf24, 0.55);
+  rimGold.position.set(-6, 2, -4);
+  scene.add(rimGold);
+  const rimBlue = new THREE.DirectionalLight(0x3b82f6, 0.4);
+  rimBlue.position.set(4, -3, -6);
+  scene.add(rimBlue);
+
+  // ========== Starfield ==========
+  {
+    const g = new THREE.BufferGeometry();
+    const N = 1200;
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const r = 30 + Math.random() * 80;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      pos[i*3 + 0] = r * Math.sin(phi) * Math.cos(theta);
+      pos[i*3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      pos[i*3 + 2] = r * Math.cos(phi);
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({
+      color: 0xffffff, size: 0.18, sizeAttenuation: true,
+      transparent: true, opacity: 0.75,
+    })));
+  }
+
+  // ========== Nebula backdrop ==========
+  function makeNebulaTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(0, 0, 256, 256);
+    const palette = [
+      ['rgba(80, 30, 130, 0.35)', 'rgba(0,0,0,0)'],
+      ['rgba(30, 60, 150, 0.30)', 'rgba(0,0,0,0)'],
+      ['rgba(140, 40, 90, 0.28)', 'rgba(0,0,0,0)'],
+      ['rgba(60, 100, 180, 0.25)', 'rgba(0,0,0,0)'],
+    ];
+    for (let i = 0; i < 6; i++) {
+      const grad = ctx.createRadialGradient(
+        Math.random() * 256, Math.random() * 256, 0,
+        Math.random() * 256, Math.random() * 256, 70 + Math.random() * 50
+      );
+      const c1 = palette[i % palette.length];
+      grad.addColorStop(0, c1[0]);
+      grad.addColorStop(1, c1[1]);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 256);
+    }
+    return new THREE.CanvasTexture(c);
+  }
+  const nebula = new THREE.Mesh(
+    new THREE.SphereGeometry(50, 24, 24),
+    new THREE.MeshBasicMaterial({ map: makeNebulaTexture(), side: THREE.BackSide, transparent: true, opacity: 0.55 })
+  );
+  scene.add(nebula);
+
+  // ========== Central Bitcoin coin (loaded from Blender) ==========
+  const loader = new GLTFLoader();
+  let coin = null, coinReady = false;
+  const statusEl = document.getElementById('status');
+
+  loader.load('assets/coin.glb', (gltf) => {
+    coin = gltf.scene;
+    scene.add(coin);
+    coinReady = true;
+    if (priceData.loaded) statusEl.style.opacity = '0';
+  }, undefined, (err) => {
+    statusEl.innerHTML = '<span class="err">Failed to load 3D model</span>';
+  });
+
+  // ========== Glow ring under the coin ==========
+  const glowRing = new THREE.Mesh(
+    new THREE.RingGeometry(2.2, 2.8, 64),
+    new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+  );
+  glowRing.rotation.x = -Math.PI / 2;
+  glowRing.position.y = -1.05;
+  scene.add(glowRing);
+
+  // Outer faint ring
+  const glowRing2 = new THREE.Mesh(
+    new THREE.RingGeometry(2.8, 3.4, 64),
+    new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+  );
+  glowRing2.rotation.x = -Math.PI / 2;
+  glowRing2.position.y = -1.06;
+  scene.add(glowRing2);
+
+  // ========== Data panels ==========
+  function makePanelTexture(label, value, colorHex, sublabel) {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 256;
+    const ctx = c.getContext('2d');
+
+    const bg = ctx.createLinearGradient(0, 0, 0, 256);
+    bg.addColorStop(0, 'rgba(15, 20, 42, 0.92)');
+    bg.addColorStop(1, 'rgba(8, 10, 28, 0.92)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 512, 256);
+
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, 492, 236);
+
+    // HUD corner brackets
+    ctx.fillStyle = '#fbbf24';
+    const cs = 22, ct = 5;
+    ctx.fillRect(10, 10, cs, ct); ctx.fillRect(10, 10, ct, cs);
+    ctx.fillRect(502-cs, 10, cs, ct); ctx.fillRect(496, 10, ct, cs);
+    ctx.fillRect(10, 240, cs, ct); ctx.fillRect(10, 234, ct, cs);
+    ctx.fillRect(502-cs, 240, cs, ct); ctx.fillRect(496, 234, ct, cs);
+
+    // Label
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = 'bold 26px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, 35, 58);
+
+    if (sublabel) {
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font = '18px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(sublabel, 477, 58);
+    }
+
+    // Divider
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(35, 78); ctx.lineTo(477, 78);
+    ctx.stroke();
+
+    // Value
+    ctx.fillStyle = colorHex;
+    ctx.font = 'bold 78px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(value, 256, 168);
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  function hexColor(n) {
+    return '#' + n.toString(16).padStart(6, '0').toUpperCase();
+  }
+
+  let priceData = {
+    price: null, change24h: null, marketCap: null,
+    blockHeight: 820134, hashRate: 625,
+    lastBlockSeconds: 240,
+    loaded: false, lastFetch: 0, isMock: false,
+  };
+
+  const PANEL_DEFS = [
+    { key: 'price',       label: 'PRICE',        color: 0xfbbf24, sublabel: 'USD' },
+    { key: 'change24h',    label: '24H CHANGE',    color: 0x22c55e, sublabel: 'BTC/USD' },
+    { key: 'marketCap',    label: 'MARKET CAP',    color: 0x60a5fa, sublabel: 'USD' },
+    { key: 'blockHeight',  label: 'BLOCK HEIGHT',  color: 0xa78bfa, sublabel: 'BITCOIN' },
+    { key: 'hashRate',     label: 'HASH RATE',     color: 0xfb923c, sublabel: 'EH/s' },
+    { key: 'lastBlock',    label: 'LAST BLOCK',    color: 0xec4899, sublabel: 'ago' },
+  ];
+
+  const panels = [];
+  function createPanels() {
+    PANEL_DEFS.forEach((def, i) => {
+      const angle = (i / PANEL_DEFS.length) * Math.PI * 2;
+      const radius = 4.6;
+      const yOffset = Math.sin(i * 0.85) * 1.0;
+
+      const tex = makePanelTexture(def.label, '…', hexColor(def.color), def.sublabel);
+      tex.colorSpace = THREE.SRGBColorSpace;
+
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+      const geo = new THREE.PlaneGeometry(2.3, 1.15);
+      const panel = new THREE.Mesh(geo, mat);
+      panel.position.set(Math.cos(angle) * radius, yOffset, Math.sin(angle) * radius);
+      panel.userData = { def, baseAngle: angle, baseY: yOffset, radius };
+      scene.add(panel);
+      panels.push(panel);
+    });
+  }
+  createPanels();
+
+  function updatePanelTexture(panel) {
+    const def = panel.userData.def;
+    let value = '…';
+    let colorHex = hexColor(def.color);
+    if (def.key === 'price' && priceData.price != null) {
+      value = '$' + Math.round(priceData.price).toLocaleString();
+    } else if (def.key === 'change24h' && priceData.change24h != null) {
+      const v = priceData.change24h;
+      const sign = v >= 0 ? '+' : '';
+      value = sign + v.toFixed(2) + '%';
+      colorHex = v >= 0 ? '#22c55e' : '#ef4444';
+    } else if (def.key === 'marketCap' && priceData.marketCap != null) {
+      const mc = priceData.marketCap;
+      if (mc >= 1e12) value = '$' + (mc / 1e12).toFixed(2) + 'T';
+      else if (mc >= 1e9) value = '$' + (mc / 1e9).toFixed(2) + 'B';
+      else value = '$' + mc.toLocaleString();
+    } else if (def.key === 'blockHeight') {
+      value = '#' + priceData.blockHeight.toLocaleString();
+    } else if (def.key === 'hashRate') {
+      value = priceData.hashRate.toLocaleString() + ' EH/s';
+    } else if (def.key === 'lastBlock') {
+      const s = Math.floor(priceData.lastBlockSeconds);
+      if (s < 60) value = s + 's ago';
+      else value = Math.floor(s / 60) + 'm ' + (s % 60) + 's ago';
+    }
+    const newTex = makePanelTexture(def.label, value, colorHex, def.sublabel);
+    newTex.colorSpace = THREE.SRGBColorSpace;
+    panel.material.map.dispose();
+    panel.material.map = newTex;
+    panel.material.color.set(colorHex);
+    panel.material.needsUpdate = true;
+  }
+  function updateAllPanels() { panels.forEach(updatePanelTexture); }
+
+  // ========== Particle stream (transactions flowing inward) ==========
+  const PARTICLE_COUNT = 90;
+  const particleGeo = new THREE.BufferGeometry();
+  const particlePos = new Float32Array(PARTICLE_COUNT * 3);
+  const particleData = [];
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const y = (Math.random() - 0.5) * 5;
+    const dist = 6 + Math.random() * 7;
+    particlePos[i*3 + 0] = Math.cos(angle) * dist;
+    particlePos[i*3 + 1] = y;
+    particlePos[i*3 + 2] = Math.sin(angle) * dist;
+    particleData.push({ angle, dist, y, speed: 0.5 + Math.random() * 0.7 });
+  }
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+  const particles = new THREE.Points(particleGeo, new THREE.PointsMaterial({
+    color: 0xfbbf24, size: 0.12, transparent: true, opacity: 0.85, sizeAttenuation: true,
+  }));
+  scene.add(particles);
+
+  // ========== Real data fetch (CoinGecko) ==========
+  async function fetchRealData() {
+    try {
+      const res = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      return {
+        price: data.market_data.current_price.usd,
+        change24h: data.market_data.price_change_percentage_24h,
+        marketCap: data.market_data.market_cap.usd,
+      };
+    } catch (e) {
+      console.warn('CoinGecko fetch failed:', e.message);
+      return null;
+    }
+  }
+
+  async function refreshData() {
+    const real = await fetchRealData();
+    if (real) {
+      priceData.price = real.price;
+      priceData.change24h = real.change24h;
+      priceData.marketCap = real.marketCap;
+      priceData.loaded = true;
+      priceData.lastFetch = Date.now();
+      priceData.isMock = false;
+      updateAllPanels();
+      if (coinReady) statusEl.style.opacity = '0';
+    } else if (!priceData.loaded) {
+      // Fallback: mock plausible numbers
+      priceData.price = 62450 + (Math.random() - 0.5) * 800;
+      priceData.change24h = 2.34 + (Math.random() - 0.5) * 0.4;
+      priceData.marketCap = 1.23e12;
+      priceData.loaded = true;
+      priceData.isMock = true;
+      updateAllPanels();
+      statusEl.innerHTML = '<span class="demo">Demo data · CoinGecko unreachable</span>';
+      if (coinReady) setTimeout(() => statusEl.style.opacity = '0', 2500);
+    }
+  }
+  refreshData();
+  setInterval(refreshData, 60000);
+
+  // ========== Orbit camera (touch + mouse) ==========
+  let angleY = 0.3, angleX = 0.25;
+  let targetY = 0.3, targetX = 0.25;
+  const camDist = 9.5;
+  let isDragging = false, lastTX = 0, lastTY = 0, lastMX = 0, lastMY = 0;
+  let idleFrames = 0;
+  const canvasEl = renderer.domElement;
+
+  function updateCameraPosition() {
+    if (!isDragging && idleFrames > 90) targetY += 0.001;
+    angleY += (targetY - angleY) * 0.08;
+    angleX += (targetX - angleX) * 0.08;
+    targetX = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, targetX));
+    const r = camDist, c = Math.cos(angleX);
+    camera.position.x = Math.sin(angleY) * c * r;
+    camera.position.z = Math.cos(angleY) * c * r;
+    camera.position.y = Math.sin(angleX) * r;
+    camera.lookAt(0, 0, 0);
+  }
+
+  canvasEl.addEventListener('touchstart', e => {
+    e.preventDefault();
+    isDragging = true;
+    idleFrames = 0;
+    lastTX = e.touches[0].clientX;
+    lastTY = e.touches[0].clientY;
+  }, { passive: false });
+
+  canvasEl.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - lastTX;
+    const dy = e.touches[0].clientY - lastTY;
+    targetY += dx * 0.0055;
+    targetX += dy * 0.0055;
+    lastTX = e.touches[0].clientX;
+    lastTY = e.touches[0].clientY;
+  }, { passive: false });
+
+  const touchEnd = e => { e.preventDefault(); isDragging = false; };
+  canvasEl.addEventListener('touchend', touchEnd, { passive: false });
+  canvasEl.addEventListener('touchcancel', touchEnd);
+
+  canvasEl.addEventListener('mousedown', e => {
+    isDragging = true;
+    idleFrames = 0;
+    lastMX = e.clientX;
+    lastMY = e.clientY;
+  });
+  canvasEl.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    targetY += (e.clientX - lastMX) * 0.0055;
+    targetX += (e.clientY - lastMY) * 0.0055;
+    lastMX = e.clientX;
+    lastMY = e.clientY;
+  });
+  canvasEl.addEventListener('mouseup',     () => { isDragging = false; });
+  canvasEl.addEventListener('mouseleave',  () => { isDragging = false; });
+
+  // ========== Animation loop ==========
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if (!isDragging) idleFrames++;
+
+    // Coin rotation + subtle wobble
+    if (coin) {
+      coin.rotation.y += dt * 0.18;
+      coin.rotation.z = Math.sin(performance.now() * 0.0009) * 0.06;
+      coin.position.y = Math.sin(performance.now() * 0.001) * 0.15;
+    }
+
+    // Glow ring pulse
+    const t = performance.now();
+    glowRing.material.opacity  = 0.30 + Math.sin(t * 0.0022) * 0.15;
+    glowRing2.material.opacity = 0.10 + Math.sin(t * 0.0015) * 0.06;
+    const pulse = 1 + Math.sin(t * 0.0018) * 0.04;
+    glowRing.scale.set(pulse, 1, pulse);
+    glowRing2.scale.set(pulse * 1.05, 1, pulse * 1.05);
+
+    // Panels: orbit slowly + face camera
+    panels.forEach((p, i) => {
+      const a = p.userData.baseAngle + t * 0.00012;
+      p.position.x = Math.cos(a) * p.userData.radius;
+      p.position.z = Math.sin(a) * p.userData.radius;
+      p.position.y = p.userData.baseY + Math.sin(t * 0.0007 + i * 1.3) * 0.18;
+      p.lookAt(camera.position);
+    });
+
+    // Particle stream
+    const pos = particles.geometry.attributes.position.array;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const d = particleData[i];
+      d.dist -= d.speed * dt;
+      if (d.dist < 2.5) {
+        d.dist = 7 + Math.random() * 6;
+        d.angle = Math.random() * Math.PI * 2;
+        d.y = (Math.random() - 0.5) * 5;
+      }
+      pos[i*3]     = Math.cos(d.angle) * d.dist;
+      pos[i*3 + 1] = d.y;
+      pos[i*3 + 2] = Math.sin(d.angle) * d.dist;
+    }
+    particles.geometry.attributes.position.needsUpdate = true;
+    particles.rotation.y += dt * 0.04;
+
+    // Mock ticker for "last block" countdown + block height
+    priceData.lastBlockSeconds += dt;
+    if (priceData.lastBlockSeconds >= 600) {
+      priceData.lastBlockSeconds = 0;
+      priceData.blockHeight++;
+      updatePanelTexture(panels.find(p => p.userData.def.key === 'blockHeight'));
+    }
+    // Refresh "last block" panel every second
+    if (Math.floor(t / 1000) !== Math.floor((t - dt * 1000) / 1000)) {
+      updatePanelTexture(panels.find(p => p.userData.def.key === 'lastBlock'));
+    }
+
+    // Subtle price tick (between real fetches) for "live" feel
+    if (priceData.loaded && Math.floor(t / 250) !== Math.floor((t - dt * 1000) / 250)) {
+      if (priceData.price != null) {
+        priceData.price += (Math.random() - 0.5) * Math.max(2, priceData.price * 0.0003);
+        if (priceData.change24h != null) {
+          priceData.change24h += (Math.random() - 0.5) * 0.04;
+        }
+        updatePanelTexture(panels.find(p => p.userData.def.key === 'price'));
+        updatePanelTexture(panels.find(p => p.userData.def.key === 'change24h'));
+      }
+    }
+
+    updateCameraPosition();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // ========== Resize ==========
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  </script>
+</body>
+</html>
