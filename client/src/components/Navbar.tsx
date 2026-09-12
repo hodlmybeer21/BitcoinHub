@@ -68,7 +68,7 @@ const Navbar = () => {
     { href: "/", label: "Learn" },
     { href: "/analytics", label: "Analytics" },
     { href: "/games/dashboard", label: "Live Dashboard" },
-    { href: "/games/btc-collector", label: "BTC Collector" },
+    { href: "/games/btc-collector", label: "Bitcoin Voyager" },
     { href: "/cycle", label: "4-Year Cycle" },
     { href: "/web-resources", label: "Web Resources" },
     { href: "/legislation", label: "Legislation" },
