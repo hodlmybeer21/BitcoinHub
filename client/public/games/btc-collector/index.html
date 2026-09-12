@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>₿ Bitcoin Empire · BitcoinHub</title>
+  <title>BitQuest · BitcoinHub</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -22,172 +22,305 @@
       background: #02030a;
       color: #fff;
     }
-    canvas { display: block; touch-action: none; }
+    canvas { display: block; }
 
-    /* Main HUD */
-    #hud {
-      position: absolute;
-      top: max(14px, env(safe-area-inset-top, 14px));
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      padding: 14px 22px;
-      text-align: center;
+    /* 3D scene behind the UI */
+    #scene-canvas { position: fixed; inset: 0; z-index: 0; }
+
+    /* Top status bar */
+    #topbar {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top, 12px));
+      left: 12px; right: 12px;
+      z-index: 5;
+      display: flex; justify-content: space-between; align-items: center;
       pointer-events: none;
     }
-    #amount-label {
+    #holdings-pill {
+      background: rgba(0,0,0,0.55);
+      border: 1.5px solid #fbbf24;
+      border-radius: 16px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fbbf24;
+      letter-spacing: 1px;
+    }
+    #holdings-pill .label {
+      font-size: 9px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 400;
+      letter-spacing: 2px;
+      display: block;
+      margin-bottom: 1px;
+    }
+    #year-pill {
+      background: rgba(0,0,0,0.55);
+      border: 1.5px solid #a78bfa;
+      border-radius: 16px;
+      padding: 6px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #a78bfa;
+      letter-spacing: 1px;
+      min-width: 100px;
+      text-align: center;
+    }
+    #year-pill .label {
+      font-size: 9px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 400;
+      letter-spacing: 2px;
+      display: block;
+      margin-bottom: 1px;
+    }
+
+    /* Badges (collected legends) */
+    #badges {
+      position: fixed;
+      top: 60px; left: 12px;
+      z-index: 5;
+      display: flex; flex-direction: column; gap: 4px;
+      pointer-events: none;
+    }
+    .badge {
+      background: rgba(167, 139, 250, 0.18);
+      border: 1px solid rgba(167, 139, 250, 0.4);
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 9px;
+      color: #c4b5fd;
+      letter-spacing: 1px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* Story card (centered, bottom) */
+    #story-card {
+      position: fixed;
+      left: 12px; right: 12px;
+      bottom: max(12px, env(safe-area-inset-bottom, 12px));
+      max-width: 540px;
+      margin: 0 auto;
+      z-index: 10;
+      background: rgba(8, 10, 22, 0.92);
+      border: 1.5px solid rgba(251, 191, 36, 0.5);
+      border-radius: 12px;
+      padding: 18px 18px 14px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    #story-era {
       font-size: 10px;
       letter-spacing: 3px;
-      color: rgba(255,255,255,0.45);
+      color: #a78bfa;
       text-transform: uppercase;
-    }
-    #amount {
-      font-size: 32px;
-      font-weight: 800;
-      color: #fbbf24;
-      letter-spacing: 1px;
-      text-shadow: 0 0 18px rgba(251, 191, 36, 0.4);
-      margin-top: 2px;
-      font-variant-numeric: tabular-nums;
-    }
-    #amount-sub {
-      font-size: 10px;
-      color: rgba(255,255,255,0.4);
-      margin-top: 4px;
-      letter-spacing: 1px;
-    }
-    #halving-bar {
-      width: 220px;
-      height: 3px;
-      background: rgba(255,255,255,0.08);
-      margin: 10px auto 0;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    #halving-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #22d3ee 0%, #fbbf24 100%);
-      transition: width 0.2s linear;
-    }
-    #halving-text {
-      font-size: 9px;
-      color: rgba(255,255,255,0.4);
-      letter-spacing: 1px;
-      margin-top: 5px;
-    }
-
-    /* Stats corner */
-    #stats {
-      position: absolute;
-      top: max(14px, env(safe-area-inset-top, 14px));
-      left: 14px;
-      z-index: 10;
-      font-size: 10px;
-      letter-spacing: 1px;
-      pointer-events: none;
-    }
-    #stats .stat {
-      color: rgba(255,255,255,0.45);
       margin-bottom: 4px;
     }
-    #stats .stat b {
-      color: #a78bfa;
+    #story-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fbbf24;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+    }
+    #story-narrator {
+      font-size: 12px;
+      line-height: 1.5;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 6px;
+      font-style: italic;
+    }
+    #story-text {
+      font-size: 12px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 14px;
+    }
+    #story-text b {
+      color: #fbbf24;
       font-weight: 600;
     }
-
-    /* Halving flash */
-    #halving-flash {
-      position: absolute;
-      inset: 0;
-      z-index: 15;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.4s;
+    .choice-btn {
+      display: block;
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background: rgba(251, 191, 36, 0.08);
+      border: 1.5px solid rgba(251, 191, 36, 0.4);
+      border-radius: 8px;
+      color: #fbbf24;
+      font-family: inherit;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s;
     }
-    #halving-flash.show { opacity: 1; }
-    #halving-flash .text {
-      font-size: 28px;
-      font-weight: 800;
+    .choice-btn:active {
+      transform: scale(0.98);
+      background: rgba(251, 191, 36, 0.15);
+    }
+    .choice-btn small {
+      display: block;
+      color: rgba(255,255,255,0.5);
+      font-size: 10px;
+      margin-top: 2px;
+      letter-spacing: 0.5px;
+    }
+    #result {
+      font-size: 13px;
+      line-height: 1.5;
       color: #22d3ee;
-      letter-spacing: 4px;
-      text-shadow: 0 0 30px rgba(34, 211, 238, 0.8);
+      margin: 10px 0;
+      padding: 10px 12px;
+      background: rgba(34, 211, 238, 0.08);
+      border-left: 2px solid #22d3ee;
+      border-radius: 4px;
+    }
+    #result b { color: #fbbf24; }
+    #continue-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #02030a;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      cursor: pointer;
+    }
+    #continue-btn:active { transform: scale(0.98); }
+
+    /* Final screen */
+    #final-card {
+      position: fixed;
+      inset: 12px;
+      margin: auto;
+      max-width: 480px;
+      max-height: 80vh;
+      z-index: 20;
+      background: rgba(8, 10, 22, 0.96);
+      border: 1.5px solid #fbbf24;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow-y: auto;
+    }
+    #final-card.show { display: flex; }
+    #final-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fbbf24;
+      margin-bottom: 8px;
+    }
+    #final-subtitle {
+      font-size: 13px;
+      color: rgba(255,255,255,0.65);
+      margin-bottom: 18px;
+      line-height: 1.5;
+      max-width: 340px;
+    }
+    #final-stats {
+      display: flex;
+      gap: 22px;
+      margin-bottom: 18px;
+    }
+    #final-stats .stat {
       text-align: center;
     }
-    #halving-flash .text small {
-      display: block;
-      font-size: 12px;
+    #final-stats .stat-num {
+      font-size: 22px;
+      font-weight: 800;
       color: #fbbf24;
+    }
+    #final-stats .stat-label {
+      font-size: 9px;
+      color: rgba(255,255,255,0.5);
       letter-spacing: 2px;
-      margin-top: 6px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    #replay-btn {
+      padding: 12px 32px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #02030a;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      cursor: pointer;
     }
 
     /* BitcoinHub footer */
     #hub-footer {
-      position: absolute;
-      bottom: max(10px, env(safe-area-inset-bottom, 10px));
-      left: 50%;
+      position: fixed;
+      bottom: 4px; left: 50%;
       transform: translateX(-50%);
-      z-index: 5;
-      font-size: 9px;
-      color: rgba(255,255,255,0.35);
+      z-index: 3;
+      font-size: 8px;
+      color: rgba(255,255,255,0.25);
       letter-spacing: 1px;
       pointer-events: auto;
       white-space: nowrap;
     }
-    #hub-footer a { color: #a78bfa; text-decoration: none; font-weight: 600; }
-    #hub-footer .sep { color: rgba(255,255,255,0.18); margin: 0 6px; }
-
-    /* Tutorial overlay (dismissed on first tap) */
-    #tutorial {
-      position: absolute;
-      bottom: 18%;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 12;
-      font-size: 11px;
-      color: rgba(255,255,255,0.55);
-      letter-spacing: 1px;
-      text-align: center;
-      pointer-events: none;
-      animation: fade-pulse 2.4s ease-in-out infinite;
-    }
-    @keyframes fade-pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 1; }
-    }
+    #hub-footer a { color: #a78bfa; text-decoration: none; }
+    #hub-footer .sep { color: rgba(255,255,255,0.12); margin: 0 4px; }
   </style>
 </head>
 <body>
-  <div id="stats">
-    <div class="stat">NODES <b id="nodes-count">0</b></div>
-    <div class="stat">RATE <b id="rate-display">1.0</b>/s</div>
+  <canvas id="scene-canvas"></canvas>
+
+  <div id="topbar">
+    <div id="holdings-pill">
+      <span class="label">YOUR HOLDINGS</span>
+      <span id="holdings-amt">0.00000000 ₿</span>
+    </div>
+    <div id="year-pill">
+      <span class="label">YEAR</span>
+      <span id="year-text">2009</span>
+    </div>
   </div>
 
-  <div id="hud">
-    <div id="amount-label">YOUR HOLDINGS</div>
-    <div id="amount">0.00000000 ₿</div>
-    <div id="amount-sub">0 satoshis</div>
-    <div id="halving-bar"><div id="halving-fill"></div></div>
-    <div id="halving-text">Next halving: <span id="halving-count">60.0</span>s</div>
+  <div id="badges"></div>
+
+  <div id="story-card">
+    <div id="story-era">Era 1 · 2009</div>
+    <div id="story-title">The Genesis Block</div>
+    <div id="story-narrator">— Narrator —</div>
+    <div id="story-text">Satoshi Nakamoto mines the first 50 BTC into existence. You are here, at the beginning of a new form of money. The block reward is 50 BTC, and you can choose what role you'll play in this experiment.</div>
+    <div id="choices"></div>
   </div>
 
-  <div id="halving-flash"><div class="text">HALVING<div id="halving-multiplier">RATE ×0.5</div><small>The code is law</small></div></div>
-
-  <div id="tutorial">Tap anywhere to add a satoshi · Empower the network</div>
+  <div id="final-card">
+    <div id="final-title">Journey Complete</div>
+    <div id="final-subtitle">You've traveled through 15 years of Bitcoin's history. The network grew stronger with each choice you made.</div>
+    <div id="final-stats">
+      <div class="stat"><div class="stat-num" id="final-btc">0</div><div class="stat-label">BTC HELD</div></div>
+      <div class="stat"><div class="stat-num" id="final-badges">0</div><div class="stat-label">LEGENDS</div></div>
+      <div class="stat"><div class="stat-num" id="final-rank">—</div><div class="stat-label">RANK</div></div>
+    </div>
+    <button id="replay-btn">PLAY AGAIN</button>
+  </div>
 
   <div id="hub-footer">
     <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener">bitcoinhub</a>
     <span class="sep">·</span>
-    <a href="https://bitcoinhub.goodbotai.tech/laws" target="_blank" rel="noopener">Laws</a>
-    <span class="sep">·</span>
     <a href="https://bitcoinhub.goodbotai.tech/cycle" target="_blank" rel="noopener">Cycle</a>
+    <span class="sep">·</span>
+    <a href="https://bitcoinhub.goodbotai.tech/laws" target="_blank" rel="noopener">Laws</a>
   </div>
-
-  <canvas id="game"></canvas>
 
   <script type="importmap">
   {
@@ -200,65 +333,37 @@
   <script type="module">
   import * as THREE from 'three';
 
-  // ========== Scene ==========
+  // ========== 3D Background Scene ==========
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x02030a);
-  scene.fog = new THREE.FogExp2(0x02030a, 0.012);
+  scene.fog = new THREE.FogExp2(0x02030a, 0.025);
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
-  camera.position.set(0, 0, 14);
+  camera.position.set(0, 4, 14);
   camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({
-    canvas: document.getElementById('game'),
+    canvas: document.getElementById('scene-canvas'),
     antialias: window.devicePixelRatio < 2,
     powerPreference: 'high-performance',
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-  // ========== Lighting ==========
-  scene.add(new THREE.AmbientLight(0x303040, 0.6));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
-  keyLight.position.set(5, 10, 8);
-  scene.add(keyLight);
-  const warmRim = new THREE.DirectionalLight(0xfbbf24, 0.7);
-  warmRim.position.set(-5, 4, 4);
-  scene.add(warmRim);
-  const coolRim = new THREE.DirectionalLight(0x60a5fa, 0.4);
-  coolRim.position.set(0, -4, -5);
-  scene.add(coolRim);
+  scene.add(new THREE.AmbientLight(0x404060, 0.5));
+  const k1 = new THREE.DirectionalLight(0xffffff, 0.7);
+  k1.position.set(5, 10, 5); scene.add(k1);
+  const k2 = new THREE.DirectionalLight(0xfbbf24, 0.4);
+  k2.position.set(-5, 3, 5); scene.add(k2);
 
-  // ========== Moon (target) ==========
-  const moonGeo = new THREE.SphereGeometry(1.5, 32, 32);
-  const moonMat = new THREE.MeshStandardMaterial({
-    color: 0xc8c4b8,
-    roughness: 0.95,
-    emissive: 0x6b6855,
-    emissiveIntensity: 0.15,
-  });
-  const moon = new THREE.Mesh(moonGeo, moonMat);
-  moon.position.set(0, 8, -22);
-  scene.add(moon);
-
-  // Moon glow halo
-  const moonHalo = new THREE.Mesh(
-    new THREE.SphereGeometry(2.0, 24, 24),
-    new THREE.MeshBasicMaterial({
-      color: 0xfbbf24, transparent: true, opacity: 0.12, side: THREE.BackSide,
-    })
-  );
-  moonHalo.position.copy(moon.position);
-  scene.add(moonHalo);
-
-  // ========== Stars ==========
+  // Stars
   {
     const g = new THREE.BufferGeometry();
-    const N = 800;
+    const N = 500;
     const pos = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
-      pos[i*3+0] = (Math.random() - 0.5) * 80;
-      pos[i*3+1] = (Math.random() - 0.5) * 80;
+      pos[i*3+0] = (Math.random() - 0.5) * 60;
+      pos[i*3+1] = (Math.random() - 0.5) * 60;
       pos[i*3+2] = -10 - Math.random() * 30;
     }
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -267,7 +372,7 @@
     })));
   }
 
-  // ========== Bitcoin coin (procedural, emissive) ==========
+  // Central Bitcoin (slowly rotating)
   function makeBitcoinTexture() {
     const c = document.createElement('canvas');
     c.width = c.height = 256;
@@ -282,7 +387,7 @@
     ctx.lineWidth = 8;
     ctx.strokeRect(10, 10, 236, 236);
     ctx.fillStyle = '#1a1a1a';
-    ctx.font = 'bold 180px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.font = 'bold 180px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('₿', 128, 140);
@@ -292,267 +397,290 @@
   }
 
   const coinGroup = new THREE.Group();
-  const coinSideMat = new THREE.MeshStandardMaterial({
-    color: 0xd97706, roughness: 0.3, metalness: 0.6,
-    emissive: 0xd97706, emissiveIntensity: 0.4,
-  });
-  const coinFaceMat = new THREE.MeshStandardMaterial({
-    map: makeBitcoinTexture(),
-    roughness: 0.4, metalness: 0.4,
-    emissive: 0xfbbf24, emissiveIntensity: 0.3,
-  });
   const coin = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.2, 1.2, 0.25, 48),
-    [coinSideMat, coinFaceMat, coinFaceMat]
+    new THREE.CylinderGeometry(1.4, 1.4, 0.3, 48),
+    [
+      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3, metalness: 0.6, emissive: 0xd97706, emissiveIntensity: 0.3 }),
+      new THREE.MeshStandardMaterial({ map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.4, emissive: 0xfbbf24, emissiveIntensity: 0.4 }),
+      new THREE.MeshStandardMaterial({ map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.4, emissive: 0xfbbf24, emissiveIntensity: 0.4 }),
+    ]
   );
   coin.rotation.x = Math.PI / 2;
   coinGroup.add(coin);
 
-  // Inner ring (decorative)
-  const coinRing = new THREE.Mesh(
-    new THREE.TorusGeometry(0.95, 0.04, 8, 48),
-    new THREE.MeshStandardMaterial({
-      color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.6,
-      roughness: 0.4, metalness: 0.6,
-    })
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.2, 0.04, 8, 48),
+    new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.6 })
   );
-  coinRing.position.z = 0.13;
-  coinGroup.add(coinRing);
+  ring.position.z = 0.16;
+  coinGroup.add(ring);
 
-  const coinRing2 = coinRing.clone();
-  coinRing2.position.z = -0.13;
-  coinGroup.add(coinRing2);
-
-  // Glow halo around coin
-  const glowGeo = new THREE.RingGeometry(1.5, 2.4, 48);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xfbbf24, transparent: true, opacity: 0.18,
-    side: THREE.DoubleSide, depthWrite: false,
-  });
-  const coinGlow = new THREE.Mesh(glowGeo, glowMat);
-  scene.add(coinGlow);
+  const ring2 = ring.clone();
+  ring2.position.z = -0.16;
+  coinGroup.add(ring2);
 
   scene.add(coinGroup);
 
-  // ========== Network nodes (empowered users) ==========
-  // Starts empty. Each tap adds a node in a sphere around the coin.
-  const nodes = [];
-  const nodeMat = new THREE.MeshStandardMaterial({
-    color: 0xa78bfa, emissive: 0xa78bfa, emissiveIntensity: 1.0,
-    roughness: 0.3, metalness: 0.5,
-  });
-  const nodeGeo = new THREE.IcosahedronGeometry(0.1, 0);
+  // Moon
+  const moon = new THREE.Mesh(
+    new THREE.SphereGeometry(1.8, 32, 32),
+    new THREE.MeshStandardMaterial({ color: 0xb8b4a8, roughness: 0.95, emissive: 0x555544, emissiveIntensity: 0.15 })
+  );
+  moon.position.set(7, 7, -22);
+  scene.add(moon);
 
-  function addNode() {
-    const node = new THREE.Mesh(nodeGeo, nodeMat.clone());
-    // Random position on a sphere of radius 4-6
-    const phi = Math.random() * Math.PI * 2;
-    const theta = Math.acos(2 * Math.random() - 1);
-    const r = 4 + Math.random() * 2;
-    node.position.set(
-      r * Math.sin(theta) * Math.cos(phi),
-      r * Math.sin(theta) * Math.sin(phi),
-      r * Math.cos(theta)
-    );
-    node.userData = {
-      baseScale: 1,
-      phase: Math.random() * Math.PI * 2,
-    };
-    scene.add(node);
-    nodes.push(node);
-    document.getElementById('nodes-count').textContent = nodes.length;
-  }
-
-  // ========== Tap particles ==========
-  const tapParticles = [];
-  const tapParticleGeo = new THREE.SphereGeometry(0.08, 8, 6);
-
-  function spawnTapParticle(targetX, targetY, targetZ, color = 0xfbbf24) {
-    for (let i = 0; i < 3; i++) {
-      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
-      const p = new THREE.Mesh(tapParticleGeo, mat);
-      // Start from random screen position-ish (use random offset around coin)
-      const a = Math.random() * Math.PI * 2;
-      const r = 3 + Math.random() * 2;
-      p.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
-      p.userData = {
-        tx: targetX, ty: targetY, tz: targetZ,
-        life: 0.8, maxLife: 0.8,
-        vx: (targetX - p.position.x) * 0.08,
-        vy: (targetY - p.position.y) * 0.08,
-        vz: (targetZ - p.position.z) * 0.08,
-      };
-      scene.add(p);
-      tapParticles.push(p);
-    }
-  }
-
-  // ========== Bitcoin text particles (satoshi spawn) ==========
-  // When you tap, a stream of small particles shoots toward the coin
-  function spawnSatoshiToCoin() {
-    const mat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 1 });
-    const p = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), mat);
-    // Random position outside the visible area
-    const a = Math.random() * Math.PI * 2;
-    const r = 6 + Math.random() * 2;
-    p.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
-    p.userData = {
-      tx: 0, ty: 0, tz: 0,
-      life: 1.2, maxLife: 1.2,
-      vx: -p.position.x * 0.04,
-      vy: -p.position.y * 0.04,
-      vz: 0,
-    };
-    scene.add(p);
-    tapParticles.push(p);
-  }
+  // ========== Era themes (changes background color and adds landmarks) ==========
+  const ERAS = [
+    { year: '2009', name: 'The Genesis Block', narrator: '— Narrator —',
+      text: 'Satoshi Nakamoto mines the first 50 BTC into existence. You are here, at the beginning of a new form of money. The block reward is 50 BTC and the network is empty.',
+      choices: [
+        { text: 'Mine your first block', sub: '+50 BTC · +Legend: Satoshi', delta: 50, badge: 'Satoshi' },
+        { text: 'Wait on the sidelines', sub: '+0 BTC · No legend', delta: 0, badge: null },
+      ] },
+    { year: '2010', name: 'The Pizza Purchase', narrator: '— Laszlo Hanyecz, May 22, 2010 —',
+      text: 'A programmer in Florida orders two pizzas for 10,000 BTC. The first real-world transaction. Some will call it wasteful. You will call it the moment Bitcoin became real money.',
+      choices: [
+        { text: 'Spend 10,000 BTC on pizza', sub: '−10,000 BTC · +Legend: Pizza Day', delta: -10000, badge: 'Pizza Day' },
+        { text: 'HODL the 10,000 BTC', sub: '+10,000 BTC · Bitcoin purist', delta: 10000, badge: null },
+      ] },
+    { year: '2011', name: 'The First Crash', narrator: '— Wikileaks Block —',
+      text: 'After hitting $31, Bitcoin crashes 94% to $2. The media declares Bitcoin dead. Holders panic-sell. You must decide what to do when everyone is screaming to sell.',
+      choices: [
+        { text: 'Panic sell everything', sub: 'Exit at $31, pocket a few dollars', delta: 5, badge: null },
+        { text: 'Buy the dip with your last dollar', sub: '−$1, but you buy 5 BTC at $0.20', delta: 5, badge: 'Buy the Dip' },
+        { text: 'HODL through the fear', sub: '+0 BTC, but conviction grows', delta: 0, badge: 'Diamond Hands' },
+      ] },
+    { year: '2012', name: 'The First Halving', narrator: '— Block 210,000 —',
+      text: 'The block reward halves from 50 BTC to 25 BTC. New BTC issuance drops. The protocol enforces digital scarcity for the first time. Skeptics say it was a one-time gimmick.',
+      choices: [
+        { text: 'Sell some — surely the halving is priced in', sub: 'Cash out half at $12', delta: 100, badge: null },
+        { text: 'Mine through it — scarcity will win', sub: '+25 BTC mined · +Legend: First Halving', delta: 25, badge: 'Halviver' },
+        { text: 'Tell everyone about this', sub: '+0 BTC · +Legend: Influencer', delta: 0, badge: 'Influencer' },
+      ] },
+    { year: '2013', name: 'The Cypherpunk Bubble', narrator: '— November 2013 —',
+      text: 'Bitcoin hits $1,000 for the first time, then crashes 80% in weeks. The first major bubble. China bans Bitcoin. The FBI seizes Mt. Gox accounts. Some call it a fad.',
+      choices: [
+        { text: 'Sell at the top — take the profits', sub: 'Cash out your stack at $1,000', delta: 5000, badge: null },
+        { text: 'HODL — this is just the beginning', sub: '+0 BTC · +Legend: True Believer', delta: 0, badge: 'True Believer' },
+        { text: 'Build during the bear market', sub: '−100 BTC but gain skills', delta: -100, badge: 'Builder' },
+      ] },
+    { year: '2014', name: 'The Mt. Gox Collapse', narrator: '— February 2014 —',
+      text: 'Mt. Gox, handling 70% of all Bitcoin trades, collapses. 850,000 BTC disappear. Critics declare Bitcoin dead for the third time. Self-custody becomes the lesson.',
+      choices: [
+        { text: 'Move everything to cold storage', sub: '−1 BTC (hardware wallet) · +Legend: HODLer', delta: -1, badge: 'Sovereign' },
+        { text: 'Trust the exchanges to sort it out', sub: '+0 BTC · Risk of losing it all', delta: 0, badge: null },
+      ] },
+    { year: '2016', name: 'The Second Halving', narrator: '— Block 420,000 —',
+      text: 'The block reward halves again to 12.5 BTC. The pattern holds: scarcity creates value. More institutional players begin paying attention.',
+      choices: [
+        { text: 'Sell 10% — diversify into gold', sub: 'Diversify your stack', delta: -500, badge: 'Diversifier' },
+        { text: 'HODL — you see the pattern', sub: '+12.5 BTC mined · +Legend: Cycle Watcher', delta: 12.5, badge: 'Cycle Watcher' },
+        { text: 'Convince one friend to buy', sub: '+0 BTC · +Legend: Missionary', delta: 0, badge: 'Missionary' },
+      ] },
+    { year: '2017', name: 'The ICO Mania', narrator: '— December 2017 —',
+      text: 'Bitcoin hits $20,000. Thousands of ICOs launch on Ethereum. Everyone is a "blockchain expert." Lambos are promised. Your family asks if you should sell.',
+      choices: [
+        { text: 'Sell a little — pay off debt', sub: 'Smart money management', delta: 2000, badge: 'Responsible' },
+        { text: 'Refuse to discuss Bitcoin with family', sub: 'Stay focused · +Legend: Quiet HODLer', delta: 0, badge: 'Quiet HODLer' },
+        { text: 'Teach them anyway', sub: 'They will thank you in 4 years', delta: 0, badge: 'Teacher' },
+      ] },
+    { year: '2018', name: 'The Crypto Winter', narrator: '— December 2018 —',
+      text: 'Bitcoin drops 84% to $3,200. ICOs collapse. "Crypto is dead" headlines return. But the network has never been stronger. Hashrate hits all-time highs.',
+      choices: [
+        { text: 'Buy more with your savings', sub: '−$5,000, add 0.5 BTC', delta: 0.5, badge: 'Contrarian' },
+        { text: 'HODL and build during winter', sub: '+0 BTC · +Legend: Winter Builder', delta: 0, badge: 'Winter Builder' },
+        { text: 'Sell at the bottom in despair', sub: 'Capitulation · −10% stack', delta: -2000, badge: null },
+      ] },
+    { year: '2020', name: 'The Institutional Era', narrator: '— May 2020, third halving —',
+      text: 'Block reward halves to 6.25 BTC. MicroStrategy buys $250M of Bitcoin for its treasury. PayPal enables Bitcoin for 350M users. The network becomes an institutional asset class.',
+      choices: [
+        { text: 'Encourage your employer to add BTC', sub: '+0 BTC · +Legend: Treasury Advocate', delta: 0, badge: 'Treasury Advocate' },
+        { text: 'Help a friend set up a wallet', sub: 'Empower one more person', delta: 0, badge: 'Empowerer' },
+        { text: 'Just keep stacking', sub: '+6.25 BTC · +Legend: Stacker', delta: 6.25, badge: 'Stacker' },
+      ] },
+    { year: '2021', name: 'The First Trillion', narrator: '— February 2021 —',
+      text: 'Bitcoin market cap hits $1 trillion. Tesla buys $1.5B. El Salvador adopts Bitcoin as legal tender. The entire monetary system is being challenged.',
+      choices: [
+        { text: 'Celebrate with the community', sub: '+0 BTC · +Legend: Bitcoiner', delta: 0, badge: 'Bitcoiner' },
+        { text: 'Build a tool for newcomers', sub: 'Empower the next wave', delta: 0, badge: 'Builder 2.0' },
+        { text: 'Take profit — it has been a long road', sub: 'Sell 25% at $60K', delta: 5000, badge: null },
+      ] },
+    { year: '2022', name: 'The FTX Collapse', narrator: '— November 2022 —',
+      text: 'FTX, the second-largest exchange, collapses overnight. Billions vanish. "Crypto is a scam" returns. But once again, the Bitcoin protocol runs exactly as designed.',
+      choices: [
+        { text: 'Withdraw everything to self-custody', sub: 'Vibe: not your keys, not your coins', delta: 0, badge: 'Self-Custody Maxi' },
+        { text: 'Run a node to verify yourself', sub: 'Empower yourself · +Legend: Node Runner', delta: 0, badge: 'Node Runner' },
+        { text: 'Sell in fear', sub: 'Sell the bottom', delta: -1000, badge: null },
+      ] },
+    { year: '2024', name: 'The ETF Era', narrator: '— January 2024 —',
+      text: 'Spot Bitcoin ETFs approved in the US. Wall Street enters. The fourth halving arrives. The network effect is undeniable. Sovereign individuals now have an unstoppable monetary rail.',
+      choices: [
+        { text: 'Help onboard 5 newcomers this year', sub: 'Empower yourself by empowering others', delta: 0, badge: 'Onboarder' },
+        { text: 'Keep stacking', sub: '+3.125 BTC · +Legend: Permabull', delta: 3.125, badge: 'Permabull' },
+        { text: 'Take some chips off the table', sub: 'Sell 10%', delta: 5000, badge: null },
+      ] },
+    { year: '2025', name: 'The Bitcoin Empire', narrator: '— Today —',
+      text: 'You\'ve traveled from the Genesis Block to today. The network has grown from one node to tens of thousands. From $0 to a multi-trillion-dollar asset. From "magic internet money" to sovereign-grade collateral.\n\nThe journey continues. The next era is yours to write.',
+      choices: [
+        { text: 'Keep going — the next era is yours', sub: 'Bitcoin empowers you. You empower Bitcoin.', delta: 1.5, badge: 'Forever HODLer' },
+        { text: 'Reflect on the journey', sub: 'Final era reached · see your score', delta: 0, badge: null },
+      ] },
+    { year: 'EPILOGUE', name: 'Journey Complete', narrator: '— BitcoinHub —',
+      text: 'Every choice you made shaped your place in this story. The same is true for every Bitcoiner alive today. The protocol doesn\'t care who you are or where you live. It just runs. That\'s what makes it powerful.',
+      choices: [
+        { text: 'View final results', sub: 'See your stats', delta: 0, badge: null },
+      ] },
+  ];
 
   // ========== Game state ==========
+  let currentEra = 0;
+  let btcAmount = 0;
+  let badges = [];
+  let chosenCount = 0;
   const SAT_PER_BTC = 100_000_000;
-  let totalSats = 0;                  // accumulated satoshis
-  let baseRate = 1.0;                 // satoshis per second at current rate
-  let halvingCountdown = 60;         // seconds until next halving
-  let lastTime = performance.now();
-  let milestone = 1;                 // for triggering node growth
 
-  // ========== UI elements ==========
-  const amountEl = document.getElementById('amount');
-  const amountSubEl = document.getElementById('amount-sub');
-  const halvingFillEl = document.getElementById('halving-fill');
-  const halvingCountEl = document.getElementById('halving-count');
-  const rateDisplayEl = document.getElementById('rate-display');
-  const tutorialEl = document.getElementById('tutorial');
-  const halvingFlashEl = document.getElementById('halving-flash');
-  const halvingMultiplierEl = document.getElementById('halving-multiplier');
-
-  function formatBTC(sats) {
-    return (sats / SAT_PER_BTC).toFixed(8);
-  }
-  function updateHUD() {
-    amountEl.textContent = formatBTC(totalSats) + ' ₿';
-    amountSubEl.textContent = Math.floor(totalSats).toLocaleString() + ' satoshis';
-    rateDisplayEl.textContent = baseRate.toFixed(2);
-    halvingCountEl.textContent = halvingCountdown.toFixed(1);
-    halvingFillEl.style.width = ((60 - halvingCountdown) / 60 * 100) + '%';
-
-    // Coin grows with total holdings (logarithmic scale, max ~2.5x)
-    const targetScale = 1 + Math.min(1.5, Math.log10(1 + totalSats / 1000) * 0.6);
-    coin.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.03);
-
-    // Glow expands with holdings
-    coinGlow.scale.lerp(new THREE.Vector3(1 + targetScale * 0.3, 1 + targetScale * 0.3, 1), 0.03);
-    glowMat.opacity = 0.18 + Math.min(0.3, totalSats / 100000 * 0.05);
+  function computeBTCDelta() {
+    if (currentEra === 1) return btcAmount * SAT_PER_BTC > 10000; // Pizza choice
+    return false;
   }
 
-  function triggerHalving() {
-    baseRate *= 0.5;
-    halvingMultiplierEl.textContent = 'RATE ×' + baseRate.toFixed(2);
-    halvingFlashEl.classList.add('show');
-    // Bright flash on the coin
-    coinFaceMat.emissiveIntensity = 2.0;
-    coinRing.material.emissiveIntensity = 2.0;
-    coinRing2.material.emissiveIntensity = 2.0;
-    setTimeout(() => {
-      halvingFlashEl.classList.remove('show');
-      coinFaceMat.emissiveIntensity = 0.3;
-      coinRing.material.emissiveIntensity = 0.6;
-      coinRing2.material.emissiveIntensity = 0.6;
-    }, 2500);
-    halvingCountdown = 60;
+  // ========== UI ==========
+  const eraEl = document.getElementById('story-era');
+  const titleEl = document.getElementById('story-title');
+  const narratorEl = document.getElementById('story-narrator');
+  const textEl = document.getElementById('story-text');
+  const choicesEl = document.getElementById('choices');
+  const card = document.getElementById('story-card');
+  const topbar = document.getElementById('topbar');
+  const yearTextEl = document.getElementById('year-text');
+  const holdingsAmtEl = document.getElementById('holdings-amt');
+  const badgesEl = document.getElementById('badges');
+  const finalCard = document.getElementById('final-card');
+  const finalBtcEl = document.getElementById('final-btc');
+  const finalBadgesEl = document.getElementById('final-badges');
+  const finalRankEl = document.getElementById('final-rank');
+
+  function getRank() {
+    if (btcAmount >= 1) return 'WHALE';
+    if (btcAmount >= 0.5) return 'MAXI';
+    if (btcAmount >= 0.1) return 'HODLER';
+    if (btcAmount >= 0.01) return 'STACKER';
+    if (badges.length >= 5) return 'SURVIVOR';
+    return 'NEWCOMER';
   }
 
-  // ========== Input ==========
-  let firstTap = true;
-  function onTap(clientX, clientY) {
-    if (firstTap) {
-      firstTap = false;
-      tutorialEl.style.display = 'none';
+  function renderEra() {
+    const era = ERAS[currentEra];
+    eraEl.textContent = 'Era ' + (currentEra + 1) + ' · ' + era.year;
+    titleEl.textContent = era.name;
+    narratorEl.textContent = era.narrator;
+    textEl.innerHTML = era.text.replace(/\n/g, '<br>');
+    yearTextEl.textContent = era.year;
+    holdingsAmtEl.textContent = btcAmount.toFixed(8) + ' ₿';
+    badgesEl.innerHTML = badges.map(b => `<div class="badge">★ ${b}</div>`).join('');
+
+    choicesEl.innerHTML = '';
+    era.choices.forEach((ch, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.innerHTML = `${ch.text}<small>${ch.sub}</small>`;
+      btn.onclick = () => chooseChoice(i);
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function chooseChoice(i) {
+    const era = ERAS[currentEra];
+    const ch = era.choices[i];
+    chosenCount++;
+    btcAmount += ch.delta;
+
+    // Show result
+    if (ch.delta > 0) {
+      btcAmount = Math.max(0, btcAmount);
     }
-    // Each tap = 1 satoshi (you "empower" the network by interacting)
-    totalSats += 1;
-    // Tap spawns: node + particles toward coin
-    addNode();
-    spawnSatoshiToCoin();
-    spawnTapParticle(0, 0, 0, 0xfbbf24);
+    if (ch.delta < 0) {
+      btcAmount = Math.max(0, btcAmount);
+    }
+
+    let resultText = '';
+    if (ch.delta > 0) resultText = `+${ch.delta} BTC. `;
+    else if (ch.delta < 0) resultText = `−${Math.abs(ch.delta)} BTC. `;
+    else resultText = '';
+    resultText += ch.sub;
+
+    choicesEl.innerHTML = `<div id="result">${resultText}</div>`;
+    if (ch.badge && !badges.includes(ch.badge)) {
+      badges.push(ch.badge);
+      choicesEl.innerHTML += `<div id="result" style="margin-top:6px;color:#a78bfa">★ Earned badge: <b>${ch.badge}</b></div>`;
+    }
+
+    holdingsAmtEl.textContent = btcAmount.toFixed(8) + ' ₿';
+    badgesEl.innerHTML = badges.map(b => `<div class="badge">★ ${b}</div>`).join('');
+
+    // Add continue button
+    const cont = document.createElement('button');
+    cont.id = 'continue-btn';
+    cont.textContent = (currentEra < ERAS.length - 1) ? 'CONTINUE →' : 'SEE RESULTS';
+    cont.onclick = advanceEra;
+    choicesEl.appendChild(cont);
   }
 
-  const canvasEl = renderer.domElement;
-  canvasEl.addEventListener('touchstart', e => {
-    e.preventDefault();
-    onTap(e.touches[0].clientX, e.touches[0].clientY);
-  }, { passive: false });
-  canvasEl.addEventListener('mousedown', e => {
-    onTap(e.clientX, e.clientY);
-  });
+  function advanceEra() {
+    currentEra++;
+    if (currentEra >= ERAS.length) {
+      showFinal();
+    } else {
+      renderEra();
+    }
+  }
 
-  // ========== Animation loop ==========
-  const clock = new THREE.Clock();
+  function showFinal() {
+    card.style.display = 'none';
+    topbar.style.display = 'none';
+    badgesEl.style.display = 'none';
+    finalCard.classList.add('show');
+    finalBtcEl.textContent = btcAmount.toFixed(4);
+    finalBadgesEl.textContent = badges.length;
+    finalRankEl.textContent = getRank();
+  }
+
+  document.getElementById('replay-btn').onclick = () => {
+    currentEra = 0;
+    btcAmount = 0;
+    badges = [];
+    chosenCount = 0;
+    finalCard.classList.remove('show');
+    card.style.display = '';
+    topbar.style.display = '';
+    badgesEl.style.display = '';
+    renderEra();
+  };
+
+  // ========== Scene animation ==========
+  let currentSceneColor = 0x02030a;
   function animate() {
     requestAnimationFrame(animate);
     const now = performance.now();
-    const dt = Math.min((now - lastTime) / 1000, 0.05);
-    lastTime = now;
 
-    // Background drift on stars
+    // Background drift
     scene.children.forEach(c => {
       if (c.isPoints) {
         const pos = c.geometry.attributes.position.array;
         for (let i = 1; i < pos.length; i += 3) {
-          pos[i] -= 1.5 * dt;
+          pos[i] -= 1.0 * (1/60);
           if (pos[i] < -25) pos[i] += 50;
         }
         c.geometry.attributes.position.needsUpdate = true;
       }
     });
 
-    // Slow coin rotation
-    coin.rotation.y += dt * 0.3;
-    coinRing.rotation.z += dt * 0.5;
-    coinRing2.rotation.z -= dt * 0.5;
+    coin.rotation.y += 0.003;
+    coin.position.y = Math.sin(now * 0.0008) * 0.15;
+    coinGroup.position.y = coin.position.y;
 
-    // Subtle coin floating
-    coinGroup.position.y = Math.sin(now * 0.0008) * 0.15;
-    coinGlow.position.y = coinGroup.position.y;
-
-    // Auto-accumulation (mining simulation)
-    totalSats += baseRate * dt;
-
-    // Halving countdown
-    halvingCountdown -= dt;
-    if (halvingCountdown <= 0) triggerHalving();
-
-    // Animate nodes (gentle float)
-    for (const node of nodes) {
-      const ud = node.userData;
-      node.position.y += Math.sin(now * 0.001 + ud.phase) * 0.002;
-      node.rotation.x += dt * 0.3;
-      node.rotation.y += dt * 0.4;
-      const s = ud.baseScale * (1 + Math.sin(now * 0.002 + ud.phase) * 0.15);
-      node.scale.setScalar(s);
-    }
-
-    // Update tap particles
-    for (let i = tapParticles.length - 1; i >= 0; i--) {
-      const p = tapParticles[i];
-      const ud = p.userData;
-      ud.life -= dt;
-      if (ud.life <= 0) {
-        scene.remove(p);
-        p.material.dispose();
-        tapParticles.splice(i, 1);
-        continue;
-      }
-      p.position.x += ud.vx * dt * 6;
-      p.position.y += ud.vy * dt * 6;
-      p.position.z += ud.vz * dt * 6;
-      p.material.opacity = Math.max(0, ud.life / ud.maxLife);
-      p.scale.setScalar(0.5 + ud.life / ud.maxLife * 0.5);
-    }
-
-    updateHUD();
     renderer.render(scene, camera);
   }
-  animate();
 
   // ========== Resize ==========
   window.addEventListener('resize', () => {
@@ -560,6 +688,10 @@
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+
+  // ========== Init ==========
+  renderEra();
+  animate();
   </script>
 </body>
 </html>
