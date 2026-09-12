@@ -88,6 +88,10 @@
       "destination": "/twitter-image.png"
     },
     {
+      "source": "/games/(.*)",
+      "destination": "/games/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
