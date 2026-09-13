@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Policy Simulator · BitcoinHub</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      background: #02030a;
+      color: #fff;
+    }
+    canvas { display: block; touch-action: none; }
+
+    /* Top HUD */
+    #topbar {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top, 12px));
+      left: 12px; right: 12px;
+      z-index: 10;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      pointer-events: none;
+    }
+    #era-pill {
+      background: rgba(0,0,0,0.55);
+      border: 1.5px solid #fbbf24;
+      border-radius: 14px;
+      padding: 8px 14px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    #era-pill .label { font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+    #era-pill .val { font-size: 12px; font-weight: 800; color: #fbbf24; letter-spacing: 0.5px; margin-top: 1px; }
+
+    #stats {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .stat-pill {
+      background: rgba(0,0,0,0.55);
+      border-radius: 12px;
+      padding: 6px 12px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+    #debt-pill { border: 1.5px solid #ef4444; }
+    #debt-pill .label { color: rgba(255,255,255,0.5); font-size: 9px; letter-spacing: 2px; }
+    #debt-pill .val { color: #ef4444; font-weight: 700; font-size: 12px; }
+    #inflation-pill { border: 1.5px solid #f59e0b; }
+    #inflation-pill .label { color: rgba(255,255,255,0.5); font-size: 9px; letter-spacing: 2px; }
+    #inflation-pill .val { color: #f59e0b; font-weight: 700; font-size: 12px; }
+
+    /* Story + choices card (bottom) */
+    #story-card {
+      position: fixed;
+      left: 12px; right: 12px;
+      bottom: max(12px, env(safe-area-inset-bottom, 12px));
+      max-width: 580px;
+      margin: 0 auto;
+      z-index: 10;
+      background: rgba(8, 10, 22, 0.92);
+      border: 1.5px solid rgba(251, 191, 36, 0.5);
+      border-radius: 12px;
+      padding: 16px 18px 14px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      max-height: 58vh;
+      overflow-y: auto;
+    }
+    #story-narrator { font-size: 10px; letter-spacing: 2px; color: #a78bfa; text-transform: uppercase; margin-bottom: 4px; }
+    #story-title { font-size: 15px; font-weight: 800; color: #fbbf24; margin-bottom: 8px; }
+    #story-text { font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.82); margin-bottom: 12px; }
+    #story-text b { color: #fbbf24; }
+    .choice-btn {
+      display: block; width: 100%; padding: 11px 13px; margin-bottom: 7px;
+      background: rgba(251, 191, 36, 0.08);
+      border: 1.5px solid rgba(251, 191, 36, 0.4);
+      border-radius: 8px;
+      color: #fbbf24;
+      font-family: inherit; font-size: 12px; text-align: left;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .choice-btn:active { transform: scale(0.98); background: rgba(251, 191, 36, 0.15); }
+    .choice-btn.correct {
+      background: rgba(34, 197, 94, 0.18);
+      border-color: #22c55e;
+      color: #22c55e;
+    }
+    .choice-btn.wrong {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+    #result-box {
+      margin-top: 8px; padding: 10px 12px;
+      background: rgba(34, 211, 238, 0.08);
+      border-left: 2px solid #22d3ee;
+      border-radius: 4px;
+      font-size: 12px; line-height: 1.5; color: #22d3ee;
+      display: none;
+    }
+    #result-box b { color: #fbbf24; }
+    #continue-btn {
+      display: none; width: 100%; padding: 13px; margin-top: 10px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #02030a; border: none; border-radius: 8px;
+      font-family: inherit; font-size: 13px; font-weight: 800;
+      letter-spacing: 2px; cursor: pointer;
+    }
+
+    /* Final card */
+    #final-card {
+      position: fixed; inset: 12px;
+      margin: auto; max-width: 460px; max-height: 86vh;
+      z-index: 30;
+      background: rgba(8, 10, 22, 0.96);
+      border: 1.5px solid #fbbf24;
+      border-radius: 12px; padding: 24px;
+      text-align: center;
+      display: none; flex-direction: column;
+      justify-content: center; align-items: center;
+      overflow-y: auto;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #final-card.show { display: flex; }
+    #final-card h1 { font-size: 22px; font-weight: 800; color: #fbbf24; margin: 0 0 4px 0; }
+    #final-card .sub { font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 14px; max-width: 340px; }
+    #final-stats { display: flex; gap: 18px; margin-bottom: 16px; }
+    #final-stats .stat { text-align: center; }
+    #final-stats .num { font-size: 22px; font-weight: 800; color: #ef4444; }
+    #final-stats .lbl { font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+    #final-message { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.78); margin-bottom: 18px; max-width: 380px; }
+    #final-message b { color: #fbbf24; }
+    #replay-btn {
+      padding: 12px 32px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #02030a; border: none; border-radius: 8px;
+      font-family: inherit; font-size: 13px; font-weight: 800;
+      letter-spacing: 2px; cursor: pointer;
+    }
+
+    /* Footer */
+    #hub-footer {
+      position: fixed; bottom: 4px; left: 50%;
+      transform: translateX(-50%); z-index: 3;
+      font-size: 8px; color: rgba(255,255,255,0.25);
+      letter-spacing: 1px; pointer-events: auto; white-space: nowrap;
+    }
+    #hub-footer a { color: #a78bfa; text-decoration: none; }
+    #hub-footer .sep { color: rgba(255,255,255,0.12); margin: 0 4px; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="topbar">
+    <div id="era-pill">
+      <div class="label">ERA</div>
+      <div class="val" id="era-text">1948-53</div>
+    </div>
+    <div id="stats">
+      <div class="stat-pill" id="debt-pill">
+        <div class="label">NATIONAL DEBT</div>
+        <div class="val">$<span id="debt-val">0.26</span>T</div>
+      </div>
+      <div class="stat-pill" id="inflation-pill">
+        <div class="label">DOLLAR LOST</div>
+        <div class="val"><span id="inflation-val">0</span>%</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="story-card">
+    <div id="story-narrator">— Era 1 —</div>
+    <div id="story-title">Marshall Plan & Cold War</div>
+    <div id="story-text">The war is over. Europe is in ruins. The Soviet Union is spreading. You must decide how America will fund its global containment strategy.</div>
+    <div id="choices"></div>
+    <div id="result-box"></div>
+    <button id="continue-btn">CONTINUE →</button>
+  </div>
+
+  <div id="final-card">
+    <h1>JOURNEY COMPLETE</h1>
+    <p class="sub">You just lived through 77 years of monetary policy decisions. Each one seemed necessary at the time. Each one stole from your children's future.</p>
+    <div id="final-stats">
+      <div class="stat"><div class="num" id="final-debt">13.0</div><div class="lbl">$T DEBT</div></div>
+      <div class="stat"><div class="num" id="final-inflation">280</div><div class="lbl">% LOST</div></div>
+      <div class="stat"><div class="num" id="final-rank">—</div><div class="lbl">RANK</div></div>
+    </div>
+    <p id="final-message">
+      <b>Bitcoin:</b> fixed supply cap of 21 million. No central bank. No human committee that can vote to inflate your savings away. The protocol enforces scarcity with math, not politics.<br><br>
+      Your grandchildren would have inherited something different.
+    </p>
+    <button id="replay-btn">REPLAY DECISIONS</button>
+  </div>
+
+  <div id="hub-footer">
+    <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener">bitcoinhub</a>
+    <span class="sep">·</span>
+    <a href="https://bitcoinhub.goodbotai.tech/laws" target="_blank" rel="noopener">Laws</a>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+
+  // ========== 3D Scene ==========
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x02030a);
+  scene.fog = new THREE.FogExp2(0x02030a, 0.018);
+
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 1.5, 14);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('game'),
+    antialias: window.devicePixelRatio < 2,
+    powerPreference: 'high-performance',
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  scene.add(new THREE.AmbientLight(0x303848, 0.55));
+  const keyLight = new THREE.DirectionalLight(0xfff8e0, 0.9);
+  keyLight.position.set(4, 12, 8); scene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0xfbbf24, 0.5);
+  rimLight.position.set(-6, 3, 4); scene.add(rimLight);
+  const goldLight = new THREE.PointLight(0xfbbf24, 0.6, 14);
+  goldLight.position.set(0, 5, 2); scene.add(goldLight);
+
+  // ========== Marble columns (the chamber) ==========
+  const NUM_COLUMNS = 6;
+  const COLUMN_RADIUS = 5.5;
+  for (let i = 0; i < NUM_COLUMNS; i++) {
+    const angle = (i / NUM_COLUMNS) * Math.PI * 2;
+    const x = Math.cos(angle) * COLUMN_RADIUS;
+    const z = Math.sin(angle) * COLUMN_RADIUS;
+
+    // Column shaft
+    const shaftGeo = new THREE.CylinderGeometry(0.25, 0.3, 8, 12);
+    const marbleMat = new THREE.MeshStandardMaterial({
+      color: 0xe8e4dc, roughness: 0.3, metalness: 0.05,
+      emissive: 0x1a1a20, emissiveIntensity: 0.1,
+    });
+    const shaft = new THREE.Mesh(shaftGeo, marbleMat);
+    shaft.position.set(x, 1, z);
+    scene.add(shaft);
+
+    // Capital (top decoration)
+    const capGeo = new THREE.CylinderGeometry(0.35, 0.25, 0.3, 12);
+    const cap = new THREE.Mesh(capGeo, marbleMat);
+    cap.position.set(x, 5, z);
+    scene.add(cap);
+
+    // Base
+    const baseGeo = new THREE.CylinderGeometry(0.35, 0.4, 0.3, 12);
+    const base = new THREE.Mesh(baseGeo, marbleMat);
+    base.position.set(x, -3, z);
+    scene.add(base);
+  }
+
+  // Marble floor
+  const floorGeo = new THREE.CircleGeometry(7, 32);
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: 0xc8c4b8, roughness: 0.4, metalness: 0.05,
+  });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -3.1;
+  scene.add(floor);
+
+  // ========== Central podium with the Bitcoin coin ==========
+  function makeBitcoinTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createRadialGradient(128, 100, 20, 128, 128, 130);
+    grad.addColorStop(0, '#fff5b8');
+    grad.addColorStop(0.4, '#fbbf24');
+    grad.addColorStop(1, '#7c2d12');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, 236, 236);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = 'bold 180px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('₿', 128, 140);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  const podiumGroup = new THREE.Group();
+  // Podium base (wooden)
+  const podiumBase = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 0.4, 1.2),
+    new THREE.MeshStandardMaterial({ color: 0x3a2820, roughness: 0.8, metalness: 0.1 })
+  );
+  podiumBase.position.y = -2.7;
+  podiumGroup.add(podiumBase);
+  // Mic stand
+  const micStand = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8),
+    new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.4, metalness: 0.8 })
+  );
+  micStand.position.set(0, -2.4, 0.3);
+  podiumGroup.add(micStand);
+  scene.add(podiumGroup);
+
+  // The Bitcoin coin (the witness in every era)
+  const coinGroup = new THREE.Group();
+  const coin = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.85, 0.85, 0.2, 32),
+    [
+      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3, metalness: 0.6, emissive: 0xd97706, emissiveIntensity: 0.3 }),
+      new THREE.MeshStandardMaterial({ map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.4, emissive: 0xfbbf24, emissiveIntensity: 0.4 }),
+      new THREE.MeshStandardMaterial({ map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.4, emissive: 0xfbbf24, emissiveIntensity: 0.4 }),
+    ]
+  );
+  coin.rotation.x = Math.PI / 2;
+  coinGroup.add(coin);
+
+  const coinRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.7, 0.025, 8, 32),
+    new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.6 })
+  );
+  coinRing.position.z = 0.11;
+  coinGroup.add(coinRing);
+  coinGroup.position.set(-2.2, 0, 0);
+  scene.add(coinGroup);
+
+  // ========== Debt Tower (grows with each bad choice) ==========
+  const debtTower = new THREE.Group();
+  let debtTowerHeight = 0.5;
+  const debtTowerGeo = new THREE.CylinderGeometry(0.5, 0.7, 1, 16);
+  const debtTowerMat = new THREE.MeshStandardMaterial({
+    color: 0x4a3030, roughness: 0.5, metalness: 0.3,
+    emissive: 0xef4444, emissiveIntensity: 0.15,
+    transparent: true, opacity: 0.85,
+  });
+  const debtTowerMesh = new THREE.Mesh(debtTowerGeo, debtTowerMat);
+  debtTowerMesh.position.y = -2.7 + debtTowerHeight / 2;
+  debtTower.add(debtTowerMesh);
+  debtTower.position.set(2.2, 0, 0);
+  scene.add(debtTower);
+
+  // ========== Gold bars (decrease over time, especially at Nixon Shock) ==========
+  const goldBarsGroup = new THREE.Group();
+  const goldBarGeo = new THREE.BoxGeometry(0.4, 0.18, 0.25);
+  const goldBarMat = new THREE.MeshStandardMaterial({
+    color: 0xfbbf24, roughness: 0.25, metalness: 0.85,
+    emissive: 0xfbbf24, emissiveIntensity: 0.3,
+  });
+  let goldBars = [];
+  for (let i = 0; i < 5; i++) {
+    const bar = new THREE.Mesh(goldBarGeo, goldBarMat);
+    bar.position.set(0, -2.6 + 0.1 + i * 0.2, 1.5 + (i % 2) * 0.27);
+    bar.userData = { baseY: bar.position.y, baseZ: bar.position.z };
+    scene.add(bar);
+    goldBars.push(bar);
+  }
+
+  // ========== Stars (subtle) ==========
+  {
+    const g = new THREE.BufferGeometry();
+    const N = 200;
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      pos[i*3+0] = (Math.random() - 0.5) * 30;
+      pos[i*3+1] = (Math.random() - 0.5) * 20;
+      pos[i*3+2] = -10 - Math.random() * 15;
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({
+      color: 0xffffff, size: 0.06, transparent: true, opacity: 0.5, sizeAttenuation: true,
+    })));
+  }
+
+  // ========== Era data ==========
+  // Each era: question, 4 options, correct index, consequence
+  // Consequence: debt delta (in trillions), inflation delta (%), gold loss (number of bars), and a summary message
+  const ERAS = [
+    {
+      era: '1948-53',
+      title: 'Marshall Plan & Cold War',
+      narrator: '— Era 1 —',
+      story: 'The war is over. Europe is in ruins. The Soviet Union is spreading. You must decide how America funds its global containment strategy.',
+      data: [
+        { label: 'Foreign aid', value: '$13B', note: 'to rebuild Europe' },
+        { label: 'Defense', value: '5% GDP', note: 'NATO + Korea buildup' },
+        { label: 'Tax rate', value: '91% top', note: 'highest in history' },
+      ],
+      quiz: {
+        question: 'How do you fund the containment strategy?',
+        options: [
+          { text: 'Deficit spending — borrow from future taxpayers', sub: 'Creates national debt' },
+          { text: 'Send gold reserves overseas — depletes Fort Knox', sub: 'Loses gold backing' },
+          { text: 'Raise taxes to 95% on the rich', sub: 'Still leaves the deficit' },
+          { text: 'Print money to cover the gap', sub: 'Begins the inflation era' },
+        ],
+        correct: 0,
+        consequence: { debt: 0.04, inflation: 1, goldLoss: 0, msg: 'You funded the Cold War with debt. The first brick in the wall of future obligations.' },
+      },
+    },
+    {
+      era: '1965-73',
+      title: 'Vietnam War',
+      narrator: '— Era 2 —',
+      story: 'You\'re in a jungle war with no end in sight. The public wants victory; the politicians want re-election. How do you pay for it?',
+      data: [
+        { label: 'War cost', value: '$168B', note: 'in 1973 dollars' },
+        { label: 'Troops', value: '540K peak', note: 'highest since WWII' },
+        { label: 'Inflation', value: '4.3% avg', note: 'during the war years' },
+      ],
+      quiz: {
+        question: 'How do you pay for an expensive war?',
+        options: [
+          { text: 'Raise taxes — wartime solidarity', sub: 'Politically toxic' },
+          { text: 'Deficit spend — borrow and print', sub: 'Inflation + debt both grow' },
+          { text: 'Cut domestic programs to balance', sub: 'Loses the next election' },
+          { text: 'End the war early to save money', sub: 'Loses geopolitically' },
+        ],
+        correct: 1,
+        consequence: { debt: 0.25, inflation: 4, goldLoss: 0, msg: 'You chose guns and butter. The debt climbed by a quarter-trillion. Inflation crept up.' },
+      },
+    },
+    {
+      era: '1971',
+      title: 'Nixon Shock',
+      narrator: '— Era 3 —',
+      story: 'Foreign governments are redeeming dollars for gold at $35/oz. The London gold pool just collapsed. The market price is $40/oz. France is calling your bluff.',
+      data: [
+        { label: 'Gold price (official)', value: '$35', note: 'per ounce, since 1944' },
+        { label: 'Market price', value: '$40', note: 'actual market rate' },
+        { label: 'Foreign US$ held', value: '$70B', note: 'redeemable for gold' },
+      ],
+      quiz: {
+        question: 'Foreign countries are draining your gold. What do you do?',
+        options: [
+          { text: 'Raise the gold peg to $40/oz', sub: 'Expensive but honest' },
+          { text: 'Close the gold window entirely', sub: 'Ends the gold standard forever' },
+          { text: 'Devalue to $30/oz to save gold', sub: 'Destroys confidence' },
+          { text: 'Print more dollars to buy gold', sub: 'Hyperinflation incoming' },
+        ],
+        correct: 1,
+        consequence: { debt: 0.5, inflation: 12, goldLoss: 5, msg: 'On August 15, 1971, you suspended gold convertibility. The age of sound money ended. The gold bars on the desk are now just decoration.' },
+      },
+    },
+    {
+      era: '2008',
+      title: 'Bank Bailouts',
+      narrator: '— Era 4 —',
+      story: 'Lehman Brothers collapsed 72 hours ago. The financial system is freezing. Credit markets are seized. Unemployment is spiking. The banks are "too big to fail."',
+      data: [
+        { label: 'Banks bailed out', value: '$700B', note: 'TARP program' },
+        { label: 'QE rounds', value: '4', note: '$4.5T printed' },
+        { label: 'Fed funds rate', value: '0-0.25%', note: 'lowest in history' },
+      ],
+      quiz: {
+        question: 'The banks are failing. How do you respond?',
+        options: [
+          { text: 'Let them fail — free market discipline', sub: 'Cascading collapse' },
+          { text: 'Bail them out with taxpayer money', sub: 'Debt + asset inflation' },
+          { text: 'Nationalize the banks', sub: 'Political backlash' },
+          { text: 'Print money and lend directly (QE)', sub: 'Quantitative Easing' },
+        ],
+        correct: 3,
+        consequence: { debt: 2.0, inflation: 3, goldLoss: 0, msg: 'You bailed out the banks with printed money. The system was saved. The dollar lost 7% of its value that year.' },
+      },
+    },
+    {
+      era: '2001-2025',
+      title: 'Wars, COVID, and the Final Explosion',
+      narrator: '— Era 5 —',
+      story: 'Twenty years of war. A pandemic. Three stimulus packages. The bill is coming due, but the bills are denominated in a currency you control the printing press for.',
+      data: [
+        { label: 'Total stimulus', value: '$6T', note: 'COVID alone' },
+        { label: 'Debt added', value: '$10T', note: 'in 24 months' },
+        { label: 'Inflation peak', value: '9.1%', note: 'June 2022, 40-year high' },
+      ],
+      quiz: {
+        question: 'How do you fund the final debt explosion?',
+        options: [
+          { text: 'Raise taxes to pay it back', sub: 'Loses elections' },
+          { text: 'Cut programs to balance the budget', sub: 'Loses elections' },
+          { text: 'Deficit spend and print money', sub: 'Hyperinflation + debt both grow' },
+          { text: 'Default on the debt', sub: 'Global financial collapse' },
+        ],
+        correct: 2,
+        consequence: { debt: 10.0, inflation: 260, goldLoss: 0, msg: 'You chose to print your way out. $10T added to the debt in 24 months. The dollar lost 9% of its purchasing power in a single year. The 80-year experiment with fiat reached its endpoint.' },
+      },
+    },
+    {
+      era: '2025',
+      title: 'The Bitcoin Alternative',
+      narrator: '— Epilogue —',
+      story: 'You\'ve lived through 77 years of monetary policy decisions. Each one seemed necessary at the time. Each one transferred wealth from savers to borrowers, from the future to the present, from your children to you.\n\nA new form of money emerged in 2009, while you were busy managing the crises your own system created.',
+      data: [
+        { label: 'Bitcoin supply', value: '21M', note: 'hard cap, mathematical' },
+        { label: 'Issuance rate', value: 'Halves', note: 'every 210,000 blocks' },
+        { label: 'Control', value: 'None', note: 'no central authority' },
+      ],
+      quiz: {
+        question: 'How would a Bitcoin standard have changed these decisions?',
+        options: [
+          { text: 'It would have prevented none of this', sub: 'Denial' },
+          { text: 'Governments could have just changed the rules', sub: 'Technically possible but socially costly' },
+          { text: 'The fixed supply would have forced fiscal discipline', sub: 'No printing press = no war financing' },
+          { text: 'It would have caused a different crisis', sub: 'Deflection' },
+        ],
+        correct: 2,
+        consequence: { debt: 0, inflation: 0, goldLoss: 0, msg: 'Bitcoin\'s fixed supply cap of 21 million would have made deficit spending impossible. No printing press, no war financing, no generational theft. Math, not politics.' },
+      },
+    },
+  ];
+
+  // ========== State ==========
+  let currentEra = 0;
+  let totalDebt = 0.26;
+  let totalInflation = 0;
+  let chosenCount = 0;
+  let gameOver = false;
+  let selectedAnswer = null;
+  let showingResult = false;
+
+  // ========== UI elements ==========
+  const eraTextEl = document.getElementById('era-text');
+  const storyNarratorEl = document.getElementById('story-narrator');
+  const storyTitleEl = document.getElementById('story-title');
+  const storyTextEl = document.getElementById('story-text');
+  const choicesEl = document.getElementById('choices');
+  const resultBoxEl = document.getElementById('result-box');
+  const continueBtnEl = document.getElementById('continue-btn');
+  const debtValEl = document.getElementById('debt-val');
+  const inflationValEl = document.getElementById('inflation-val');
+  const finalCardEl = document.getElementById('final-card');
+  const finalDebtEl = document.getElementById('final-debt');
+  const finalInflationEl = document.getElementById('final-inflation');
+  const finalRankEl = document.getElementById('final-rank');
+
+  function getRank() {
+    if (totalInflation >= 200) return 'DEBASED';
+    if (totalInflation >= 100) return 'INFLATIONARY';
+    if (totalDebt >= 10) return 'DEBTOR';
+    if (totalDebt >= 1) return 'BORROWER';
+    return 'FISCALLY RESPONSIBLE';
+  }
+
+  function updateHUD() {
+    eraTextEl.textContent = ERAS[currentEra].era;
+    debtValEl.textContent = totalDebt.toFixed(2);
+    inflationValEl.textContent = Math.floor(totalInflation).toLocaleString();
+  }
+
+  function renderEra() {
+    const era = ERAS[currentEra];
+    storyNarratorEl.textContent = era.narrator;
+    storyTitleEl.textContent = era.title;
+    storyTextEl.textContent = era.story;
+
+    // Era data tiles
+    let dataHtml = '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">';
+    era.data.forEach(d => {
+      dataHtml += `<div style="flex:1;min-width:90px;padding:8px;background:rgba(0,0,0,0.3);border-radius:6px;text-align:center;border:1px solid rgba(245,158,11,0.2);">
+        <div style="color:#f59e0b;font-weight:700;font-size:13px;">${d.value}</div>
+        <div style="color:rgba(255,255,255,0.8);font-size:10px;margin-top:2px;">${d.label}</div>
+        <div style="color:rgba(255,255,255,0.4);font-size:9px;margin-top:1px;">${d.note}</div>
+      </div>`;
+    });
+    dataHtml += '</div>';
+    dataHtml += `<div style="font-size:11px;color:#fbbf24;letter-spacing:1px;margin-bottom:6px;">▸ ${era.quiz.question}</div>`;
+    storyTextEl.insertAdjacentHTML('afterend', ''); // placeholder
+    storyTextEl.nextElementSibling && (storyTextEl.nextElementSibling.outerHTML = dataHtml);
+
+    // Choice buttons
+    choicesEl.innerHTML = '';
+    era.quiz.options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.innerHTML = `${opt.text}<br><small style="color:rgba(255,255,255,0.5);font-size:10px;">${opt.sub}</small>`;
+      btn.onclick = () => chooseAnswer(i);
+      choicesEl.appendChild(btn);
+    });
+
+    resultBoxEl.style.display = 'none';
+    continueBtnEl.style.display = 'none';
+    updateHUD();
+  }
+
+  function chooseAnswer(idx) {
+    if (showingResult) return;
+    const era = ERAS[currentEra];
+    const isCorrect = idx === era.quiz.correct;
+    selectedAnswer = idx;
+    showingResult = true;
+    chosenCount++;
+
+    // Disable all buttons, highlight correct + chosen
+    const btns = choicesEl.querySelectorAll('.choice-btn');
+    btns.forEach((b, i) => {
+      b.onclick = null;
+      if (i === era.quiz.correct) b.classList.add('correct');
+      else if (i === idx) b.classList.add('wrong');
+    });
+
+    // Apply consequence regardless of correctness (the historical outcome is what happened)
+    const c = era.quiz.consequence;
+    totalDebt += c.debt;
+    totalInflation += c.inflation;
+    updateHUD();
+
+    // Update 3D: grow debt tower
+    animateDebtTower(c.debt);
+
+    // Update 3D: remove gold bars at Nixon Shock
+    if (c.goldLoss > 0) {
+      animateGoldLoss(c.goldLoss);
+    }
+
+    // Show result
+    resultBoxEl.innerHTML = isCorrect
+      ? `<b>✓ Insight gained.</b> ${c.msg}`
+      : `<b>⚠ Consider the impact:</b> ${c.msg}`;
+    resultBoxEl.style.display = 'block';
+    continueBtnEl.style.display = 'block';
+  }
+
+  function animateDebtTower(deltaDebt) {
+    // Scale the debt tower by delta * 0.3 visually
+    const targetScale = 1 + (totalDebt - 0.26) * 0.15;
+    debtTowerMesh.scale.y = targetScale;
+    debtTowerMesh.position.y = -2.7 + (debtTowerHeight * targetScale) / 2;
+    debtTowerMat.emissiveIntensity = Math.min(0.6, 0.15 + totalInflation / 500);
+  }
+
+  function animateGoldLoss(loss) {
+    for (let i = 0; i < loss && goldBars.length > 0; i++) {
+      const bar = goldBars.pop();
+      // Animate fade and rise
+      const startY = bar.position.y;
+      const startOpacity = 1;
+      const duration = 1.2;
+      const startTime = performance.now();
+      const animate = () => {
+        const elapsed = (performance.now() - startTime) / 1000 / duration;
+        if (elapsed >= 1) {
+          scene.remove(bar);
+          return;
+        }
+        bar.position.y = startY + elapsed * 1.5;
+        bar.material.opacity = 1 - elapsed;
+        bar.material.transparent = true;
+        requestAnimationFrame(animate);
+      };
+      animate();
+    }
+  }
+
+  function advanceEra() {
+    currentEra++;
+    if (currentEra >= ERAS.length) {
+      showFinal();
+    } else {
+      renderEra();
+    }
+  }
+
+  function showFinal() {
+    finalDebtEl.textContent = totalDebt.toFixed(2);
+    finalInflationEl.textContent = Math.floor(totalInflation).toLocaleString();
+    finalRankEl.textContent = getRank();
+    finalCardEl.classList.add('show');
+  }
+
+  document.getElementById('continue-btn').onclick = advanceEra;
+  document.getElementById('replay-btn').onclick = () => {
+    currentEra = 0;
+    totalDebt = 0.26;
+    totalInflation = 0;
+    chosenCount = 0;
+    selectedAnswer = null;
+    showingResult = false;
+    finalCardEl.classList.remove('show');
+    // Restore gold bars
+    goldBars.forEach(b => scene.remove(b));
+    goldBars = [];
+    for (let i = 0; i < 5; i++) {
+      const bar = new THREE.Mesh(goldBarGeo, goldBarMat);
+      bar.position.set(0, -2.6 + 0.1 + i * 0.2, 1.5 + (i % 2) * 0.27);
+      bar.userData = { baseY: bar.position.y, baseZ: bar.position.z };
+      scene.add(bar);
+      goldBars.push(bar);
+    }
+    debtTowerMesh.scale.y = 1;
+    debtTowerMesh.position.y = -2.7 + debtTowerHeight / 2;
+    debtTowerMat.emissiveIntensity = 0.15;
+    renderEra();
+  };
+
+  // ========== Animation loop ==========
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const now = performance.now();
+
+    coin.rotation.y += dt * 0.25;
+    coinRing.rotation.z += dt * 0.4;
+    coin.position.y = Math.sin(now * 0.001) * 0.15;
+    coinGroup.position.y = coin.position.y;
+
+    // Bitcoin brightens dramatically at the end
+    if (currentEra >= ERAS.length - 1) {
+      const pulse = 1 + Math.sin(now * 0.003) * 0.15;
+      coin.scale.set(pulse, pulse, pulse);
+      coinRing.material.emissiveIntensity = 1.0 + Math.sin(now * 0.005) * 0.3;
+      goldLight.intensity = 1.0 + Math.sin(now * 0.003) * 0.4;
+    } else {
+      coinRing.material.emissiveIntensity = 0.7;
+      coin.scale.set(1, 1, 1);
+      goldLight.intensity = 0.6;
+    }
+
+    // Gentle gold bar hover
+    goldBars.forEach((bar, i) => {
+      bar.position.y = bar.userData.baseY + Math.sin(now * 0.002 + i * 0.5) * 0.04;
+    });
+
+    // Subtle background drift
+    scene.children.forEach(c => {
+      if (c.isPoints) {
+        const pos = c.geometry.attributes.position.array;
+        for (let i = 1; i < pos.length; i += 3) {
+          pos[i] -= 0.8 * dt;
+          if (pos[i] < -15) pos[i] += 30;
+        }
+        c.geometry.attributes.position.needsUpdate = true;
+      }
+    });
+
+    renderer.render(scene, camera);
+  }
+
+  // Init
+  renderEra();
+  animate();
+
+  // Resize
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  </script>
+</body>
+</html>
