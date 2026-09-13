@@ -198,12 +198,13 @@
     character.add(bang);
   }
 
-  // Eyes
-  for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), eyeMat);
-    eye.position.set(side * 0.11, 1.58, 0.28);
-    character.add(eye);
-  }
+  // Eyes (named refs so the wake-up animation can scale them)
+  const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), eyeMat);
+  leftEye.position.set(-0.11, 1.58, 0.28);
+  character.add(leftEye);
+  const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), eyeMat);
+  rightEye.position.set(0.11, 1.58, 0.28);
+  character.add(rightEye);
 
   // Smile (small dark curve approximated by a thin torus)
   const smile = new THREE.Mesh(
@@ -303,6 +304,35 @@
   highlight.visible = false;
 
   scene.add(character);
+
+  // ========== Wake-up animation (one-time, on load) ==========
+  // Sleeping pose values
+  const SLEEP = {
+    headRotX: 0.45,
+    torsoY: 0.78,
+    eyeScale: 0.04,
+    armForwardX: 0.15,
+  };
+  // Awake pose (defaults — leave at 0 for head, 0.85 for torso, 1 for eyes, 0 for arms)
+  const AWAKE = {
+    headRotX: 0,
+    torsoY: 0.85,
+    eyeScale: 1,
+    armForwardX: 0,
+  };
+
+  // Apply sleeping pose
+  head.rotation.x = SLEEP.headRotX;
+  torso.position.y = SLEEP.torsoY;
+  leftEye.scale.setScalar(SLEEP.eyeScale);
+  rightEye.scale.setScalar(SLEEP.eyeScale);
+  leftUpperArm.rotation.x = SLEEP.armForwardX;
+  rightUpperArm.rotation.x = SLEEP.armForwardX;
+
+  const WAKE_START_DELAY_MS = 1500; // pause before waking
+  const WAKE_DURATION_MS = 2500;    // length of wake-up animation
+  const wakeStartTime = performance.now() + WAKE_START_DELAY_MS;
+  let wakeDone = false;
 
   // ========== Stars ==========
   {
@@ -410,6 +440,24 @@
     requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.05);
     const now = performance.now();
+
+    // Wake-up animation (one-time on page load)
+    if (!wakeDone && now >= wakeStartTime) {
+      const elapsed = now - wakeStartTime;
+      const t = Math.min(elapsed / WAKE_DURATION_MS, 1);
+      // Cubic ease-out
+      const eased = 1 - Math.pow(1 - t, 3);
+      // Lerp primary values
+      head.rotation.x = THREE.MathUtils.lerp(SLEEP.headRotX, AWAKE.headRotX, eased);
+      torso.position.y = THREE.MathUtils.lerp(SLEEP.torsoY, AWAKE.torsoY, eased);
+      leftEye.scale.setScalar(THREE.MathUtils.lerp(SLEEP.eyeScale, AWAKE.eyeScale, eased));
+      rightEye.scale.setScalar(THREE.MathUtils.lerp(SLEEP.eyeScale, AWAKE.eyeScale, eased));
+      // Stretch — arms raise in a bell curve, then settle
+      const stretch = Math.sin(eased * Math.PI);
+      leftUpperArm.rotation.x = THREE.MathUtils.lerp(SLEEP.armForwardX, -0.3, stretch);
+      rightUpperArm.rotation.x = THREE.MathUtils.lerp(SLEEP.armForwardX, -0.3, stretch);
+      if (t >= 1) wakeDone = true;
+    }
 
     // Gentle idle breathing + hair sway
     character.position.y = Math.sin(now * 0.0012) * 0.04;
