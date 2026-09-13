@@ -71,6 +71,7 @@ const Navbar = () => {
     { href: "/games/btc-collector", label: "Bitcoin Empire" },
     { href: "/games/policy-simulator", label: "Policy Sim" },
     { href: "/games/hash-defense", label: "Hash Defense" },
+    { href: "/games/character", label: "3D Character" },
     { href: "/cycle", label: "4-Year Cycle" },
     { href: "/web-resources", label: "Web Resources" },
     { href: "/legislation", label: "Legislation" },
