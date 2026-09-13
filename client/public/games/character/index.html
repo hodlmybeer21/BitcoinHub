@@ -226,30 +226,28 @@
   character.add(torso);
 
   // ---- Arms ----
-  // Left arm (slightly bent)
-  const leftUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.32, 12), shirtMat);
-  leftUpperArm.position.set(-0.36, 0.95, 0);
-  leftUpperArm.rotation.z = 0.2;
+  // Arms hang straight down from the shoulders, connected to the torso.
+  // Torso center y=0.85, height 0.7, so top is at y=1.2.
+  // Upper arm top connects at shoulder (y≈1.2), extends 0.32 down → center y≈1.04.
+  const leftUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.32, 14), shirtMat);
+  leftUpperArm.position.set(-0.30, 1.04, 0);
   character.add(leftUpperArm);
-  const leftForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.32, 12), skinMat);
-  leftForearm.position.set(-0.46, 0.65, 0);
-  leftForearm.rotation.z = 0.15;
+  const leftForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.06, 0.30, 14), skinMat);
+  leftForearm.position.set(-0.30, 0.73, 0);
   character.add(leftForearm);
-  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), skinMat);
-  leftHand.position.set(-0.50, 0.45, 0);
+  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 14), skinMat);
+  leftHand.position.set(-0.30, 0.53, 0);
   character.add(leftHand);
 
-  // Right arm
-  const rightUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.32, 12), shirtMat);
-  rightUpperArm.position.set(0.36, 0.95, 0);
-  rightUpperArm.rotation.z = -0.2;
+  // Right arm (mirror)
+  const rightUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.32, 14), shirtMat);
+  rightUpperArm.position.set(0.30, 1.04, 0);
   character.add(rightUpperArm);
-  const rightForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.32, 12), skinMat);
-  rightForearm.position.set(0.46, 0.65, 0);
-  rightForearm.rotation.z = -0.15;
+  const rightForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.06, 0.30, 14), skinMat);
+  rightForearm.position.set(0.30, 0.73, 0);
   character.add(rightForearm);
-  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), skinMat);
-  rightHand.position.set(0.50, 0.45, 0);
+  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 14), skinMat);
+  rightHand.position.set(0.30, 0.53, 0);
   character.add(rightHand);
 
   // ---- Hips / pants ----
