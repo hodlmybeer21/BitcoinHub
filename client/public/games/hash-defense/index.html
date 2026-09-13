@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Hash Defense · BitcoinHub</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      background: #02030a;
+      color: #fff;
+    }
+    canvas { display: block; touch-action: none; }
+
+    /* Top HUD */
+    #topbar {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top, 12px));
+      left: 12px; right: 12px;
+      z-index: 10;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      pointer-events: none;
+    }
+    .stat-pill {
+      background: rgba(0,0,0,0.55);
+      border-radius: 12px;
+      padding: 8px 14px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      pointer-events: auto;
+    }
+    #btc-pill { border: 1.5px solid #fbbf24; }
+    #btc-pill .label { font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+    #btc-pill .val { font-size: 14px; font-weight: 800; color: #fbbf24; letter-spacing: 0.5px; }
+    #wave-pill { border: 1.5px solid #a78bfa; min-width: 90px; text-align: center; }
+    #wave-pill .label { font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+    #wave-pill .val { font-size: 14px; font-weight: 800; color: #a78bfa; }
+
+    #lives-pill { border: 1.5px solid #ef4444; text-align: center; }
+    #lives-pill .label { font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+    #lives-pill .val { font-size: 14px; letter-spacing: 3px; }
+    .heart-on { color: #ef4444; text-shadow: 0 0 6px rgba(239,68,68,0.6); }
+    .heart-off { color: #444; }
+
+    /* Bottom placement bar */
+    #bottombar {
+      position: fixed;
+      bottom: max(12px, env(safe-area-inset-bottom, 12px));
+      left: 12px; right: 12px;
+      z-index: 10;
+      background: rgba(0,0,0,0.55);
+      border: 1.5px solid rgba(251,191,36,0.4);
+      border-radius: 12px;
+      padding: 10px 14px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    #bottombar .left { font-size: 12px; color: rgba(255,255,255,0.7); letter-spacing: 0.5px; }
+    #bottombar .left b { color: #fbbf24; font-weight: 700; }
+    #bottombar .right {
+      font-size: 11px;
+      color: #22d3ee;
+      letter-spacing: 1px;
+    }
+
+    /* Halving banner */
+    #halving-banner {
+      position: fixed;
+      top: 18%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      font-size: 24px;
+      font-weight: 800;
+      color: #22d3ee;
+      letter-spacing: 4px;
+      text-shadow: 0 0 30px rgba(34, 211, 238, 0.8);
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    #halving-banner.show { opacity: 1; }
+    #halving-banner small {
+      display: block;
+      font-size: 11px;
+      color: #fbbf24;
+      letter-spacing: 2px;
+      margin-top: 4px;
+    }
+
+    /* Game over */
+    #game-over {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #game-over.show { display: flex; }
+    #game-over .card {
+      background: rgba(8,10,22,0.95);
+      border: 1.5px solid #ef4444;
+      border-radius: 12px;
+      padding: 24px 28px;
+      text-align: center;
+      max-width: 360px;
+    }
+    #game-over h2 { margin: 0 0 6px 0; font-size: 20px; color: #ef4444; letter-spacing: 2px; }
+    #game-over .stat { font-size: 13px; color: rgba(255,255,255,0.7); margin: 6px 0; }
+    #game-over .stat b { color: #fbbf24; }
+    #replay-btn {
+      margin-top: 14px;
+      padding: 12px 32px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #02030a;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      cursor: pointer;
+    }
+
+    /* Footer */
+    #hub-footer {
+      position: fixed;
+      bottom: 4px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      font-size: 8px;
+      color: rgba(255,255,255,0.25);
+      letter-spacing: 1px;
+      pointer-events: auto;
+      white-space: nowrap;
+    }
+    #hub-footer a { color: #a78bfa; text-decoration: none; }
+    #hub-footer .sep { color: rgba(255,255,255,0.12); margin: 0 4px; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="topbar">
+    <div class="stat-pill" id="btc-pill">
+      <div class="label">BTC</div>
+      <div class="val" id="btc-val">0.00010000</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="stat-pill" id="wave-pill">
+        <div class="label">WAVE</div>
+        <div class="val" id="wave-val">1</div>
+      </div>
+      <div class="stat-pill" id="lives-pill">
+        <div class="label">NODES</div>
+        <div class="val" id="lives-val"><span class="heart-on">♥</span><span class="heart-on">♥</span><span class="heart-on">♥</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="halving-banner">HALVING<small>ENEMIES HALVED · REWARDS DOUBLED</small></div>
+
+  <div id="bottombar">
+    <div class="left">Tap empty <b>hex cell</b> to place miner · <b id="cost">0.0001</b> BTC</div>
+    <div class="right" id="kills-val">0 FUD killed</div>
+  </div>
+
+  <div id="game-over">
+    <div class="card">
+      <h2>NODE COMPROMISED</h2>
+      <div class="stat">Final: <b id="final-btc">0</b> BTC</div>
+      <div class="stat">Waves defended: <b id="final-waves">0</b></div>
+      <div class="stat">FUD killed: <b id="final-kills">0</b></div>
+      <button id="replay-btn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <div id="hub-footer">
+    <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener">bitcoinhub</a>
+    <span class="sep">·</span>
+    <a href="https://bitcoinhub.goodbotai.tech/laws" target="_blank" rel="noopener">Laws</a>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+
+  // ========== Scene ==========
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x02030a);
+  scene.fog = new THREE.FogExp2(0x02030a, 0.030);
+
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 0, 16);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('game'),
+    antialias: window.devicePixelRatio < 2,
+    powerPreference: 'high-performance',
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  scene.add(new THREE.AmbientLight(0x404060, 0.5));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  keyLight.position.set(5, 10, 5); scene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0xfbbf24, 0.5);
+  rimLight.position.set(-6, 3, 5); scene.add(rimLight);
+
+  // Stars
+  {
+    const g = new THREE.BufferGeometry();
+    const N = 400;
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      pos[i*3+0] = (Math.random() - 0.5) * 60;
+      pos[i*3+1] = (Math.random() - 0.5) * 60;
+      pos[i*3+2] = -8 - Math.random() * 20;
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({
+      color: 0xffffff, size: 0.12, transparent: true, opacity: 0.6, sizeAttenuation: true,
+    })));
+  }
+
+  // ========== Central Bitcoin (the node being defended) ==========
+  function makeBitcoinTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createRadialGradient(128, 100, 20, 128, 128, 130);
+    grad.addColorStop(0, '#fff5b8');
+    grad.addColorStop(0.4, '#fbbf24');
+    grad.addColorStop(1, '#7c2d12');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, 236, 236);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = 'bold 180px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('₿', 128, 140);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  const nodeGroup = new THREE.Group();
+  const nodeCoin = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.0, 1.0, 0.22, 32),
+    [
+      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3, metalness: 0.6, emissive: 0xd97706, emissiveIntensity: 0.4 }),
+      new THREE.MeshStandardMaterial({ map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.4, emissive: 0xfbbf24, emissiveIntensity: 0.5 }),
+      new THREE.MeshStandardMaterial({ map: makeBitcoinTexture(), roughness: 0.4, metalness: 0.4, emissive: 0xfbbf24, emissiveIntensity: 0.5 }),
+    ]
+  );
+  nodeCoin.rotation.x = Math.PI / 2;
+  nodeGroup.add(nodeCoin);
+
+  // Inner ring
+  const innerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.85, 0.03, 8, 32),
+    new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.6 })
+  );
+  innerRing.position.z = 0.12;
+  nodeGroup.add(innerRing);
+  const innerRing2 = innerRing.clone();
+  innerRing2.position.z = -0.12;
+  nodeGroup.add(innerRing2);
+
+  // Outer protective ring (pulse on halving)
+  const shieldRing = new THREE.Mesh(
+    new THREE.TorusGeometry(2.2, 0.05, 8, 48),
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.5 })
+  );
+  nodeGroup.add(shieldRing);
+  scene.add(nodeGroup);
+
+  // ========== Hex grid placement cells (around the Bitcoin) ==========
+  const CELL_RING_R = 4.5;  // distance from center
+  const NUM_CELLS = 8;
+  const cells = [];
+  for (let i = 0; i < NUM_CELLS; i++) {
+    const angle = (i / NUM_CELLS) * Math.PI * 2;
+    const x = Math.cos(angle) * CELL_RING_R;
+    const y = Math.sin(angle) * CELL_RING_R;
+
+    // Hex cell (flat hexagonal disc)
+    const geo = new THREE.CircleGeometry(0.55, 6);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24, transparent: true, opacity: 0.18, side: THREE.DoubleSide,
+    });
+    const cell = new THREE.Mesh(geo, mat);
+    cell.position.set(x, y, 0);
+    cell.userData = { occupied: false, angle, radius: CELL_RING_R };
+    scene.add(cell);
+    cells.push(cell);
+
+    // Subtle outer ring (highlight when hovered/affordable)
+    const ringGeo = new THREE.RingGeometry(0.55, 0.65, 6);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24, transparent: true, opacity: 0.0, side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(x, y, 0.01);
+    cell.userData.ring = ring;
+    scene.add(ring);
+  }
+
+  // Connecting lane lines (visual guides from outer edge to center)
+  for (let i = 0; i < NUM_CELLS; i++) {
+    const angle = (i / NUM_CELLS) * Math.PI * 2;
+    const outerX = Math.cos(angle) * 7.5;
+    const outerY = Math.sin(angle) * 7.5;
+    const points = [
+      new THREE.Vector3(outerX, outerY, -0.5),
+      new THREE.Vector3(0, 0, -0.5),
+    ];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color: 0x334466, transparent: true, opacity: 0.3 });
+    scene.add(new THREE.Line(geo, mat));
+  }
+
+  // ========== Defenders (miner towers) ==========
+  const defenders = [];
+  const defenderGeo = new THREE.ConeGeometry(0.3, 0.7, 6);
+  const defenderMat = new THREE.MeshStandardMaterial({
+    color: 0xfbbf24, roughness: 0.3, metalness: 0.7,
+    emissive: 0xfbbf24, emissiveIntensity: 0.6,
+  });
+
+  function placeDefender(cellIdx) {
+    const cell = cells[cellIdx];
+    if (cell.userData.occupied) return false;
+    if (btc < towerCost) return false;
+
+    btc -= towerCost;
+    cell.userData.occupied = true;
+
+    // Visual: replace cell with a defender tower
+    cell.material.opacity = 0.0;
+    cell.userData.ring.material.opacity = 0.0;
+
+    const tower = new THREE.Mesh(defenderGeo, defenderMat.clone());
+    tower.position.copy(cell.position);
+    tower.position.z = 0.3;
+    tower.userData = {
+      type: 'miner',
+      range: 6.0,
+      fireRate: 0.5, // shots per second
+      fireCooldown: 0,
+      angle: cell.userData.angle,
+    };
+    scene.add(tower);
+    defenders.push(tower);
+
+    towerCost = Math.round((towerCost * 1.5) * 1e8) / 1e8;
+    costEl.textContent = towerCost.toFixed(7).replace(/0+$/, '');
+    btcValEl.textContent = btc.toFixed(8).replace(/0+$/, '');
+    return true;
+  }
+
+  // ========== Enemies (FUD agents) ==========
+  const enemies = [];
+  const ENEMY_TYPES = {
+    fud:        { color: 0x8b5cf6, speed: 1.0, hp: 2, reward: 0.00001, label: 'FUD' },
+    hacker:     { color: 0xef4444, speed: 1.8, hp: 1, reward: 0.000005, label: 'HACK' },
+    regulator:  { color: 0xf59e0b, speed: 1.3, hp: 3, reward: 0.00002, label: 'REG' },
+  };
+  const enemyGeoCache = {
+    fud: new THREE.OctahedronGeometry(0.3, 0),
+    hacker: new THREE.TetrahedronGeometry(0.3, 0),
+    regulator: new THREE.BoxGeometry(0.45, 0.45, 0.45),
+  };
+
+  function spawnEnemy() {
+    const cellIdx = Math.floor(Math.random() * NUM_CELLS);
+    const angle = cells[cellIdx].userData.angle;
+    const typeKeys = Object.keys(ENEMY_TYPES);
+    const typeKey = typeKeys[Math.floor(Math.random() * typeKeys.length)];
+    const type = ENEMY_TYPES[typeKey];
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: type.color,
+      emissive: type.color, emissiveIntensity: 0.7,
+      roughness: 0.5, metalness: 0.3,
+    });
+    const enemy = new THREE.Mesh(enemyGeoCache[typeKey], mat);
+    enemy.position.set(Math.cos(angle) * 7.5, Math.sin(angle) * 7.5, 0);
+    enemy.userData = {
+      type: typeKey,
+      hp: type.hp,
+      maxHp: type.hp,
+      speed: type.speed,
+      reward: type.reward,
+      angle,
+      radius: 7.5,
+    };
+    scene.add(enemy);
+    enemies.push(enemy);
+  }
+
+  // ========== Laser beams (defender → enemy) ==========
+  const lasers = [];
+  const laserGeo = new THREE.BufferGeometry();
+  function fireLaser(from, to) {
+    const positions = new Float32Array([from.x, from.y, from.z, to.x, to.y, to.z]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 1 });
+    const laser = new THREE.Line(geo, mat);
+    scene.add(laser);
+    lasers.push({ line: laser, mat, life: 0.12, maxLife: 0.12 });
+  }
+
+  // ========== Explosions ==========
+  const explosions = [];
+  function spawnExplosion(pos, color = 0xfbbf24) {
+    for (let i = 0; i < 6; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), mat);
+      p.position.copy(pos);
+      const a = Math.random() * Math.PI * 2;
+      p.userData = {
+        vx: Math.cos(a) * (2 + Math.random() * 2),
+        vy: Math.sin(a) * (2 + Math.random() * 2),
+        life: 0.6, maxLife: 0.6,
+      };
+      scene.add(p);
+      explosions.push(p);
+    }
+  }
+
+  // ========== State ==========
+  let btc = 0.0001; // start with some satoshis
+  let towerCost = 0.0001;
+  let lives = 3;
+  let wave = 1;
+  let kills = 0;
+  let gameOver = false;
+  let halvingActive = false;
+  let halvingCountdown = 30;
+  let lastSpawn = 0;
+  let spawnInterval = 2000;
+  let timeSinceWave = 0;
+
+  // ========== UI elements ==========
+  const btcValEl = document.getElementById('btc-val');
+  const waveValEl = document.getElementById('wave-val');
+  const livesValEl = document.getElementById('lives-val');
+  const killsValEl = document.getElementById('kills-val');
+  const costEl = document.getElementById('cost');
+  const halvingBannerEl = document.getElementById('halving-banner');
+  const gameOverEl = document.getElementById('game-over');
+  const finalBtcEl = document.getElementById('final-btc');
+  const finalWavesEl = document.getElementById('final-waves');
+  const finalKillsEl = document.getElementById('final-kills');
+
+  function updateHUD() {
+    btcValEl.textContent = btc.toFixed(8).replace(/0+$/, '').replace(/.$/, '');
+    waveValEl.textContent = wave;
+    killsValEl.textContent = kills + ' FUD killed';
+    livesValEl.innerHTML =
+      (lives >= 1 ? '<span class="heart-on">♥</span>' : '<span class="heart-off">♥</span>') +
+      (lives >= 2 ? '<span class="heart-on">♥</span>' : '<span class="heart-off">♥</span>') +
+      (lives >= 3 ? '<span class="heart-on">♥</span>' : '<span class="heart-off">♥</span>');
+
+    // Highlight affordable cells
+    cells.forEach(c => {
+      if (!c.userData.occupied) {
+        const affordable = btc >= towerCost;
+        c.material.opacity = affordable ? 0.18 : 0.08;
+        c.material.color.setHex(affordable ? 0xfbbf24 : 0x444444);
+      }
+    });
+  }
+
+  function triggerHalving() {
+    halvingActive = true;
+    spawnInterval = 4000; // enemies slower (4s instead of 2s)
+    halvingBannerEl.classList.add('show');
+    shieldRing.material.color.setHex(0x22d3ee);
+    shieldRing.material.opacity = 0.9;
+    setTimeout(() => {
+      halvingBannerEl.classList.remove('show');
+      halvingActive = false;
+      // Next halving reduces spawn more aggressively
+      spawnInterval = 5000;
+      shieldRing.material.color.setHex(0x22d3ee);
+      shieldRing.material.opacity = 0.5;
+    }, 3500);
+  }
+
+  function gameOverFunc() {
+    gameOver = true;
+    finalBtcEl.textContent = btc.toFixed(4);
+    finalWavesEl.textContent = wave;
+    finalKillsEl.textContent = kills;
+    gameOverEl.classList.add('show');
+  }
+
+  document.getElementById('replay-btn').onclick = () => {
+    // Reset state
+    while (enemies.length) { scene.remove(enemies.pop()); }
+    while (defenders.length) { scene.remove(defenders.pop()); }
+    while (lasers.length) { scene.remove(lasers[0].line); lasers.shift(); }
+    while (explosions.length) { scene.remove(explosions.pop()); }
+    cells.forEach(c => {
+      c.userData.occupied = false;
+      c.material.opacity = 0.18;
+      c.material.color.setHex(0xfbbf24);
+    });
+    btc = 0.0001;
+    towerCost = 0.0001;
+    lives = 3;
+    wave = 1;
+    kills = 0;
+    halvingCountdown = 30;
+    spawnInterval = 2000;
+    gameOver = false;
+    gameOverEl.classList.remove('show');
+    updateHUD();
+  };
+
+  // ========== Input ==========
+  const canvasEl = renderer.domElement;
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  function handleTap(clientX, clientY) {
+    if (gameOver) return;
+    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(cells);
+    if (hits.length > 0) {
+      const cell = hits[0].object;
+      const idx = cells.indexOf(cell);
+      if (idx >= 0) placeDefender(idx);
+    }
+  }
+
+  canvasEl.addEventListener('touchstart', e => {
+    e.preventDefault();
+    handleTap(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+  canvasEl.addEventListener('mousedown', e => {
+    handleTap(e.clientX, e.clientY);
+  });
+
+  // ========== Game loop ==========
+  const clock = new THREE.Clock();
+  let lastFrame = performance.now();
+  function animate() {
+    requestAnimationFrame(animate);
+    const now = performance.now();
+    const dt = Math.min((now - lastFrame) / 1000, 0.05);
+    lastFrame = now;
+
+    if (!gameOver) {
+      // Halving countdown
+      halvingCountdown -= dt;
+      if (halvingCountdown <= 0) {
+        triggerHalving();
+        halvingCountdown = 30;
+        wave++;
+      }
+
+      // Spawn enemies
+      timeSinceWave += dt * 1000;
+      if (timeSinceWave > spawnInterval) {
+        spawnEnemy();
+        timeSinceWave = 0;
+        // Increase wave every 5 enemies
+        if (enemies.length % 5 === 0 && wave < 99) {
+          // Just visual wave counter
+        }
+      }
+
+      // Update enemies (move toward center)
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        const ud = e.userData;
+        ud.radius -= ud.speed * dt;
+        e.position.set(Math.cos(ud.angle) * ud.radius, Math.sin(ud.angle) * ud.radius, 0);
+        e.rotation.x += dt * 2;
+        e.rotation.y += dt * 1.5;
+
+        // Reached center
+        if (ud.radius < 1.2) {
+          spawnExplosion(nodeCoin.position, 0xef4444);
+          scene.remove(e);
+          enemies.splice(i, 1);
+          lives--;
+          updateHUD();
+          if (lives <= 0) {
+            gameOverFunc();
+          }
+          continue;
+        }
+
+        // Check defender hits
+        for (const tower of defenders) {
+          const tPos = tower.position;
+          const dist = e.position.distanceTo(tPos);
+          if (dist < tower.userData.range) {
+            ud.hp--;
+            spawnExplosion(e.position, ud.type === 'hacker' ? 0xef4444 : 0xfbbf24);
+            if (ud.hp <= 0) {
+              const rewardMult = halvingActive ? 2 : 1;
+              btc += ud.reward * rewardMult;
+              kills++;
+              scene.remove(e);
+              enemies.splice(i, 1);
+              updateHUD();
+            }
+            break;
+          }
+        }
+      }
+
+      // Update defenders (fire at nearest enemy)
+      for (const tower of defenders) {
+        const ud = tower.userData;
+        ud.fireCooldown -= dt;
+        if (ud.fireCooldown > 0) continue;
+
+        // Find nearest enemy in lane
+        let nearest = null;
+        let nearestDist = Infinity;
+        for (const e of enemies) {
+          if (e.userData.type === ud.type || Math.abs(e.userData.angle - ud.angle) < 0.6) {
+            const d = e.position.distanceTo(tower.position);
+            if (d < ud.range && d < nearestDist) {
+              nearest = e;
+              nearestDist = d;
+            }
+          }
+        }
+        if (nearest) {
+          // Fire laser
+          fireLaser(tower.position, nearest.position);
+          ud.fireCooldown = 1 / ud.fireRate;
+        }
+      }
+    }
+
+    // Update lasers
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      const l = lasers[i];
+      l.life -= dt;
+      l.mat.opacity = Math.max(0, l.life / l.maxLife);
+      if (l.life <= 0) {
+        scene.remove(l.line);
+        l.mat.dispose();
+        lasers.splice(i, 1);
+      }
+    }
+
+    // Update explosions
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const p = explosions[i];
+      const ud = p.userData;
+      ud.life -= dt;
+      if (ud.life <= 0) {
+        scene.remove(p);
+        explosions.splice(i, 1);
+        continue;
+      }
+      p.position.x += ud.vx * dt;
+      p.position.y += ud.vy * dt;
+      p.material.opacity = Math.max(0, ud.life / ud.maxLife);
+      p.scale.setScalar(0.5 + (1 - ud.life / ud.maxLife) * 1.5);
+    }
+
+    // Animate node
+    nodeCoin.rotation.y += dt * 0.3;
+    nodeCoin.position.y = Math.sin(now * 0.001) * 0.1;
+    nodeGroup.position.y = nodeCoin.position.y;
+    innerRing.rotation.z += dt * 0.5;
+    innerRing2.rotation.z -= dt * 0.5;
+    shieldRing.rotation.z += dt * 0.15;
+
+    // Pulse shield on halving
+    if (halvingActive) {
+      shieldRing.material.opacity = 0.7 + Math.sin(now * 0.01) * 0.2;
+    }
+
+    // Background drift
+    scene.children.forEach(c => {
+      if (c.isPoints && c !== particlesRef) {
+        // skip; stars handled separately
+      }
+    });
+
+    renderer.render(scene, camera);
+  }
+  const particlesRef = scene.children.find(c => c.isPoints);
+  animate();
+
+  // Init
+  updateHUD();
+
+  // Resize
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  </script>
+</body>
+</html>
