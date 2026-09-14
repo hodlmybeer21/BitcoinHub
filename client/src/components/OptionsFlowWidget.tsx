@@ -14,17 +14,35 @@ interface OptionContract {
 }
 
 interface OptionsFlowResponse {
-  putCallRatio: number;
-  totalCallOI: number;
-  totalPutOI: number;
-  totalCallVolume: number;
-  totalPutVolume: number;
-  netDelta: number;
-  avgImpliedVolatility: number;
-  topContracts: OptionContract[];
-  marketSentiment: 'bullish' | 'bearish' | 'neutral';
-  flowAnalysis: string[];
-  timestamp: string;
+  // Actual /api/options-flow shape (Deribit proxy): nested per-asset + topStrikes list.
+  // (The old flat shape {putCallRatio, totalCallOI, ...} never matched the API —
+  // reading those top-level fields threw 'Cannot read properties of undefined'
+  // and unmounted the whole Trading Cockpit.)
+  btc?: {
+    putCallRatio?: number;
+    totalOI?: number;
+    totalVolume?: number;
+    putCallVolumeRatio?: number;
+    netDelta?: number;
+    sentiment?: 'bullish' | 'bearish' | 'neutral';
+  };
+  eth?: {
+    putCallRatio?: number;
+    totalOI?: number;
+    totalVolume?: number;
+    sentiment?: 'bullish' | 'bearish' | 'neutral';
+  };
+  topStrikes?: Array<{
+    symbol?: string;
+    strike?: number;
+    type?: 'call' | 'put';
+    openInterest?: number;
+    volume?: number;
+    iv?: number;
+    markPrice?: number;
+  }>;
+  lastUpdated?: string;
+  source?: string;
 }
 
 export default function OptionsFlowWidget() {
@@ -70,6 +88,17 @@ export default function OptionsFlowWidget() {
     neutral: 'text-yellow-500 bg-yellow-500/10',
   };
 
+  // Derive values from actual API shape (data.btc / data.eth / data.topStrikes).
+  const btcPcr = data.btc?.putCallRatio;
+  const btcOI = data.btc?.totalOI;
+  const btcVol = data.btc?.totalVolume;
+  const sentiment = data.btc?.sentiment ?? 'neutral';
+  const strikes = Array.isArray(data.topStrikes) ? data.topStrikes : [];
+  // Approximate avg IV from topStrikes (API doesn't expose a single avg field).
+  const avgIv = strikes.length
+    ? strikes.reduce((s, c) => s + (c.iv ?? 0), 0) / strikes.length
+    : null;
+
   return (
     <Card className="bg-card/50">
       <CardHeader className="pb-2">
@@ -79,30 +108,31 @@ export default function OptionsFlowWidget() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          {/* Put/Call Ratio */}
+          {/* Put/Call Ratio (BTC) */}
           <div className="p-3 bg-card rounded-lg border">
-            <div className="text-xs text-muted-foreground mb-1">Put/Call Ratio</div>
+            <div className="text-xs text-muted-foreground mb-1">Put/Call Ratio (BTC)</div>
             <div className={`text-xl font-mono font-bold ${
-              data.putCallRatio > 1.2 ? 'text-red-500' : 
-              data.putCallRatio < 0.8 ? 'text-green-500' : 'text-yellow-500'
+              btcPcr === undefined ? 'text-muted-foreground' :
+              btcPcr > 1.2 ? 'text-red-500' :
+              btcPcr < 0.8 ? 'text-green-500' : 'text-yellow-500'
             }`}>
-              {data.putCallRatio.toFixed(2)}
+              {btcPcr !== undefined ? btcPcr.toFixed(2) : '—'}
             </div>
           </div>
 
-          {/* Total OI */}
+          {/* Total OI (BTC) */}
           <div className="p-3 bg-card rounded-lg border">
             <div className="text-xs text-muted-foreground mb-1">Total Open Interest</div>
             <div className="text-xl font-mono font-bold">
-              {formatOI(data.totalCallOI + data.totalPutOI)} BTC
+              {btcOI !== undefined ? `${formatOI(btcOI)} BTC` : '—'}
             </div>
           </div>
 
-          {/* IV */}
+          {/* Avg IV (from topStrikes) */}
           <div className="p-3 bg-card rounded-lg border">
             <div className="text-xs text-muted-foreground mb-1">Avg Implied Vol</div>
             <div className="text-xl font-mono font-bold">
-              {data.avgImpliedVolatility.toFixed(1)}%
+              {avgIv !== null ? `${(avgIv * 100).toFixed(1)}%` : '—'}
             </div>
           </div>
 
@@ -110,40 +140,38 @@ export default function OptionsFlowWidget() {
           <div className="p-3 bg-card rounded-lg border">
             <div className="text-xs text-muted-foreground mb-1">Sentiment</div>
             <div className={`inline-flex px-2 py-1 rounded text-sm font-bold ${
-              sentimentColor[data.marketSentiment]
+              sentimentColor[sentiment] ?? sentimentColor.neutral
             }`}>
-              {data.marketSentiment.toUpperCase()}
+              {sentiment.toUpperCase()}
             </div>
           </div>
         </div>
 
-        {/* Call/Put breakdown */}
+        {/* Volume summary (BTC only — API doesn't split calls vs puts in this proxy) */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="p-3 bg-green-500/5 rounded-lg border border-green-500/20">
-            <div className="text-xs text-muted-foreground mb-1">Call OI / Volume</div>
-            <div className="flex justify-between">
-              <span className="text-sm font-mono text-green-500">OI: {formatOI(data.totalCallOI)}</span>
-              <span className="text-sm font-mono text-green-500">Vol: {formatOI(data.totalCallVolume)}</span>
+            <div className="text-xs text-muted-foreground mb-1">BTC 24h Volume</div>
+            <div className="text-sm font-mono text-green-500">
+              {btcVol !== undefined ? formatOI(btcVol) : '—'}
             </div>
           </div>
-          <div className="p-3 bg-red-500/5 rounded-lg border border-red-500/20">
-            <div className="text-xs text-muted-foreground mb-1">Put OI / Volume</div>
-            <div className="flex justify-between">
-              <span className="text-sm font-mono text-red-500">OI: {formatOI(data.totalPutOI)}</span>
-              <span className="text-sm font-mono text-red-500">Vol: {formatOI(data.totalPutVolume)}</span>
+          <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+            <div className="text-xs text-muted-foreground mb-1">BTC Net Delta</div>
+            <div className="text-sm font-mono text-blue-500">
+              {data.btc?.netDelta !== undefined ? formatOI(data.btc.netDelta) : '—'}
             </div>
           </div>
         </div>
 
-        {/* Top Contracts */}
-        {data.topContracts.length > 0 && (
+        {/* Top Strikes */}
+        {strikes.length > 0 && (
           <div>
-            <p className="text-xs text-muted-foreground mb-2 font-semibold">TOP CONTRACTS BY VOLUME</p>
+            <p className="text-xs text-muted-foreground mb-2 font-semibold">TOP STRIKES BY VOLUME</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-muted-foreground border-b">
-                    <th className="text-left py-1 pr-4">Strike</th>
+                    <th className="text-left py-1 pr-4">Symbol</th>
                     <th className="text-left py-1 pr-4">Type</th>
                     <th className="text-right py-1 pr-4">OI</th>
                     <th className="text-right py-1 pr-4">Volume</th>
@@ -151,15 +179,15 @@ export default function OptionsFlowWidget() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.topContracts.slice(0, 5).map((c, i) => (
-                    <tr key={c.instrumentName + i} className="border-b border-muted/10">
-                      <td className="py-1 pr-4 font-mono">{c.strike.toLocaleString()}</td>
-                      <td className={`py-1 pr-4 font-mono ${c.type === 'call' ? 'text-green-500' : 'text-red-500'}`}>
-                        {c.type.toUpperCase()}
+                  {strikes.slice(0, 5).map((c, i) => (
+                    <tr key={(c.symbol ?? 'strike') + i} className="border-b border-muted/10">
+                      <td className="py-1 pr-4 font-mono">{c.symbol ?? '—'}</td>
+                      <td className={`py-1 pr-4 font-mono ${c.type === 'call' ? 'text-green-500' : c.type === 'put' ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        {(c.type ?? '—').toUpperCase()}
                       </td>
-                      <td className="py-1 pr-4 font-mono text-right">{formatOI(c.openInterest)}</td>
-                      <td className="py-1 pr-4 font-mono text-right">{formatOI(c.volume24h)}</td>
-                      <td className="py-1 font-mono text-right">{c.impliedVolatility.toFixed(1)}%</td>
+                      <td className="py-1 pr-4 font-mono text-right">{c.openInterest !== undefined ? formatOI(c.openInterest) : '—'}</td>
+                      <td className="py-1 pr-4 font-mono text-right">{c.volume !== undefined ? formatOI(c.volume) : '—'}</td>
+                      <td className="py-1 font-mono text-right">{c.iv !== undefined ? `${(c.iv * 100).toFixed(1)}%` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -168,12 +196,10 @@ export default function OptionsFlowWidget() {
           </div>
         )}
 
-        {/* Analysis */}
-        {data.flowAnalysis.length > 0 && (
-          <div className="mt-4 pt-4 border-t space-y-1">
-            {data.flowAnalysis.slice(0, 2).map((analysis, i) => (
-              <p key={i} className="text-xs text-muted-foreground">{analysis}</p>
-            ))}
+        {/* Last updated footer */}
+        {data.lastUpdated && (
+          <div className="mt-3 pt-3 border-t text-[10px] text-muted-foreground">
+            Last updated: {new Date(data.lastUpdated).toLocaleString()}
           </div>
         )}
       </CardContent>
