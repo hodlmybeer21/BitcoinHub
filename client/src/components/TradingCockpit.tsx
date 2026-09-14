@@ -13,6 +13,7 @@ import WhaleAlertsWidget from "@/components/WhaleAlertsWidget";
 import FundingRates from "@/components/FundingRates";
 import OptionsFlowWidget from "@/components/OptionsFlowWidget";
 import LiquidityWidget from "@/components/LiquidityWidget";
+import DebtLiquidityPanel from "@/components/analytics/DebtLiquidityPanel";
 
 const TIMEFRAMES = ['1m', '5m', '1h', '1D', '1W', '1M', '3M', '1Y', 'ALL'] as const;
 type Timeframe = typeof TIMEFRAMES[number];
@@ -170,6 +171,9 @@ const TradingCockpit = () => {
         </div>
       </header>
       
+      {/* Debt Liquidity — US Treasury buyer dashboard (2026-09-14) */}
+      <DebtLiquidityPanel />
+
       {/* Main Grid: 3 columns on desktop, 1 on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         {/* Column 1: BTC Dashboard */}

@@ -90,8 +90,26 @@ export const FRED_SERIES: FredSeriesDef[] = [
   {
     id: 'DGS10', name: '10Y Treasury (DGS10)',
     category: 'rates', unit: '%',
-    description: '10-year Treasury constant maturity yield — daily. Tyler’s TNX: cost-of-capital proxy for risk-asset multiples.',
+    description: '10-year Treasury constant maturity yield — daily. Tyler's TNX: cost-of-capital proxy for risk-asset multiples.',
     frequency: 'daily', transform: 'none',
+  },
+  {
+    id: 'DGS30', name: '30Y Treasury (DGS30)',
+    category: 'rates', unit: '%',
+    description: '30-year Treasury constant maturity yield — daily. The long-end of the curve — primary auction watch.',
+    frequency: 'daily', transform: 'none',
+  },
+  {
+    id: 'TB3MS', name: '3M T-Bill (TB3MS)',
+    category: 'rates', unit: '%',
+    description: '3-month T-bill yield — daily. Front-end demand signal; spikes when nobody wants duration.',
+    frequency: 'daily', transform: 'none',
+  },
+  {
+    id: 'WTREGEN', name: 'Fed SOMA Treasuries',
+    category: 'liquidity', unit: 'M USD',
+    description: 'Total U.S. Treasury Securities Held by Federal Reserve (SOMA) — weekly (Thursday). Drops = QT; rises = QE.',
+    frequency: 'weekly', transform: 'none',
   },
 
   // ─── Inflation ─────────────────────────────────────────────────────

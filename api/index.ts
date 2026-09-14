@@ -4487,6 +4487,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/ai/analysis' || path === '/api/ai/analysis/') return handleAiAnalysis(req, res);
     if (path === '/api/ai/multi-timeframe-predictions' || path === '/api/ai/multi-timeframe-predictions/') return handleAiMultiTimeframe(req, res);
     if (path === '/api/financial/treasury-fiscal' || path === '/api/financial/treasury-fiscal/') return handleTreasuryFiscal(req, res);
+
+    // ── Debt Liquidity Dashboard (2026-09-14) ─────────────────────────
+    // /api/treasury/auctions/snapshot — US Treasury auction results
+    // (bid-to-cover, indirect share, tail) + computed stress score.
+    // Source: Treasury Fiscal Data API. No key required.
+    if (path === '/api/treasury/auctions/snapshot' || path === '/api/treasury/auctions/snapshot/') {
+      const { default: h } = await import('../lib/treasury/auctions.js');
+      return h(req, res);
+    }
     if (path === '/api/financial/inflation' || path === '/api/financial/inflation/') return handleFinancialInflation(req, res);
 
 
