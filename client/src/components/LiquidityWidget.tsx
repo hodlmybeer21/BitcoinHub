@@ -83,8 +83,12 @@ export default function LiquidityWidget() {
     .filter((i: any) => ['M2', 'M1', 'RRP', 'TGA', 'Fed BS', 'Reserves'].includes(i.shortName))
     .slice(0, 6);
 
-  const dmArr = Array.isArray(data.derivedMetrics) ? data.derivedMetrics : Object.values(data.derivedMetrics || {});
-  const netLiq = dmArr.find((d: any) => d.id === 'net_liquidity');
+  const dmArr = Array.isArray(data.derivedMetrics)
+    ? data.derivedMetrics
+    : Object.values(data.derivedMetrics || {}).filter(
+        (v): v is DerivedMetric => v != null && typeof v === 'object'
+      );
+  const netLiq = dmArr.find((d: DerivedMetric) => d.id === 'net_liquidity');
   const stackSatsAlert = data.summary?.stackSatsAlert;
 
   return (
