@@ -17,11 +17,15 @@ interface LiquidityData {
     signalReasons: string[];
     lastUpdated: string;
   };
-  indicators?: Array<{
-    shortName: string;
-    displayValue: string;
-    yoyChangePercent: number;
-  }>;
+  // Actual shape from /api/liquidity: a DICT keyed by short code.
+  // (The old Array<{shortName}> interface never matched the API — calling
+  // .find() on a dict throws and unmounts the whole page.)
+  indicators?: {
+    m2?: { value: number; label: string; unit: string; change: number | null };
+    rrp?: { value: number; label: string; unit: string; change: number | null };
+    tga?: { value: number; label: string; unit: string; change: number | null };
+    fedBalance?: { value: number; label: string; unit: string; change: number | null };
+  };
 }
 
 export default function MacroIndicators() {
@@ -63,9 +67,12 @@ export default function MacroIndicators() {
     return 'text-muted-foreground';
   };
 
-  // Get M2 from liquidity data
-  const m2Indicator = liquidityData?.indicators?.find(i => i.shortName === 'M2');
-  const netLiqIndicator = liquidityData?.indicators?.find(i => i.shortName === 'Net Liq');
+  // /api/liquidity returns `indicators` as a DICT keyed by short code
+  // (m2, rrp, tga, fedBalance) — not an array of {shortName}. The interface
+  // was wrong. Use direct access; .find() on a dict throws and crashes the page.
+  const m2Indicator = liquidityData?.indicators?.m2;
+  // 'Net Liq' isn't exposed by /api/liquidity; closest analog is fedBalance.
+  const netLiqIndicator = liquidityData?.indicators?.fedBalance;
 
   return (
     <Card className="bg-card/50">
@@ -138,19 +145,26 @@ export default function MacroIndicators() {
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">M2 Money</span>
             <div className="text-right">
-              <span className="font-mono font-medium">{m2Indicator.displayValue}</span>
-              <span className={`font-mono text-xs ml-2 ${getChangeColor(m2Indicator.yoyChangePercent)}`}>
-                {formatChange(m2Indicator.yoyChangePercent)}
+              <span className="font-mono font-medium">
+                ${(m2Indicator.value / 1000).toFixed(2)}T
               </span>
+              {m2Indicator.change !== null && m2Indicator.change !== undefined && (
+                <span className={`font-mono text-xs ml-2 ${getChangeColor(m2Indicator.change)}`}>
+                  {formatChange(m2Indicator.change)}
+                </span>
+              )}
             </div>
           </div>
         )}
 
-        {/* Net Liquidity */}
+        {/* Fed Balance Sheet (proxy for Net Liq — /api/liquidity doesn't
+            expose a true Net Liq series) */}
         {netLiqIndicator && (
           <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Net Liquidity</span>
-            <span className="font-mono font-medium">{netLiqIndicator.displayValue}</span>
+            <span className="text-muted-foreground">Fed Balance</span>
+            <span className="font-mono font-medium">
+              ${(netLiqIndicator.value / 1000).toFixed(2)}T
+            </span>
           </div>
         )}
 
