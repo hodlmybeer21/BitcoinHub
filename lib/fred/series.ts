@@ -90,7 +90,7 @@ export const FRED_SERIES: FredSeriesDef[] = [
   {
     id: 'DGS10', name: '10Y Treasury (DGS10)',
     category: 'rates', unit: '%',
-    description: '10-year Treasury constant maturity yield — daily. Tyler's TNX: cost-of-capital proxy for risk-asset multiples.',
+    description: '10-year Treasury constant maturity yield — daily. The TNX: cost-of-capital proxy for risk-asset multiples.',
     frequency: 'daily', transform: 'none',
   },
   {
