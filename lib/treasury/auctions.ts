@@ -9,6 +9,7 @@
 // and indirect_share for that term, plus a computed stress score (0–100).
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { validateShape, TreasuryAuctionsSchema } from '../shared/safe-api.js';
 
 const AUCTIONS_URL =
   'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query';
@@ -235,6 +236,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path.endsWith('/snapshot') || path.endsWith('/snapshot/')) {
       const force = req.query?.force === '1';
       const snap = await getAuctionsSnapshot({ force });
+      validateShape(snap, TreasuryAuctionsSchema, '/api/treasury/auctions/snapshot');
       return res.status(200).json(snap);
     }
     return res.status(400).json({ error: 'unknown endpoint — try /api/treasury/auctions/snapshot' });

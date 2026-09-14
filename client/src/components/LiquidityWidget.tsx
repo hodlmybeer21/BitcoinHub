@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { safeFetch, LiquiditySchema } from "@shared/safe-api";
 
 interface LiquidityIndicator {
   seriesId: string;
@@ -35,6 +36,7 @@ interface LiquidityData {
 export default function LiquidityWidget() {
   const { data, isLoading } = useQuery<LiquidityData>({
     queryKey: ['/api/liquidity'],
+    queryFn: () => safeFetch<LiquidityData>('/api/liquidity', LiquiditySchema),
     refetchInterval: 300000, // 5 minutes
   });
 

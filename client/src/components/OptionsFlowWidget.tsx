@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { safeFetch, OptionsFlowSchema } from "@shared/safe-api";
 
 interface OptionContract {
   instrumentName: string;
@@ -48,6 +49,7 @@ interface OptionsFlowResponse {
 export default function OptionsFlowWidget() {
   const { data, isLoading } = useQuery<OptionsFlowResponse>({
     queryKey: ['/api/options-flow'],
+    queryFn: () => safeFetch<OptionsFlowResponse>('/api/options-flow', OptionsFlowSchema),
     refetchInterval: 300000, // 5 minutes
   });
 

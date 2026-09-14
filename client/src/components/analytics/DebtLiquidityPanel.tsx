@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingDown, TrendingUp, Minus, AlertTriangle, RefreshCw, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { safeFetch, TreasuryAuctionsSchema } from "@shared/safe-api";
 
 interface AuctionRow {
   record_date: string;
@@ -290,11 +291,7 @@ function FredCard({
 export default function DebtLiquidityPanel() {
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['/api/treasury/auctions/snapshot'],
-    queryFn: async () => {
-      const res = await fetch('/api/treasury/auctions/snapshot');
-      if (!res.ok) throw new Error('treasury fetch failed');
-      return res.json() as Promise<AuctionsSnapshot>;
-    },
+    queryFn: () => safeFetch<AuctionsSnapshot>('/api/treasury/auctions/snapshot', TreasuryAuctionsSchema),
     refetchInterval: 30 * 60 * 1000, // 30 min
   });
 

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { safeFetch, LiquiditySchema } from "@shared/safe-api";
 
 interface FinancialMarketData {
   dxy: { value: number; change: number };
@@ -31,11 +32,13 @@ interface LiquidityData {
 export default function MacroIndicators() {
   const { data: marketData, isLoading: loadingMarket } = useQuery<FinancialMarketData>({
     queryKey: ['/api/financial/markets'],
+    queryFn: () => safeFetch<FinancialMarketData>('/api/financial/markets', LiquiditySchema),
     refetchInterval: 60000,
   });
 
   const { data: liquidityData, isLoading: loadingLiquidity } = useQuery<LiquidityData>({
     queryKey: ['/api/liquidity'],
+    queryFn: () => safeFetch<LiquidityData>('/api/liquidity', LiquiditySchema),
     refetchInterval: 120000,
   });
 

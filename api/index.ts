@@ -944,12 +944,14 @@ async function handleOptionsFlow(_: VercelRequest, res: VercelResponse) {
           iv: o.implied_volatility || 0,
           markPrice: o.mark_price || 0,
         }));
-      return ok(res, { btc: agg, eth: aggregateOptions(ethJson.result || []), topStrikes, lastUpdated: new Date().toISOString() });
+      const payload = { btc: agg, eth: aggregateOptions(ethJson.result || []), topStrikes, lastUpdated: new Date().toISOString() };
+      validateShape(payload, OptionsFlowSchema, '/api/options-flow');
+      return ok(res, payload);
     }
     throw new Error('Invalid Deribit response');
   } catch (_) {
     // Fallback: realistic proxy data based on current market conditions
-    ok(res, {
+    const payload = {
       btc: {
         putCallRatio: 0.68,
         totalOI: 2840000000,
@@ -978,7 +980,9 @@ async function handleOptionsFlow(_: VercelRequest, res: VercelResponse) {
       ],
       lastUpdated: new Date().toISOString(),
       source: 'proxy',
-    });
+    };
+    validateShape(payload, OptionsFlowSchema, '/api/options-flow');
+    ok(res, payload);
   }
 }
 
