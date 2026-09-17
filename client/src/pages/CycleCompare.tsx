@@ -161,6 +161,10 @@ const fmtDate = (iso: string) =>
   });
 
 // ── Section definitions (the chips above the overlay chart) ───────────────
+// Per Tyler's request (2026-09-17): ATH → Bottom and ATH → Top presets
+// were removed — they conflate the all-time high (which is a moving
+// target across cycles) with cycle-relative events, so they're less
+// useful than the halving/top/bottom-anchored views. 6 presets remain.
 const SECTION_PRESETS: Array<{
   label: string;
   from: 'halving' | 'top' | 'bottom' | 'prevBottom' | 'ath';
@@ -173,8 +177,6 @@ const SECTION_PRESETS: Array<{
   { label: 'Bottom → Next Halving', from: 'bottom',    to: 'halving', description: 'The accumulation phase before next cycle' },
   { label: 'Halving → Next Halving', from: 'halving',  to: 'halving', description: 'Full 4-year cycle from supply shock to supply shock' },
   { label: 'Prev Bottom → Top',     from: 'prevBottom', to: 'top',    description: 'Red to orange across cycle boundaries — the rise from previous bear bottom to current cycle peak' },
-  { label: 'ATH → Bottom',          from: 'ath',       to: 'bottom',  description: 'All-time high to cycle bottom — how much was given back after the peak' },
-  { label: 'ATH → Top',             from: 'ath',       to: 'top',     description: 'All-time high to next cycle top — the full run-up across cycle boundaries' },
 ];
 
 const ALL_CYCLES: Array<{ id: 'c1' | 'c2' | 'c3' | 'c4'; label: string; range: string }> = [
