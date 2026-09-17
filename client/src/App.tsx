@@ -66,7 +66,11 @@ function Router() {
         <Route path="/register" component={Register} />
         <Route path="/portfolio" component={Portfolio} />
         <Route path="/portfolio/mpt" component={PortfolioMPT} />
-        <Route path="/workbench" component={Workbench} />
+        <Route path="/workbench">
+          <ErrorBoundary label="Workbench">
+            <Workbench />
+          </ErrorBoundary>
+        </Route>
         <Route path="/workbench/templates" component={WorkbenchTemplates} />
         <Route path="/workbench/gallery" component={WorkbenchGallery} />
         <Route path="/workbench/backtests" component={WorkbenchBacktests} />
