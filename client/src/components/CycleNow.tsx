@@ -80,7 +80,12 @@ export function CycleNow() {
   }
 
   const score = Number(risk.risk ?? 0);
-  const band: string = risk.band ?? 'neutral';
+  // /api/risk/indicator returns band as { band: 'neutral', label: 'Neutral', color, min, max }.
+  // Unwrap to the enum string for label/color lookup; fall back to 'neutral' defensively.
+  const band: string =
+    typeof risk.band === 'string'
+      ? risk.band
+      : (risk.band?.band ?? 'neutral');
   const c4 = cycleData?.series?.[0];
   const day: number = c4?.days ?? 880;
   const cycleProgress = Math.min(100, Math.max(0, Math.round((day / 1460) * 100)));
