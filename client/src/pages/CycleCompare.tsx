@@ -643,9 +643,14 @@ function OverlayTab() {
       return data.series.map((s, i) => ({
         cycleId: s.cycleId,
         fromDate: s.fromDate,
-        us10y: (results[i * 3 + 0]?.observations ?? []) as YieldObs[],
-        us30y: (results[i * 3 + 1]?.observations ?? []) as YieldObs[],
-        dff:   (results[i * 3 + 2]?.observations ?? []) as YieldObs[],
+        // FRED API returns the per-observation array as `points` (top-level
+        // keys: seriesId, definition, count, originalCount, points, meta,
+        // dataLagDays). Earlier this code read `observations` which is
+        // undefined on this endpoint — silently yielded [] and no macro
+        // lines drew on the chart.
+        us10y: (results[i * 3 + 0]?.points ?? []) as YieldObs[],
+        us30y: (results[i * 3 + 1]?.points ?? []) as YieldObs[],
+        dff:   (results[i * 3 + 2]?.points ?? []) as YieldObs[],
       }));
     },
     enabled: selectedMacros.length > 0 && !!data?.series?.length,
