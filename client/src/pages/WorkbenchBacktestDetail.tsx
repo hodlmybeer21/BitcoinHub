@@ -22,6 +22,7 @@ import {
   TrendingUp, TrendingDown, AlertCircle,
 } from 'lucide-react';
 import { getUserId } from '@/lib/persistence/client';
+import { HouseBadge, isHouseItem } from '@/components/HouseBadge';
 import { ShareChartButton } from '@/components/ShareChartButton';
 
 interface BacktestDetail {
@@ -209,6 +210,7 @@ export default function WorkbenchBacktestDetail() {
               <BookOpen className="h-6 w-6 text-orange-500" />
               <h1 className="text-3xl font-bold">{data.title}</h1>
               <Badge variant="outline" className="text-[10px] font-mono">{data.authorUuidPrefix}</Badge>
+              {isHouseItem(data.authorUuidPrefix) && <HouseBadge size="sm" className="ml-1" />}
               {r.mode === 'portfolio' && <Badge variant="secondary" className="text-[10px]">Portfolio</Badge>}
             </div>
             {data.description && (

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { HouseBadge, isHouseItem } from '@/components/HouseBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Users, Hammer, Eye, GitFork, BookOpen, Sparkles, TrendingUp, TrendingDown,
@@ -147,9 +148,13 @@ export default function WorkbenchBacktests() {
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-base leading-tight">{item.title}</CardTitle>
-                      <Badge variant="outline" className="shrink-0 text-[10px] font-mono">
-                        {item.authorUuidPrefix}
-                      </Badge>
+                      {isHouseItem(item.authorUuidPrefix) ? (
+                        <HouseBadge size="sm" className="shrink-0" />
+                      ) : (
+                        <Badge variant="outline" className="shrink-0 text-[10px] font-mono">
+                          {item.authorUuidPrefix}
+                        </Badge>
+                      )}
                     </div>
                     {item.description && (
                       <CardDescription className="text-xs">{item.description}</CardDescription>
