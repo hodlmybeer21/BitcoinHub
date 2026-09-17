@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 16 },
@@ -972,7 +973,9 @@ function OverlayTab() {
         </div>
       )}
 
-      {/* Overlay chart */}
+      {/* Overlay chart — wrapped in ErrorBoundary so a Recharts 2.15.x
+          "Invariant failed" crash shows a red card instead of unmounting
+          the whole page (PROJECT.md §3.8). */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
@@ -996,7 +999,7 @@ function OverlayTab() {
               No cycles available for this section. Try a different combination.
             </div>
           ) : (
-            <>
+            <ErrorBoundary label="Cycle overlay chart">
               <ResponsiveContainer width="100%" height={440}>
                 <LineChart data={chartData} margin={{ top: 16, right: 24, left: 8, bottom: 5 }}>
                   <CartesianGrid stroke="#333" strokeDasharray="3 3" />
@@ -1033,63 +1036,67 @@ function OverlayTab() {
                       x={m.day}
                       stroke={m.color}
                       strokeWidth={1}
-                      strokeDasharray={m.kind === 'halving' ? '0' : '4 4'}
-                      ifOverflow="extendDomain"
+                      strokeDasharray={m.kind === 'halving' ? '4 4' : '4 4'}
                     />
                   ))}
                   <RTooltip
                     contentStyle={{ background: '#1a1a1a', border: '1px solid #444', fontSize: 12 }}
                     labelStyle={{ color: '#fb923c' }}
                     labelFormatter={(day: number) => `Day ${day}`}
-                    formatter={(value: number, name: string) => {
-                      if (name.endsWith('_price') || name.endsWith('_date')) return [null, null];
-                      // Rate data keys: c2_us10y, c2_us30y, c2_dff
-                      if (typeof name === 'string' && (name.endsWith('_us10y') || name.endsWith('_us30y') || name.endsWith('_dff'))) {
-                        const [cycleId, key] = name.split('_');
-                        const c = data.series.find(s => s.cycleId === cycleId);
-                        if (!c) return [null, null];
-                        const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
+                    formatter={(value: any, name: any) => {
+                      try {
+                        if (typeof name !== 'string') return [null, null];
+                        if (name.endsWith('_price') || name.endsWith('_date')) return [null, null];
+                        // Rate data keys: c2_us10y, c2_us30y, c2_dff
+                        if (name.endsWith('_us10y') || name.endsWith('_us30y') || name.endsWith('_dff')) {
+                          const [cycleId, key] = name.split('_');
+                          const c = data.series.find(s => s.cycleId === cycleId);
+                          if (!c) return [null, null];
+                          const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
+                          return [
+                            <div key={name} className="space-y-0.5">
+                              <div className="font-mono text-sky-300">{Number(value).toFixed(2)}%</div>
+                              <div className="text-[10px] text-muted-foreground">{c.cycleLabel} · {label}</div>
+                            </div>,
+                            null,
+                          ];
+                        }
+                        const series = data.series.find(s => s.cycleId === name);
+                        if (!series) return [null, null];
                         return [
                           <div key={name} className="space-y-0.5">
-                            <div className="font-mono text-sky-300">{value.toFixed(2)}%</div>
-                            <div className="text-[10px] text-muted-foreground">{c.cycleLabel} · {label}</div>
+                            <div className="font-mono text-emerald-300">
+                              {Number(value) >= 0 ? '+' : ''}{Number(value).toFixed(2)}%
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {series.cycleLabel}
+                            </div>
                           </div>,
                           null,
                         ];
+                      } catch {
+                        return [null, null];
                       }
-                      const cycleId = name as 'c1' | 'c2' | 'c3' | 'c4';
-                      const series = data.series.find(s => s.cycleId === cycleId);
-                      if (!series) return [null, null];
-                      return [
-                        <div key={cycleId} className="space-y-0.5">
-                          <div className="font-mono text-emerald-300">
-                            {value >= 0 ? '+' : ''}{value.toFixed(2)}%
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {series.cycleLabel}
-                          </div>
-                        </div>,
-                        null,
-                      ];
                     }}
                   />
                   <Legend
                     wrapperStyle={{ fontSize: 11 }}
                     formatter={(value) => {
-                      // Rate data: c2_us10y, c2_us30y, c2_dff
-                      if (typeof value === 'string' && (value.endsWith('_us10y') || value.endsWith('_us30y') || value.endsWith('_dff'))) {
-                        const [cycleId, key] = value.split('_');
-                        const c = data.series.find(s => s.cycleId === cycleId);
-                        if (!c) return value;
-                        const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
-                        return `${c.cycleLabel} · ${label}`;
+                      try {
+                        if (typeof value !== 'string') return String(value);
+                        if (value.endsWith('_us10y') || value.endsWith('_us30y') || value.endsWith('_dff')) {
+                          const [cycleId, key] = value.split('_');
+                          const c = data.series.find(s => s.cycleId === cycleId);
+                          if (!c) return value;
+                          const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
+                          return `${c.cycleLabel} · ${label}`;
+                        }
+                        const series = data.series.find(s => s.cycleId === value);
+                        if (!series) return value;
+                        return series.inProgress ? `${series.cycleLabel} · live` : series.cycleLabel;
+                      } catch {
+                        return String(value);
                       }
-                      const cycleId = value as 'c1' | 'c2' | 'c3' | 'c4';
-                      const series = data.series.find(s => s.cycleId === cycleId);
-                      if (!series) return value;
-                      return series.inProgress
-                        ? `${series.cycleLabel} · live`
-                        : series.cycleLabel;
                     }}
                   />
                   {data.series.map(s => (
@@ -1151,7 +1158,7 @@ function OverlayTab() {
                 <span><XCircle className="inline h-3 w-3 mr-0.5 text-red-400" /> Negative return</span>
                 <span className="ml-auto">{chartData.length.toLocaleString()} daily points across {data.series.length} cycle{data.series.length === 1 ? '' : 's'}</span>
               </div>
-            </>
+            </ErrorBoundary>
           )}
         </CardContent>
       </Card>
