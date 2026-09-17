@@ -529,7 +529,11 @@ async function handleBacktestList(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function handleBacktestGet(req: VercelRequest, res: VercelResponse, id: number) {
+async function handleBacktestGet(
+  req: VercelRequest,
+  res: VercelResponse,
+  lookup: { id: number } | { dataKey: string },
+) {
   if (req.method === 'OPTIONS') {
     setPersistenceCorsHeaders(res);
     return res.status(204).end();
@@ -539,16 +543,22 @@ async function handleBacktestGet(req: VercelRequest, res: VercelResponse, id: nu
     if (!process.env.DATABASE_URL) {
       return err(res, 503, 'Persistence unavailable: DATABASE_URL not configured');
     }
-    const { getPublicRowById, checkRateLimit } = await import('../lib/persistence/server.js');
+    const { getPublicRowById, getPublicRowByDataKey, checkRateLimit } = await import('../lib/persistence/server.js');
     const ip = getClientIp(req);
     if (req.method !== 'GET') return err(res, 405, 'GET required');
     if (!checkRateLimit(ip, 'read')) {
       return err(res, 429, 'Rate limit exceeded: max 300 reads/min per IP. Slow down.');
     }
-    if (!Number.isInteger(id) || id <= 0) {
-      return err(res, 400, 'id (positive integer) is required');
+    if ('id' in lookup) {
+      if (!Number.isInteger(lookup.id) || lookup.id <= 0) {
+        return err(res, 400, 'id (positive integer) is required');
+      }
+    } else if (!lookup.dataKey || typeof lookup.dataKey !== 'string' || lookup.dataKey.length === 0) {
+      return err(res, 400, 'dataKey (non-empty string) is required');
     }
-    const row = await getPublicRowById(id, ip);
+    const row = 'id' in lookup
+      ? await getPublicRowById(lookup.id, ip)
+      : await getPublicRowByDataKey(lookup.dataKey, ip);
     if (!row) return err(res, 404, 'Backtest not found or not public');
     let parsed: any = null;
     try { parsed = JSON.parse(row.dataValue); } catch { /* leave null */ }
@@ -4664,13 +4674,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/workbench/backtests' || path === '/api/workbench/backtests/') {
       return handleBacktestList(req, res);
     }
-    // Single published backtest by numeric id (anonymous_data.id PK).
-    // Path shape: /api/workbench/backtest/<positive-int>
+    // Single published backtest — accepts BOTH numeric id (anonymous_data.id PK)
+    // and dataKey string (legacy/old-client-format URL). The client gallery list
+    // builds links from item.dataKey; older shared URLs from the publish dialog
+    // also use dataKey. We accept both so neither format 404s. Dispatch on
+    // whether the captured path segment is all-digits (id) or anything else (dataKey).
     {
-      const m = path.match(/^\/api\/workbench\/backtest\/(\d+)\/?$/);
+      const m = path.match(/^\/api\/workbench\/backtest\/([^/]+)\/?$/);
       if (m) {
-        const id = parseInt(m[1], 10);
-        return handleBacktestGet(req, res, id);
+        const raw = decodeURIComponent(m[1]);
+        if (/^\d+$/.test(raw)) {
+          return handleBacktestGet(req, res, { id: parseInt(raw, 10) });
+        }
+        return handleBacktestGet(req, res, { dataKey: raw });
       }
     }
 
