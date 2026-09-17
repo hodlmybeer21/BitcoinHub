@@ -30,6 +30,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
+import { CycleNow } from '@/components/CycleNow';
 
 interface MarketData {
   price: number;
@@ -214,6 +215,17 @@ const Home = () => {
         <motion.div className="absolute bottom-8 left-1/2 -translate-x-1/2" animate={{ y: [0, 8, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>
           <ChevronDown className="w-7 h-7 text-muted-foreground/50" />
         </motion.div>
+      </section>
+
+      {/* ─── CYCLE NOW — "Where are we in the Bitcoin cycle?" hero widget ─── */}
+      {/* Per Tyler's 2026-09-17 review: the first above-the-fold data hook for
+          new visitors. Day X of the 4-year halving cycle, current risk band,
+          BTC price change since halving. The single artifact the daily X
+          auto-post compounds on. */}
+      <section className="bg-background py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <CycleNow />
+        </div>
       </section>
 
       {/* ─── VALUE TRACKER STATS BAR ─── */}
