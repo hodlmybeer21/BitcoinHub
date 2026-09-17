@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ShareChartButton } from '@/components/ShareChartButton';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   Tooltip as RTooltip, Scatter, ComposedChart, ReferenceLine,
@@ -326,16 +326,32 @@ export default function WorkbenchOverlay() {
         {(btcSeries.length > 0 || loading) && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">BTC price with overlay markers</CardTitle>
-              <CardDescription>
-                {selected && <span>Formula: <span className="font-mono text-xs">{selected.formula}</span></span>}
-                {evalSources.length > 0 && (
-                  <span className="ml-3 text-xs">
-                    {evalSources.length} source{evalSources.length === 1 ? '' : 's'}:
-                    {' '}{evalSources.map(s => `${s.id} (${s.points})`).join(', ')}
-                  </span>
-                )}
-              </CardDescription>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">BTC price with overlay markers</CardTitle>
+                  <CardDescription>
+                    {selected && <span>Formula: <span className="font-mono text-xs">{selected.formula}</span></span>}
+                    {evalSources.length > 0 && (
+                      <span className="ml-3 text-xs">
+                        {evalSources.length} source{evalSources.length === 1 ? '' : 's'}:
+                        {' '}{evalSources.map(s => `${s.id} (${s.points})`).join(', ')}
+                      </span>
+                    )}
+                  </CardDescription>
+                </div>
+                <ShareChartButton
+                  className="flex-shrink-0 mt-0.5"
+                  title="Share this indicator overlay on X"
+                  text={
+                    selected
+                      ? `My BTC indicator overlay:\n` +
+                        `Formula: ${selected.formula}\n` +
+                        `Saved as: ${selected.name}\n\n` +
+                        `Built no-code → bitcoinhub.goodbotai.tech/workbench/overlay`
+                      : `BTC price chart with custom indicator overlays → bitcoinhub.goodbotai.tech/workbench/overlay`
+                  }
+                />
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (

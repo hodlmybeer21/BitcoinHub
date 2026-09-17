@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { MPTDcaPlan } from "./PortfolioMPT";
 import { useSyncedStorage } from "@/lib/persistence/client";
+import { ShareChartButton } from "@/components/ShareChartButton";
 
 const DCA_PLAN_STORAGE_KEY = 'bitcoinhub_dca_mpt_plan_v1';
 
@@ -394,7 +395,20 @@ export default function DCASimulator() {
                 <Card className="border-[#F7931A]/30 bg-card/50 backdrop-blur overflow-hidden">
                   <div className="h-1 bg-gradient-to-r from-[#F7931A] to-[#FFB347]" />
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Your Results</CardTitle>
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-lg">Your Results</CardTitle>
+                      <ShareChartButton
+                        className="flex-shrink-0 mt-0.5"
+                        title="Share your DCA projection on X"
+                        text={
+                          `My BTC DCA plan:\n` +
+                          `$${inputs.amount}/month × ${inputs.months} months → ${formatBTC(data.btcAccumulated)} BTC\n` +
+                          `Current value: ${formatCurrency(data.currentValue)}\n` +
+                          `Total invested: ${formatCurrency(data.totalInvested)}\n\n` +
+                          `Build your own → bitcoinhub.goodbotai.tech/dca-simulator`
+                        }
+                      />
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* BTC Held - Hero Stat */}

@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useSyncedStorage, getUserId } from "@/lib/persistence/client";
+import { ShareChartButton } from "@/components/ShareChartButton";
 import { HouseIndicatorSpotlight } from "@/components/HouseIndicatorSpotlight";
 
 // --- Types ---
@@ -1593,7 +1594,20 @@ export default function Workbench() {
                   {/* Equity curve chart */}
                   {backtestResult.equityCurve && backtestResult.equityCurve.length > 0 && (
                     <div className="bg-muted/20 border border-border/30 rounded p-3">
-                      <div className="text-xs text-muted-foreground mb-2">Equity curve ($1 normalized)</div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-muted-foreground">Equity curve ($1 normalized)</div>
+                        <ShareChartButton
+                          size="sm"
+                          variant="outline"
+                          title="Share this backtest on X"
+                          text={
+                            `My BTC strategy backtest:\n` +
+                            `Formula: ${formula || '(empty)'}\n` +
+                            `Total: ${backtestResult.stats.totalReturnPct >= 0 ? '+' : ''}${backtestResult.stats.totalReturnPct.toFixed(1)}% · Sharpe ${backtestResult.stats.sharpeRatio.toFixed(2)} · Max DD ${backtestResult.stats.maxDrawdownPct.toFixed(1)}%\n` +
+                            `Built no-code → bitcoinhub.goodbotai.tech/workbench`
+                          }
+                        />
+                      </div>
                       <ResponsiveContainer width="100%" height={260}>
                         <LineChart data={downsampleEquity(backtestResult.equityCurve)} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
                           <CartesianGrid stroke="#333" strokeDasharray="3 3" />

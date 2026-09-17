@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ShareChartButton } from '@/components/ShareChartButton';
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp, TrendingDown, Layers, AlertTriangle, RefreshCw, Filter,
@@ -145,17 +146,29 @@ function MacroCard({ series }: { series: FredSeriesDef }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-2">
           <div>
             <CardDescription className="text-xs">{series.id}</CardDescription>
             <CardTitle className="text-lg">{series.name}</CardTitle>
           </div>
-          <Badge
-            variant="outline"
-            style={{ borderColor: `${color}66`, color, backgroundColor: `${color}11` }}
-          >
-            {CATEGORY_LABELS[series.category]}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              style={{ borderColor: `${color}66`, color, backgroundColor: `${color}11` }}
+            >
+              {CATEGORY_LABELS[series.category]}
+            </Badge>
+            <ShareChartButton
+              className="flex-shrink-0"
+              title={`Share ${series.name} on X`}
+              text={
+                `BTC macro: ${series.name}\n` +
+                `Latest: ${formatValue(last?.value, series.unit)}` +
+                (changePct !== null ? ` (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% YoY)\n` : '\n') +
+                `\nLive FRED data → bitcoinhub.goodbotai.tech/macro`
+              }
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
