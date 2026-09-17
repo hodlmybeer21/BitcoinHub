@@ -54,7 +54,11 @@ function Router() {
         <Route path="/admin" component={Admin} />
         <Route path="/dca-simulator" component={DCASimulator} />
         <Route path="/cycle" component={Cycle} />
-        <Route path="/cycle/compare" component={CycleCompare} />
+        <Route path="/cycle/compare">
+          <ErrorBoundary label="Cycle compare">
+            <CycleCompare />
+          </ErrorBoundary>
+        </Route>
         <Route path="/newsletter" component={Newsletter} />
         <Route path="/privacy" component={Privacy} />
         <Route path="/terms" component={Terms} />
