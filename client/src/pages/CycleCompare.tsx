@@ -973,9 +973,12 @@ function OverlayTab() {
         </div>
       )}
 
-      {/* Overlay chart — wrapped in ErrorBoundary so a Recharts 2.15.x
-          "Invariant failed" crash shows a red card instead of unmounting
-          the whole page (PROJECT.md §3.8). */}
+      {/* Overlay chart — stripped to absolute bare minimum per PROJECT.md §7 lesson
+          ("Binary-search approach ... didn't converge. Don't keep removing individual
+          props — change approach: restore to a minimal working state and rebuild
+          incrementally with the ErrorBoundary catching any throw.").
+          Wrapped in ErrorBoundary so any Recharts 2.15.x crash shows a red card
+          *inside* the page chrome instead of unmounting the whole page. */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
@@ -983,8 +986,7 @@ function OverlayTab() {
           </CardTitle>
           <CardDescription>
             X-axis: days from section start (day 0). Y-axis: % return from section start.
-            Each colored line is one cycle's section. Longer sections stretch further right.
-            Toggle "Show macro rates" to overlay US10Y + US30Y + Fed Funds on a secondary y-axis.
+            Each colored line is one cycle's section.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1001,163 +1003,19 @@ function OverlayTab() {
           ) : (
             <ErrorBoundary label="Cycle overlay chart">
               <ResponsiveContainer width="100%" height={440}>
-                <LineChart data={chartData} margin={{ top: 16, right: 24, left: 8, bottom: 5 }}>
-                  <CartesianGrid stroke="#333" strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="day"
-                    type="number"
-                    domain={[0, maxDay]}
-                    tick={{ fontSize: 10, fill: '#888' }}
-                    tickFormatter={(d) => `${d}d`}
-                    label={{ value: 'days from section start', position: 'insideBottom', offset: -2, fill: '#888', fontSize: 11 }}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    tick={{ fontSize: 10, fill: '#888' }}
-                    tickFormatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(0)}%`}
-                    label={{ value: '% return', angle: -90, position: 'insideLeft', fill: '#888', fontSize: 11 }}
-                  />
-                  {showMacro && (
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      tick={{ fontSize: 10, fill: '#7dd3fc' }}
-                      tickFormatter={(v) => `${v.toFixed(2)}%`}
-                      domain={['auto', 'auto']}
-                      label={{ value: 'rate %', angle: 90, position: 'insideRight', fill: '#7dd3fc', fontSize: 11 }}
-                    />
-                  )}
-                  <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
-                  {/* Cycle marker lines — halving (blue), top (orange), bottom (red).
-                      Positioned at each event's day offset within its cycle's section. */}
-                  {overlayMarkerLines.map((m, i) => (
-                    <ReferenceLine
-                      key={`overlay-marker-${m.kind}-${m.day}-${i}`}
-                      x={m.day}
-                      stroke={m.color}
-                      strokeWidth={1}
-                      strokeDasharray={m.kind === 'halving' ? '4 4' : '4 4'}
-                    />
-                  ))}
-                  <RTooltip
-                    contentStyle={{ background: '#1a1a1a', border: '1px solid #444', fontSize: 12 }}
-                    labelStyle={{ color: '#fb923c' }}
-                    labelFormatter={(day: number) => `Day ${day}`}
-                    formatter={(value: any, name: any) => {
-                      try {
-                        if (typeof name !== 'string') return [null, null];
-                        if (name.endsWith('_price') || name.endsWith('_date')) return [null, null];
-                        // Rate data keys: c2_us10y, c2_us30y, c2_dff
-                        if (name.endsWith('_us10y') || name.endsWith('_us30y') || name.endsWith('_dff')) {
-                          const [cycleId, key] = name.split('_');
-                          const c = data.series.find(s => s.cycleId === cycleId);
-                          if (!c) return [null, null];
-                          const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
-                          return [
-                            <div key={name} className="space-y-0.5">
-                              <div className="font-mono text-sky-300">{Number(value).toFixed(2)}%</div>
-                              <div className="text-[10px] text-muted-foreground">{c.cycleLabel} · {label}</div>
-                            </div>,
-                            null,
-                          ];
-                        }
-                        const series = data.series.find(s => s.cycleId === name);
-                        if (!series) return [null, null];
-                        return [
-                          <div key={name} className="space-y-0.5">
-                            <div className="font-mono text-emerald-300">
-                              {Number(value) >= 0 ? '+' : ''}{Number(value).toFixed(2)}%
-                            </div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {series.cycleLabel}
-                            </div>
-                          </div>,
-                          null,
-                        ];
-                      } catch {
-                        return [null, null];
-                      }
-                    }}
-                  />
-                  <Legend
-                    wrapperStyle={{ fontSize: 11 }}
-                    formatter={(value) => {
-                      try {
-                        if (typeof value !== 'string') return String(value);
-                        if (value.endsWith('_us10y') || value.endsWith('_us30y') || value.endsWith('_dff')) {
-                          const [cycleId, key] = value.split('_');
-                          const c = data.series.find(s => s.cycleId === cycleId);
-                          if (!c) return value;
-                          const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
-                          return `${c.cycleLabel} · ${label}`;
-                        }
-                        const series = data.series.find(s => s.cycleId === value);
-                        if (!series) return value;
-                        return series.inProgress ? `${series.cycleLabel} · live` : series.cycleLabel;
-                      } catch {
-                        return String(value);
-                      }
-                    }}
-                  />
+                <LineChart data={chartData}>
+                  <XAxis dataKey="day" type="number" />
+                  <YAxis />
                   {data.series.map(s => (
                     <Line
                       key={s.cycleId}
-                      yAxisId="left"
-                      type="monotone"
                       dataKey={s.cycleId}
                       stroke={CYCLE_COLORS[s.cycleId]}
-                      strokeWidth={2}
-                      strokeDasharray={s.inProgress ? '6 3' : undefined}
                       dot={false}
-                      name={s.cycleId}
-                      connectNulls
                     />
                   ))}
-                  {showMacro && data.series.flatMap(s => [
-                    <Line
-                      key={`${s.cycleId}_us10y`}
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey={`${s.cycleId}_us10y`}
-                      stroke="#67e8f9"
-                      strokeWidth={1.25}
-                      strokeDasharray="5 3"
-                      dot={false}
-                      name={`${s.cycleId}_us10y`}
-                      connectNulls
-                    />,
-                    <Line
-                      key={`${s.cycleId}_us30y`}
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey={`${s.cycleId}_us30y`}
-                      stroke="#fde047"
-                      strokeWidth={1.25}
-                      strokeDasharray="2 3"
-                      dot={false}
-                      name={`${s.cycleId}_us30y`}
-                      connectNulls
-                    />,
-                    <Line
-                      key={`${s.cycleId}_dff`}
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey={`${s.cycleId}_dff`}
-                      stroke="#86efac"
-                      strokeWidth={1.25}
-                      strokeDasharray="1 2"
-                      dot={false}
-                      name={`${s.cycleId}_dff`}
-                      connectNulls
-                    />,
-                  ])}
                 </LineChart>
               </ResponsiveContainer>
-              <div className="text-[10px] text-muted-foreground mt-2 flex flex-wrap gap-4">
-                <span><CheckCircle2 className="inline h-3 w-3 mr-0.5 text-emerald-400" /> Positive return</span>
-                <span><XCircle className="inline h-3 w-3 mr-0.5 text-red-400" /> Negative return</span>
-                <span className="ml-auto">{chartData.length.toLocaleString()} daily points across {data.series.length} cycle{data.series.length === 1 ? '' : 's'}</span>
-              </div>
             </ErrorBoundary>
           )}
         </CardContent>
