@@ -585,10 +585,21 @@ function AnnotatedTab() {
 function OverlayTab() {
   const [presetIdx, setPresetIdx] = useState(0); // start with "Halving → Top"
   const [selectedCycles, setSelectedCycles] = useState<Array<'c1' | 'c2' | 'c3' | 'c4'>>(['c2', 'c3', 'c4']);
-  // showMacro: when true, overlay US10Y (DGS10), US30Y (DGS30), and Fed Funds
-  // Effective Rate (DFF) on a secondary y-axis for every selected cycle's section.
-  // FRED observations are aligned to days-from-section-start alongside BTC return.
-  const [showMacro, setShowMacro] = useState(false);
+  // selectedMacros: independent toggles for US10Y / US30Y / DFF on the secondary
+  // y-axis. Each macro renders 3 dashed lines (one per selected cycle). Default:
+  // all 3 on, so the macro overlay is visible without an extra click.
+  // Must have at least 1 selected (matches the cycle-toggle chip pattern).
+  const [selectedMacros, setSelectedMacros] = useState<Array<'us10y' | 'us30y' | 'dff'>>(['us10y', 'us30y', 'dff']);
+
+  function toggleMacro(m: 'us10y' | 'us30y' | 'dff') {
+    setSelectedMacros(prev => {
+      if (prev.includes(m)) {
+        if (prev.length === 1) return prev; // must have at least 1
+        return prev.filter(x => x !== m);
+      }
+      return [...prev, m].sort() as Array<'us10y' | 'us30y' | 'dff'>;
+    });
+  }
 
   const preset = SECTION_PRESETS[presetIdx];
 
@@ -637,7 +648,7 @@ function OverlayTab() {
         dff:   (results[i * 3 + 2]?.observations ?? []) as YieldObs[],
       }));
     },
-    enabled: showMacro && !!data?.series?.length,
+    enabled: selectedMacros.length > 0 && !!data?.series?.length,
     refetchOnWindowFocus: false,
     staleTime: 60 * 60 * 1000,
   });
@@ -663,6 +674,7 @@ function OverlayTab() {
     }
     if (yieldData?.length) {
       const addRate = (obsArr: YieldObs[], key: 'us10y' | 'us30y' | 'dff', cycleId: string, startMs: number) => {
+        if (!selectedMacros.includes(key)) return; // skip when macro toggle is off
         for (const obs of obsArr) {
           if (obs.value == null) continue;
           const obsMs = Date.parse(obs.date + 'T00:00:00Z');
@@ -903,21 +915,53 @@ function OverlayTab() {
         </Card>
       )}
 
-      {/* Macro overlay toggle — overlay US10Y/US30Y/Fed Funds on a secondary y-axis. */}
+      {/* Macro overlay — three independent chip-toggles, matching the cycle
+          toggle pattern above. Each macro renders 3 dashed lines (one per selected
+          cycle) on the secondary y-axis when enabled. */}
       <Card>
         <CardContent className="py-3">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={showMacro}
-              onCheckedChange={(v) => setShowMacro(v === true)}
-              id="show-macro-toggle"
-            />
-            <label htmlFor="show-macro-toggle" className="text-sm cursor-pointer select-none">
-              Show macro rates
-              <span className="text-[10px] text-muted-foreground ml-2">
-                US10Y · US30Y · Fed Funds on a secondary y-axis
-              </span>
-            </label>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+              Macros to overlay
+            </div>
+            <span className="text-[10px] text-muted-foreground">
+              US10Y · US30Y · DFF on a secondary y-axis
+            </span>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {selectedMacros.length === 3 ? 'all on' : `${selectedMacros.length}/3 on`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { key: 'us10y', label: 'US 10-Year', sublabel: 'DGS10 · cost-of-capital', color: '#67e8f9' },
+              { key: 'us30y', label: 'US 30-Year', sublabel: 'DGS30 · long-end auctions',  color: '#fde047' },
+              { key: 'dff',   label: 'Fed Funds',   sublabel: 'DFF · FOMC policy lever',   color: '#86efac' },
+            ] as const).map(m => {
+              const checked = selectedMacros.includes(m.key);
+              return (
+                <label
+                  key={m.key}
+                  className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors ${
+                    checked
+                      ? 'border-[#67e8f9]/50 bg-[#67e8f9]/10'
+                      : 'border-border/40 bg-muted/20 hover:bg-muted/40'
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleMacro(m.key)}
+                  />
+                  <span
+                    className="w-3 h-3 rounded-full inline-block"
+                    style={{ backgroundColor: m.color }}
+                  />
+                  <div>
+                    <div className="text-sm font-semibold leading-tight">{m.label}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight">{m.sublabel}</div>
+                  </div>
+                </label>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -985,8 +1029,9 @@ function OverlayTab() {
             {preset.label} — overlay
           </CardTitle>
           <CardDescription>
-            X-axis: days from section start (day 0). Y-axis: % return from section start.
-            Each colored line is one cycle's section.
+            X-axis: days from section start (day 0). Left Y-axis: % return from
+            section start. Right Y-axis (when macros enabled): rate %. Solid lines
+            are BTC return per cycle; dashed lines are macro rates.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1006,6 +1051,15 @@ function OverlayTab() {
                 <LineChart data={chartData}>
                   <XAxis dataKey="day" type="number" />
                   <YAxis />
+                  {selectedMacros.length > 0 && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 10, fill: '#7dd3fc' }}
+                      tickFormatter={(v) => `${v.toFixed(2)}%`}
+                      domain={['auto', 'auto']}
+                    />
+                  )}
                   {data.series.map(s => (
                     <Line
                       key={s.cycleId}
@@ -1014,6 +1068,49 @@ function OverlayTab() {
                       dot={false}
                     />
                   ))}
+                  {selectedMacros.length > 0 && data.series.flatMap(s => {
+                    const lines = [];
+                    if (selectedMacros.includes('us10y')) {
+                      lines.push(
+                        <Line
+                          key={`${s.cycleId}_us10y`}
+                          yAxisId="right"
+                          dataKey={`${s.cycleId}_us10y`}
+                          stroke="#67e8f9"
+                          strokeWidth={1.25}
+                          strokeDasharray="5 3"
+                          dot={false}
+                        />
+                      );
+                    }
+                    if (selectedMacros.includes('us30y')) {
+                      lines.push(
+                        <Line
+                          key={`${s.cycleId}_us30y`}
+                          yAxisId="right"
+                          dataKey={`${s.cycleId}_us30y`}
+                          stroke="#fde047"
+                          strokeWidth={1.25}
+                          strokeDasharray="2 3"
+                          dot={false}
+                        />
+                      );
+                    }
+                    if (selectedMacros.includes('dff')) {
+                      lines.push(
+                        <Line
+                          key={`${s.cycleId}_dff`}
+                          yAxisId="right"
+                          dataKey={`${s.cycleId}_dff`}
+                          stroke="#86efac"
+                          strokeWidth={1.25}
+                          strokeDasharray="1 2"
+                          dot={false}
+                        />
+                      );
+                    }
+                    return lines;
+                  })}
                 </LineChart>
               </ResponsiveContainer>
             </ErrorBoundary>
