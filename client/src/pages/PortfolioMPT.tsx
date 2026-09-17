@@ -33,6 +33,7 @@ import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useSyncedStorage, writeServerValue } from "@/lib/persistence/client";
+import { ShareChartButton } from "@/components/ShareChartButton";
 
 // --- Types (mirrors server/mpt/index.ts) ---
 
@@ -761,7 +762,21 @@ export default function PortfolioMPT() {
         {/* Results */}
         {result && (
           <>
-            {/* Headline stats */}
+            {/* Headline stats + share */}
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+                Optimal portfolio · {result.cycle?.label || ''}
+              </div>
+              <ShareChartButton
+                title="Share your optimal portfolio on X"
+                text={
+                  `My BTC portfolio optimizer:\n` +
+                  `Max Sharpe: ${result.maxSharpe?.sharpe?.toFixed(2) ?? '—'} · ${((result.maxSharpe?.expectedReturn ?? 0) * 100).toFixed(1)}% ret / ${((result.maxSharpe?.volatility ?? 0) * 100).toFixed(1)}% vol\n` +
+                  `Distance from frontier: ${((result.distanceFromFrontier ?? 0) * 100).toFixed(1)}%\n\n` +
+                  `Built free → bitcoinhub.goodbotai.tech/portfolio/mpt`
+                }
+              />
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard
                 label="Your Portfolio Sharpe"

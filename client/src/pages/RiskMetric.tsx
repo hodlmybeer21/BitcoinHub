@@ -28,6 +28,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { Link } from "wouter";
+import { ShareChartButton } from "@/components/ShareChartButton";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -534,10 +535,27 @@ export default function RiskMetric() {
       {/* Time series */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5" />
-            4-Year Risk History
-          </CardTitle>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              4-Year Risk History
+            </CardTitle>
+            <ShareChartButton
+              className="flex-shrink-0 mt-0.5"
+              title="Share the risk chart on X"
+              text={(() => {
+                const band = (typeof risk.data?.band === 'string' ? risk.data.band : risk.data?.band?.band) || 'neutral';
+                const score = Number(risk.data?.risk ?? 0);
+                const day = ts.data?.points?.length ? Math.round((Date.now() - Date.UTC(2024, 3, 20)) / 86400000) : null;
+                const last = ts.data?.points?.[ts.data.points.length - 1];
+                const lastScore = last ? Number(last.risk ?? score).toFixed(2) : score.toFixed(2);
+                const lastBand = last?.band || band;
+                return `BTC risk band: ${lastBand.replace('_', ' ')} (${lastScore}/1.00)\n` +
+                  `4-Year Risk History · live\n\n` +
+                  `Track it → bitcoinhub.goodbotai.tech/risk`;
+              })()}
+            />
+          </div>
           <CardDescription>
             Daily risk score with halving markers. Color = current band at that date.
           </CardDescription>

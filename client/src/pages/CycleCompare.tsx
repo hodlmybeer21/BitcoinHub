@@ -43,6 +43,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { ShareChartButton } from '@/components/ShareChartButton';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 16 },
@@ -1032,9 +1033,24 @@ function OverlayTab() {
           *inside* the page chrome instead of unmounting the whole page. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            {preset.label} — overlay
-          </CardTitle>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-base">
+              {preset.label} — overlay
+            </CardTitle>
+            <ShareChartButton
+              className="flex-shrink-0 mt-0.5"
+              title="Share this cycle comparison on X"
+              text={
+                data && data.series.length > 0
+                  ? `BTC ${preset.label} across cycles:\n` +
+                    data.series
+                      .map(s => `• Cycle ${s.cycleId.slice(1)} (${(s.fromDate || '').slice(0, 4)}): ${s.changePct >= 0 ? '+' : ''}${s.changePct.toFixed(1)}% in ${s.days}d`)
+                      .join('\n') +
+                    '\n\nSee the overlay → bitcoinhub.goodbotai.tech/cycle/compare'
+                  : `Bitcoin cycle comparison on BitcoinHub\n\nbitcoinhub.goodbotai.tech/cycle/compare`
+              }
+            />
+          </div>
           <CardDescription>
             X-axis: days from section start (day 0). Left Y-axis: % return from
             section start. Right Y-axis (when macros enabled): rate %. Solid lines

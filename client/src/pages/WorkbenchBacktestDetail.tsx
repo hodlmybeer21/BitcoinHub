@@ -22,6 +22,7 @@ import {
   TrendingUp, TrendingDown, AlertCircle,
 } from 'lucide-react';
 import { getUserId } from '@/lib/persistence/client';
+import { ShareChartButton } from '@/components/ShareChartButton';
 
 interface BacktestDetail {
   id: number;
@@ -288,7 +289,21 @@ export default function WorkbenchBacktestDetail() {
         {r.equityCurve && r.equityCurve.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Equity curve ($1 normalized)</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="text-base">Equity curve ($1 normalized)</CardTitle>
+                <ShareChartButton
+                  className="flex-shrink-0 mt-0.5"
+                  title="Share this backtest on X"
+                  text={
+                    r.stats
+                      ? `My BTC strategy backtest:\n` +
+                        `Formula: ${r.formula}\n` +
+                        `Total: ${r.stats.totalReturnPct >= 0 ? '+' : ''}${r.stats.totalReturnPct.toFixed(1)}% · Sharpe ${r.stats.sharpeRatio.toFixed(2)} · Max DD ${r.stats.maxDrawdownPct.toFixed(1)}%\n` +
+                        `Built no-code → bitcoinhub.goodbotai.tech/workbench/backtests/${id}`
+                      : `BTC backtest on BitcoinHub → bitcoinhub.goodbotai.tech/workbench/backtests/${id}`
+                  }
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={340}>
