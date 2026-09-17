@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useSyncedStorage, getUserId } from "@/lib/persistence/client";
+import { HouseIndicatorSpotlight } from "@/components/HouseIndicatorSpotlight";
 
 // --- Types ---
 
@@ -1057,6 +1058,16 @@ export default function Workbench() {
             </Button>
           </div>
         </div>
+
+        {/* House indicator spotlight — "Start from a House indicator"
+            chicken-and-egg breaker. Sits between the header and the formula
+            editor so new users see populated options before the empty input. */}
+        <HouseIndicatorSpotlight
+          onLoad={(f) => {
+            setFormula(f);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
 
         <div className="grid lg:grid-cols-[280px_1fr] gap-4">
           {/* Sidebar */}
