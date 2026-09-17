@@ -332,6 +332,54 @@ export async function getPublicRowById(
   };
 }
 
+// Sibling to getPublicRowById — looks up by data_key instead of numeric id.
+// Needed because the client UI builds detail-page URLs from the gallery
+// list, which exposes both `id` (numeric PK) and `dataKey` (string). Older
+// shared URLs in the wild still use dataKey (e.g. from the publish-share
+// dialog); this keeps them working without a separate endpoint.
+// Same visibility + view-count bump pattern as getPublicRowById.
+export async function getPublicRowByDataKey(
+  dataKey: string,
+  ip: string = 'unknown',
+): Promise<{
+  id: number;
+  authorUuidPrefix: string;
+  userId: string;
+  dataKey: string;
+  title: string;
+  description: string;
+  dataValue: string;
+  viewCount: number;
+  forkCount: number;
+  publishedAt: string;
+} | null> {
+  await ensureTable();
+  const pool = await getPool();
+  const result = await pool.query(
+    `UPDATE anonymous_data
+     SET view_count = view_count + 1
+     WHERE data_key = $1 AND visibility = 'public'
+     RETURNING id, user_id, data_key, gallery_title, gallery_description,
+               data_value, view_count, fork_count, published_at`,
+    [dataKey],
+  );
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  await logAudit('anonymous', 'read_public', row.data_key as string, (row.data_value as string).length, ip);
+  return {
+    id: row.id as number,
+    authorUuidPrefix: String(row.user_id).slice(0, 8),
+    userId: row.user_id as string,
+    dataKey: row.data_key as string,
+    title: (row.gallery_title as string) || (row.data_key as string),
+    description: (row.gallery_description as string) || '',
+    dataValue: row.data_value as string,
+    viewCount: row.view_count as number,
+    forkCount: row.fork_count as number,
+    publishedAt: row.published_at as string,
+  };
+}
+
 export async function forkIndicator(
   forkerUserId: string,
   sourceId: number,

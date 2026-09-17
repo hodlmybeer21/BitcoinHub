@@ -1039,7 +1039,13 @@ export default function Workbench() {
               apply series operators like <code className="text-orange-400 font-mono">sma(X, 30)</code>, combine with logic.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/workbench/backtests">
+              <Button variant="outline" title="Browse the community gallery of published backtests">
+                <Users className="h-4 w-4 mr-2" />
+                Browse gallery
+              </Button>
+            </Link>
             <Button onClick={() => { setBacktestResult(null); setBacktestOpen(true); }} variant="outline" disabled={!formula} title="Run this formula as a strategy over historical BTC-USD daily data">
               <LineChartIcon className="h-4 w-4 mr-2" />
               Backtest
