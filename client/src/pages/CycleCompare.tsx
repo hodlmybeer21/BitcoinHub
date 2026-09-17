@@ -162,8 +162,8 @@ const fmtDate = (iso: string) =>
 // ── Section definitions (the chips above the overlay chart) ───────────────
 const SECTION_PRESETS: Array<{
   label: string;
-  from: 'halving' | 'top' | 'bottom' | 'prevBottom';
-  to:   'top' | 'bottom' | 'halving' | 'nextTop';
+  from: 'halving' | 'top' | 'bottom' | 'prevBottom' | 'ath';
+  to:   'top' | 'bottom' | 'halving' | 'nextTop' | 'ath';
   description: string;
 }> = [
   { label: 'Halving → Top',        from: 'halving',   to: 'top',     description: 'How long from supply shock to euphoria' },
@@ -172,6 +172,8 @@ const SECTION_PRESETS: Array<{
   { label: 'Bottom → Next Halving', from: 'bottom',    to: 'halving', description: 'The accumulation phase before next cycle' },
   { label: 'Halving → Next Halving', from: 'halving',  to: 'halving', description: 'Full 4-year cycle from supply shock to supply shock' },
   { label: 'Prev Bottom → Top',     from: 'prevBottom', to: 'top',    description: 'Red to orange across cycle boundaries — the rise from previous bear bottom to current cycle peak' },
+  { label: 'ATH → Bottom',          from: 'ath',       to: 'bottom',  description: 'All-time high to cycle bottom — how much was given back after the peak' },
+  { label: 'ATH → Top',             from: 'ath',       to: 'top',     description: 'All-time high to next cycle top — the full run-up across cycle boundaries' },
 ];
 
 const ALL_CYCLES: Array<{ id: 'c1' | 'c2' | 'c3' | 'c4'; label: string; range: string }> = [
@@ -582,6 +584,10 @@ function AnnotatedTab() {
 function OverlayTab() {
   const [presetIdx, setPresetIdx] = useState(0); // start with "Halving → Top"
   const [selectedCycles, setSelectedCycles] = useState<Array<'c1' | 'c2' | 'c3' | 'c4'>>(['c2', 'c3', 'c4']);
+  // showMacro: when true, overlay US10Y (DGS10), US30Y (DGS30), and Fed Funds
+  // Effective Rate (DFF) on a secondary y-axis for every selected cycle's section.
+  // FRED observations are aligned to days-from-section-start alongside BTC return.
+  const [showMacro, setShowMacro] = useState(false);
 
   const preset = SECTION_PRESETS[presetIdx];
 
@@ -601,9 +607,46 @@ function OverlayTab() {
     staleTime: 60 * 60 * 1000,
   });
 
+  // Macro overlay data: when showMacro is on, fetch US10Y (DGS10), US30Y
+  // (DGS30), and Fed Funds Effective Rate (DFF) for every selected cycle's
+  // section window. Each cycle's dates are independent, so we issue the
+  // calls in parallel and align into one dataset keyed by day offset.
+  // Schema: { cycleId, fromDate, us10y: [{date,value}], us30y: [...], dff: [...] }
+  type YieldObs = { date: string; value: number };
+  type YieldBlock = { cycleId: string; fromDate: string; us10y: YieldObs[]; us30y: YieldObs[]; dff: YieldObs[] };
+  const { data: yieldData } = useQuery<YieldBlock[]>({
+    queryKey: ['/fred/macro-overlay', data?.series?.map(s => `${s.cycleId}:${s.fromDate}:${s.toDate}`).join(',')],
+    queryFn: async () => {
+      if (!data?.series?.length) return [];
+      const results = await Promise.all(
+        data.series.flatMap(s => {
+          const q = `start=${s.fromDate}&end=${s.toDate}`;
+          return [
+            fetch(`/api/fred/data?series_id=DGS10&${q}`).then(r => r.json()),
+            fetch(`/api/fred/data?series_id=DGS30&${q}`).then(r => r.json()),
+            fetch(`/api/fred/data?series_id=DFF&${q}`).then(r => r.json()),
+          ];
+        })
+      );
+      return data.series.map((s, i) => ({
+        cycleId: s.cycleId,
+        fromDate: s.fromDate,
+        us10y: (results[i * 3 + 0]?.observations ?? []) as YieldObs[],
+        us30y: (results[i * 3 + 1]?.observations ?? []) as YieldObs[],
+        dff:   (results[i * 3 + 2]?.observations ?? []) as YieldObs[],
+      }));
+    },
+    enabled: showMacro && !!data?.series?.length,
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 60 * 1000,
+  });
+
   // Combine all cycle series into one dataset keyed by day, so the chart
   // shows each cycle as a separate line. Recharts wants one y-axis key
   // per series, so we pivot to { day, c2: retPct, c3: retPct, c4: retPct }.
+  // When the macro overlay is on, also merge US10Y/US30Y/DFF observations
+  // into the same day-keyed rows so the secondary y-axis has something to plot.
+  // Row keys for rates are `${cycleId}_us10y` / `_us30y` / `_dff`.
   const chartData = useMemo(() => {
     if (!data?.series?.length) return [];
     const dayMap = new Map<number, any>();
@@ -617,8 +660,29 @@ function OverlayTab() {
         dayMap.set(p.day, row);
       }
     }
+    if (yieldData?.length) {
+      const addRate = (obsArr: YieldObs[], key: 'us10y' | 'us30y' | 'dff', cycleId: string, startMs: number) => {
+        for (const obs of obsArr) {
+          if (obs.value == null) continue;
+          const obsMs = Date.parse(obs.date + 'T00:00:00Z');
+          if (Number.isNaN(obsMs)) continue;
+          const day = Math.round((obsMs - startMs) / 86400000);
+          if (day < 0) continue;
+          const row = dayMap.get(day) ?? { day };
+          row[`${cycleId}_${key}`] = +obs.value;
+          dayMap.set(day, row);
+        }
+      };
+      for (const yd of yieldData) {
+        const startMs = Date.parse(yd.fromDate + 'T00:00:00Z');
+        if (Number.isNaN(startMs)) continue;
+        addRate(yd.us10y, 'us10y', yd.cycleId, startMs);
+        addRate(yd.us30y, 'us30y', yd.cycleId, startMs);
+        addRate(yd.dff,   'dff',   yd.cycleId, startMs);
+      }
+    }
     return Array.from(dayMap.values()).sort((a, b) => a.day - b.day);
-  }, [data]);
+  }, [data, yieldData]);
 
   // Vertical marker lines for halving/top/bottom events that fall within
   // each cycle's section. X axis is "days from section start" so we map
@@ -660,6 +724,32 @@ function OverlayTab() {
     if (!data?.series?.length) return 0;
     return Math.max(...data.series.map(s => s.days));
   }, [data]);
+
+  // Per-cycle macro rate change summary — first obs → last obs in the section,
+  // expressed in basis points. Used in the cycle summary cards so you can see at a
+  // glance whether rates were being hiked (positive bps, red ↑) or cut (negative
+  // bps, green ↓) during the section. Mirrors the BTC % return row above.
+  // Returns a Map keyed by cycleId → { us10y: {start,end,bps}, us30y: {...}, dff: {...} }.
+  type RateChange = { start: number; end: number; bps: number };
+  const rateChanges = useMemo(() => {
+    const out = new Map<string, { us10y?: RateChange; us30y?: RateChange; dff?: RateChange }>();
+    if (!yieldData?.length) return out;
+    const calc = (obs: YieldObs[]): RateChange | undefined => {
+      const valid = obs.filter(o => o.value != null);
+      if (valid.length < 2) return undefined;
+      const start = valid[0].value;
+      const end = valid[valid.length - 1].value;
+      return { start, end, bps: Math.round((end - start) * 100) };
+    };
+    for (const yd of yieldData) {
+      out.set(yd.cycleId, {
+        us10y: calc(yd.us10y),
+        us30y: calc(yd.us30y),
+        dff:   calc(yd.dff),
+      });
+    }
+    return out;
+  }, [yieldData]);
 
   function toggleCycle(id: 'c1' | 'c2' | 'c3' | 'c4') {
     setSelectedCycles(prev => {
@@ -812,6 +902,25 @@ function OverlayTab() {
         </Card>
       )}
 
+      {/* Macro overlay toggle — overlay US10Y/US30Y/Fed Funds on a secondary y-axis. */}
+      <Card>
+        <CardContent className="py-3">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={showMacro}
+              onCheckedChange={(v) => setShowMacro(v === true)}
+              id="show-macro-toggle"
+            />
+            <label htmlFor="show-macro-toggle" className="text-sm cursor-pointer select-none">
+              Show macro rates
+              <span className="text-[10px] text-muted-foreground ml-2">
+                US10Y · US30Y · Fed Funds on a secondary y-axis
+              </span>
+            </label>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Section summary chips */}
       {data?.series && data.series.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -872,6 +981,7 @@ function OverlayTab() {
           <CardDescription>
             X-axis: days from section start (day 0). Y-axis: % return from section start.
             Each colored line is one cycle's section. Longer sections stretch further right.
+            Toggle "Show macro rates" to overlay US10Y + US30Y + Fed Funds on a secondary y-axis.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -899,10 +1009,21 @@ function OverlayTab() {
                     label={{ value: 'days from section start', position: 'insideBottom', offset: -2, fill: '#888', fontSize: 11 }}
                   />
                   <YAxis
+                    yAxisId="left"
                     tick={{ fontSize: 10, fill: '#888' }}
                     tickFormatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(0)}%`}
                     label={{ value: '% return', angle: -90, position: 'insideLeft', fill: '#888', fontSize: 11 }}
                   />
+                  {showMacro && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 10, fill: '#7dd3fc' }}
+                      tickFormatter={(v) => `${v.toFixed(2)}%`}
+                      domain={['auto', 'auto']}
+                      label={{ value: 'rate %', angle: 90, position: 'insideRight', fill: '#7dd3fc', fontSize: 11 }}
+                    />
+                  )}
                   <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
                   {/* Cycle marker lines — halving (blue), top (orange), bottom (red).
                       Positioned at each event's day offset within its cycle's section. */}
@@ -922,6 +1043,20 @@ function OverlayTab() {
                     labelFormatter={(day: number) => `Day ${day}`}
                     formatter={(value: number, name: string) => {
                       if (name.endsWith('_price') || name.endsWith('_date')) return [null, null];
+                      // Rate data keys: c2_us10y, c2_us30y, c2_dff
+                      if (typeof name === 'string' && (name.endsWith('_us10y') || name.endsWith('_us30y') || name.endsWith('_dff'))) {
+                        const [cycleId, key] = name.split('_');
+                        const c = data.series.find(s => s.cycleId === cycleId);
+                        if (!c) return [null, null];
+                        const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
+                        return [
+                          <div key={name} className="space-y-0.5">
+                            <div className="font-mono text-sky-300">{value.toFixed(2)}%</div>
+                            <div className="text-[10px] text-muted-foreground">{c.cycleLabel} · {label}</div>
+                          </div>,
+                          null,
+                        ];
+                      }
                       const cycleId = name as 'c1' | 'c2' | 'c3' | 'c4';
                       const series = data.series.find(s => s.cycleId === cycleId);
                       if (!series) return [null, null];
@@ -941,6 +1076,14 @@ function OverlayTab() {
                   <Legend
                     wrapperStyle={{ fontSize: 11 }}
                     formatter={(value) => {
+                      // Rate data: c2_us10y, c2_us30y, c2_dff
+                      if (typeof value === 'string' && (value.endsWith('_us10y') || value.endsWith('_us30y') || value.endsWith('_dff'))) {
+                        const [cycleId, key] = value.split('_');
+                        const c = data.series.find(s => s.cycleId === cycleId);
+                        if (!c) return value;
+                        const label = key === 'us10y' ? 'US10Y' : key === 'us30y' ? 'US30Y' : 'DFF';
+                        return `${c.cycleLabel} · ${label}`;
+                      }
                       const cycleId = value as 'c1' | 'c2' | 'c3' | 'c4';
                       const series = data.series.find(s => s.cycleId === cycleId);
                       if (!series) return value;
@@ -952,6 +1095,7 @@ function OverlayTab() {
                   {data.series.map(s => (
                     <Line
                       key={s.cycleId}
+                      yAxisId="left"
                       type="monotone"
                       dataKey={s.cycleId}
                       stroke={CYCLE_COLORS[s.cycleId]}
@@ -962,6 +1106,44 @@ function OverlayTab() {
                       connectNulls
                     />
                   ))}
+                  {showMacro && data.series.flatMap(s => [
+                    <Line
+                      key={`${s.cycleId}_us10y`}
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey={`${s.cycleId}_us10y`}
+                      stroke="#67e8f9"
+                      strokeWidth={1.25}
+                      strokeDasharray="5 3"
+                      dot={false}
+                      name={`${s.cycleId}_us10y`}
+                      connectNulls
+                    />,
+                    <Line
+                      key={`${s.cycleId}_us30y`}
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey={`${s.cycleId}_us30y`}
+                      stroke="#fde047"
+                      strokeWidth={1.25}
+                      strokeDasharray="2 3"
+                      dot={false}
+                      name={`${s.cycleId}_us30y`}
+                      connectNulls
+                    />,
+                    <Line
+                      key={`${s.cycleId}_dff`}
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey={`${s.cycleId}_dff`}
+                      stroke="#86efac"
+                      strokeWidth={1.25}
+                      strokeDasharray="1 2"
+                      dot={false}
+                      name={`${s.cycleId}_dff`}
+                      connectNulls
+                    />,
+                  ])}
                 </LineChart>
               </ResponsiveContainer>
               <div className="text-[10px] text-muted-foreground mt-2 flex flex-wrap gap-4">

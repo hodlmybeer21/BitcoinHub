@@ -100,6 +100,14 @@ export const FRED_SERIES: FredSeriesDef[] = [
     frequency: 'daily', transform: 'none',
   },
   {
+    id: 'DFF', name: 'Fed Funds Effective Rate (DFF)',
+    category: 'rates', unit: '%',
+    description: 'Federal Funds Effective Rate — daily. The rate banks actually charge each other overnight; the FOMC\'s policy lever.',
+    frequency: 'daily', transform: 'none',
+    startOverride: '1982-01-01',
+  },
+
+  {
     id: 'TB3MS', name: '3M T-Bill (TB3MS)',
     category: 'rates', unit: '%',
     description: '3-month T-bill yield — daily. Front-end demand signal; spikes when nobody wants duration.',
