@@ -31,6 +31,7 @@ import {
   AlertCircle, Hammer, Sparkles, Save, FolderOpen, Trash2, Play,
   RefreshCw, Copy, BookOpen, Plus, MousePointerClick,
   Download, Share2, Upload, Link as LinkIcon, LineChart as LineChartIcon, TrendingUp, X,
+  Users,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useSyncedStorage, getUserId } from "@/lib/persistence/client";
