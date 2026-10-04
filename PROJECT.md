@@ -337,12 +337,12 @@ But here are the top 3 in priority order for Tyler to override:
 
 ### Senior review — Oct 4 2026 (hermes agent, "act as top tier researcher/designer/coder" pass)
 
-Three PRs shipped in this session: PR #1 (trust fixes), PR #2 (risk chart visual richness), PR #3 (live learn count). Three open threads from the review that need Tyler input or are deferred per the "don't expand scope unilaterally" rule:
+Three PRs shipped in this session: PR #1 (trust fixes), PR #2 (risk chart visual richness), PR #3 (live learn count). Then PR #5 shipped the auth-decision follow-up. Open threads from the review that need Tyler input or are deferred per the "don't expand scope unilaterally" rule:
 
-- **Login/Register UI vs. disabled auth** — `Login.tsx` and `Register.tsx` exist as full pages, and the navbar has links to them, but `/api/auth/me` returns `null` and `handleAuthDisabled` returns 503 for any auth action. The auth_disabled 503 message is well-written but the navbar links to the disabled pages without any "auth coming back" indicator. Options: (a) gate the navbar links behind an `/api/auth/status` probe, (b) add a permanent "auth coming back" notice to `Login.tsx`/`Register.tsx`, (c) hide the links entirely until auth ships. Tyler's call.
+- **Login/Register UI vs. disabled auth** — **Resolved by PR #5** (banner on `/login` and `/register` + "data on this device" hint on Workbench + MPT). Decision: don't ship placeholder auth — the codebase is moving away from it via the anonymous UUID MVP in `lib/persistence/server.js`. Re-evaluate when a real trigger lands (paid tier, cross-device sync, community features). When that happens: Clerk (fastest, Tyler already uses it on `pembroke.goodbotai.tech` per hermes MEMORY.md), Supabase Auth (ties to Postgres cleanly, cheaper long-term), or roll-your-own (full control, more work).
 - **Replit-specific vite plugins in vite.config.ts** — `@replit/vite-plugin-runtime-error-modal` and `@replit/vite-plugin-cartographer` are loaded only when `REPL_ID` is set, so they don't bundle in production. They do run on Replit dev. If Tyler ever moves dev off Replit, those can be deleted.
 - **Stray debug PNGs in repo root** — `after_load.png`, `left-column-scan.png`, `wb-*.png`, `whale_card.png`, `worldbank-element-0.png` etc. Checked into git, never referenced by code. Safe to `git rm` in a one-time cleanup PR.
-- **`localStorage` key `'bitcoi…s_v1'` placeholder** (still pending) — should be `'bitcoinhub_workbench_v1'` and `'bitcoinhub_mpt_v1'`. Per the existing entry below, the rename needs a one-time dedupe migration so existing user data isn't lost. Not blocking, but cosmetic.
+- **`localStorage` key `'bitcoi…s_v1'` placeholder** — already fixed in the code (current values are `bitcoinhub_workbench_indicators_v1` and `bitcoinhub_mpt_portfolios_v1`). The "Bugs to fix" entry below is stale and can be deleted in a future docs cleanup.
 
 ### Bugs to fix (not blocking but should be addressed)
 
