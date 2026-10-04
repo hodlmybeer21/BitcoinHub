@@ -25,7 +25,7 @@ import {
 } from "recharts";
 import {
   AlertCircle, TrendingUp, TrendingDown, Plus, Trash2, RefreshCw,
-  Wallet, Target, Activity, BarChart3, Sparkles, ArrowRight,
+  Wallet, Target, Activity, BarChart3, Sparkles, ArrowRight, HardDrive,
   Save, FolderOpen, CalendarClock,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -497,6 +497,10 @@ export default function PortfolioMPT() {
           <p className="text-muted-foreground">
             Compose your crypto portfolio across halving cycles. See the efficient frontier,
             your distance from optimal, and what to buy or sell to fix it.
+          </p>
+          <p className="text-xs text-muted-foreground/70 mt-1">
+            <HardDrive className="inline h-3 w-3 mr-1 -mt-0.5" />
+            Saved portfolios live on this device until accounts return.
           </p>
         </div>
 

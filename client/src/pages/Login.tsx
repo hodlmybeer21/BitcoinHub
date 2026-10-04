@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, LogIn, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,11 +68,28 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <Card className="w-full max-w-md">
+        {/* Honest banner about the auth state. The form still works
+            (submitting surfaces the auth_disabled 503 in a toast), but
+            a visitor who landed on /login directly shouldn't have to
+            submit a form to learn accounts are temporarily off. Per
+            PROJECT.md §7 senior review — Oct 4 2026. */}
+        <div
+          className="flex items-start gap-2.5 px-4 py-3 rounded-t-lg border-b border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <span>
+            Accounts are temporarily disabled. Your saved Workbench and
+            MPT data lives on this device and will be waiting when
+            accounts return.
+          </span>
+        </div>
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
-            <img 
-              src={bitcoinHouseIcon} 
-              alt="BitcoinHub" 
+            <img
+              src={bitcoinHouseIcon}
+              alt="BitcoinHub"
               className="h-16 w-16 rounded-lg object-cover"
             />
           </div>

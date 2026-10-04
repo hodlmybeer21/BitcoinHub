@@ -29,7 +29,7 @@ import {
 } from "recharts";
 import {
   AlertCircle, Hammer, Sparkles, Save, FolderOpen, Trash2, Play,
-  RefreshCw, Copy, BookOpen, Plus, MousePointerClick,
+  RefreshCw, Copy, BookOpen, Plus, MousePointerClick, HardDrive,
   Download, Share2, Upload, Link as LinkIcon, LineChart as LineChartIcon, TrendingUp, X,
   Users,
 } from "lucide-react";
@@ -1040,6 +1040,10 @@ export default function Workbench() {
               Build custom indicators from BitcoinHub's data sources — no code.
               Compose formulas from blocks like <code className="text-orange-400 font-mono">fear_greed.value</code>,
               apply series operators like <code className="text-orange-400 font-mono">sma(X, 30)</code>, combine with logic.
+            </p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              <HardDrive className="inline h-3 w-3 mr-1 -mt-0.5" />
+              Saved indicators live on this device until accounts return.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
