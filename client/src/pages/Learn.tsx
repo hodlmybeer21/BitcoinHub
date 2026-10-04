@@ -43,6 +43,27 @@ export default function Learn() {
   const completedCount = completedGames.length;
   const progressPercent = totalGames > 0 ? Math.round((completedCount / totalGames) * 100) : 0;
 
+  // Compute the live game count from the API so the header reflects
+  // whatever the server says is currently available, not a hard-coded
+  // 13. When the API is unreachable, fall back to 13 (matches the
+  // /api/learning/paths server-side seed and the home-page hero copy).
+  const [liveGameCount, setLiveGameCount] = useState<number>(13);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/learning/paths', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (cancelled || !d || typeof d !== 'object') return;
+        const n = Object.keys(d).length;
+        if (n > 0) {
+          setLiveGameCount(n);
+          setTotalGames(n);
+        }
+      })
+      .catch(() => { /* keep fallback 13 */ });
+    return () => { cancelled = true; };
+  }, []);
+
   // Award XP when a game is completed
   const awardXP = async (gameId: string) => {
     if (!isAuthenticated) return;
@@ -115,7 +136,7 @@ export default function Learn() {
                 </div>
                 <div className="flex items-center gap-1.5 bg-card border border-muted/20 rounded-lg px-3 py-2">
                   <Clock className="h-4 w-4 text-blue-400" />
-                  <span className="text-sm font-semibold text-foreground">13</span>
+                  <span className="text-sm font-semibold text-foreground">{liveGameCount}</span>
                   <span className="text-xs text-muted-foreground hidden sm:inline">simulations</span>
                 </div>
               </div>
