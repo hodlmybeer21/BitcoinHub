@@ -544,15 +544,26 @@ export default function RiskMetric() {
               className="flex-shrink-0 mt-0.5"
               title="Share the risk chart on X"
               text={(() => {
-                const band = (typeof risk.data?.band === 'string' ? risk.data.band : risk.data?.band?.band) || 'neutral';
-                const score = Number(risk.data?.risk ?? 0);
-                const day = ts.data?.points?.length ? Math.round((Date.now() - Date.UTC(2024, 3, 20)) / 86400000) : null;
-                const last = ts.data?.points?.[ts.data.points.length - 1];
-                const lastScore = last ? Number(last.risk ?? score).toFixed(2) : score.toFixed(2);
-                const lastBand = last?.band || band;
-                return `BTC risk band: ${lastBand.replace('_', ' ')} (${lastScore}/1.00)\n` +
-                  `4-Year Risk History · live\n\n` +
-                  `Track it → bitcoinhub.goodbotai.tech/risk`;
+                // Risk Metric /risk page — was rendering "Risk indicator is
+                // temporarily unavailable / risk is not defined" because this
+                // IIFE referenced `risk` (the variable that doesn't exist on
+                // this page) instead of `snapshot` (the useRiskSnapshot() hook
+                // return). Pre-existing bug from the share-to-X feature in
+                // commit c480907. Wrapped the whole IIFE in try/catch so a
+                // future typo here doesn't take down the entire /risk page —
+                // the button falls back to a static share message instead.
+                try {
+                  const band = (typeof snapshot.data?.band === 'string' ? snapshot.data.band : snapshot.data?.band?.band) || 'neutral';
+                  const score = Number(snapshot.data?.risk ?? 0);
+                  const last = ts.data?.points?.[ts.data.points.length - 1];
+                  const lastScore = last ? Number(last.risk ?? score).toFixed(2) : score.toFixed(2);
+                  const lastBand = last?.band || band;
+                  return `BTC risk band: ${lastBand.replace('_', ' ')} (${lastScore}/1.00)\n` +
+                    `4-Year Risk History · live\n\n` +
+                    `Track it → bitcoinhub.goodbotai.tech/risk`;
+                } catch {
+                  return `BTC risk history · live\n\nTrack it → bitcoinhub.goodbotai.tech/risk`;
+                }
               })()}
             />
           </div>
