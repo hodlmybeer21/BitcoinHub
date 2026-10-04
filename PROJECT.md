@@ -335,6 +335,15 @@ But here are the top 3 in priority order for Tyler to override:
 
 ## 7. Known Issues / Tech Debt
 
+### Senior review — Oct 4 2026 (hermes agent, "act as top tier researcher/designer/coder" pass)
+
+Three PRs shipped in this session: PR #1 (trust fixes), PR #2 (risk chart visual richness), PR #3 (live learn count). Then PR #5 shipped the auth-decision follow-up. Open threads from the review that need Tyler input or are deferred per the "don't expand scope unilaterally" rule:
+
+- **Login/Register UI vs. disabled auth** — **Resolved by PR #5** (banner on `/login` and `/register` + "data on this device" hint on Workbench + MPT). Decision: don't ship placeholder auth — the codebase is moving away from it via the anonymous UUID MVP in `lib/persistence/server.js`. Re-evaluate when a real trigger lands (paid tier, cross-device sync, community features). When it does, do a fresh options review scoped to this project's stack (Vite + Express + Drizzle + Neon) — don't pick a provider based on what's running anywhere else.
+- **Replit-specific vite plugins in vite.config.ts** — `@replit/vite-plugin-runtime-error-modal` and `@replit/vite-plugin-cartographer` are loaded only when `REPL_ID` is set, so they don't bundle in production. They do run on Replit dev. If Tyler ever moves dev off Replit, those can be deleted.
+- **Stray debug PNGs in repo root** — `after_load.png`, `left-column-scan.png`, `wb-*.png`, `whale_card.png`, `worldbank-element-0.png` etc. Checked into git, never referenced by code. Safe to `git rm` in a one-time cleanup PR.
+- **`localStorage` key `'bitcoi…s_v1'` placeholder** — already fixed in the code (current values are `bitcoinhub_workbench_indicators_v1` and `bitcoinhub_mpt_portfolios_v1`). The "Bugs to fix" entry below is stale and can be deleted in a future docs cleanup.
+
 ### Bugs to fix (not blocking but should be addressed)
 
 - **`localStorage` key `'bitcoi…s_v1'` is a truncated placeholder**
