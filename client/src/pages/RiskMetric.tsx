@@ -567,7 +567,7 @@ export default function RiskMetric() {
             <div className="h-80">
               <ErrorBoundary label="Risk time series chart">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={ts.data.points} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                  <LineChart data={ts.data.points} margin={{ top: 5, right: 24, left: 8, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis
                     dataKey="date"
@@ -577,12 +577,66 @@ export default function RiskMetric() {
                   />
                   <YAxis domain={[0, 1]} stroke="#888" fontSize={11} />
                   <RTooltip content={<RiskTooltip />} />
+
+                  {/* Halving markers — vertical reference lines, one per halving. */}
+                  {halvingMarkers.map((m) => (
+                    <ReferenceLine
+                      key={`halving-${m.x}`}
+                      x={m.x}
+                      stroke="#94a3b8"
+                      strokeDasharray="2 4"
+                      strokeWidth={1}
+                      label={{
+                        value: m.label,
+                        position: 'top',
+                        fill: '#94a3b8',
+                        fontSize: 9,
+                      }}
+                    />
+                  ))}
+
+                  {/* Band boundary reference lines — horizontal guides at the
+                      six extreme-fear ↔ extreme-greed band edges. Subtle so
+                      they don't compete with the data line. */}
+                  {[0.0, 0.2, 0.4, 0.6, 0.8, 1.0].map((y) => (
+                    <ReferenceLine
+                      key={`band-${y.toFixed(1)}`}
+                      y={y}
+                      stroke="#475569"
+                      strokeDasharray="1 6"
+                      strokeWidth={1}
+                    />
+                  ))}
+
+                  {/* Gradient fill under the line. The Recharts 2.15.x <Area>
+                      inside <LineChart> is the historically fragile combination
+                      (per PROJECT.md §7 known limitations), so this lives in
+                      its own ErrorBoundary — if the gradient throw kills the
+                      fill, the line + halving markers + band lines still
+                      render. Fail-loud, not fail-everything. */}
+                  <ErrorBoundary label="Risk chart gradient fill">
+                    <defs>
+                      <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ea580c" stopOpacity={0.45} />
+                        <stop offset="100%" stopColor="#ea580c" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <Area
+                      type="monotone"
+                      dataKey="risk"
+                      stroke="none"
+                      fill="url(#riskGradient)"
+                      isAnimationActive={false}
+                    />
+                  </ErrorBoundary>
+
                   <Line
                     type="monotone"
                     dataKey="risk"
                     stroke="#ea580c"
                     strokeWidth={1.5}
                     dot={false}
+                    isAnimationActive={false}
                   />
                   {/* Phase 6b: Cowen cycle-top threshold reference lines + peak dots */}
                   {thresholds.data?.historical.map(h => (
