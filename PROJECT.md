@@ -69,6 +69,7 @@ verify with a curl before relying on it.
 
 | Commit | What |
 |---|---|
+| `f11f07a` | **fix(trust)**: drop hard-coded "47,000+ learners/subscribers" copy (no data source), fix `/api/options-flow` 500 (handler referenced `validateShape` + `OptionsFlowSchema` from `shared/safe-api.ts` but never imported them; tightened Deribit fetch from 8s → 3s so a slow upstream doesn't blow the 10s Vercel gateway budget), surface whale-alert `data.timestamp` in empty state. PR open: https://github.com/hodlmybeer21/BitcoinHub/pull/1 |
 | `bb31a6f` | **fix(risk)**: restore to e08d4d0 working state (binary-search abandoned). The 4 single-prop fixes (Bar+Cell, gradient fill, dual YAxis, XAxis interval) didn't fix the "Invariant failed" — the actual culprit is a combination of all the internals together. Restored the e08d4d0 minimal LineChart. The visual richness (per-band bar colors, halving markers, band lines, gradient fill) is lost — the chart now renders as a single orange line. Future work: restore the visual richness incrementally with the inner ErrorBoundary catching any throw. |
 | `58af0e9` | **fix(risk)**: remove XAxis interval prop (next suspect in 'Invariant failed' binary search). The 4th single-prop fix — didn't fix it. The binary-search approach of removing individual props one at a time isn't converging. |
 | `d1a048c` | **fix(risk)**: remove dual YAxis (next suspect in 'Invariant failed' binary search). The 3rd single-prop fix — didn't fix it. |

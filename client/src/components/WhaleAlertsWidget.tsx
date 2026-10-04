@@ -57,9 +57,14 @@ export default function WhaleAlertsWidget() {
           <CardTitle className="text-sm font-semibold text-muted-foreground">WHALE ALERTS</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No large transactions detected
+          <p className="text-sm text-muted-foreground text-center py-2">
+            No transactions ≥100 BTC right now.
           </p>
+          {data?.timestamp && (
+            <p className="text-xs text-muted-foreground/60 text-center pb-2">
+              Last checked {new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
         </CardContent>
       </Card>
     );

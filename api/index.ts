@@ -7,6 +7,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // bundle — any axios-using module that throws at init takes down the
 // entire dispatcher (legacy routes too). Lazy import per-route isolates
 // each handler's load to its own request.
+import { validateShape, OptionsFlowSchema } from '../shared/safe-api.js';
 // --- inlined from api/cycle.ts ---
 /**
  * Live state for the 4-Year Cycle page.
@@ -222,10 +223,10 @@ async function getCycleState(): Promise<CycleState> {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-async function apiFetch(url: string, opts?: RequestInit): Promise<Response> {
+async function apiFetch(url: string, opts?: RequestInit, timeoutMs = 8000): Promise<Response> {
   const res = await fetch(url, {
     ...opts,
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   return res;
 }
@@ -932,11 +933,15 @@ async function getFundingRates() {
 // Deribit blocks serverless with Cloudflare — use fallback data
 
 async function handleOptionsFlow(_: VercelRequest, res: VercelResponse) {
-  // Try Deribit first (sometimes works)
+  // Try Deribit first with a tight 3s budget per request — Vercel's
+  // serverless lambda has a 10s gateway cap, and Deribit is often slow
+  // (or 403'd by Cloudflare) from the edge. If either call doesn't return
+  // a usable `result` array in 3s, fall through to the proxy data marked
+  // `source: 'proxy'` so the page renders something useful.
   try {
     const [btcRes, ethRes] = await Promise.all([
-      apiFetch('https://www.deribit.com/api/v6/public/get_book_summary_by_currency?currency=BTC&kind=option'),
-      apiFetch('https://www.deribit.com/api/v6/public/get_book_summary_by_currency?currency=ETH&kind=option'),
+      apiFetch('https://www.deribit.com/api/v6/public/get_book_summary_by_currency?currency=BTC&kind=option', undefined, 3000),
+      apiFetch('https://www.deribit.com/api/v6/public/get_book_summary_by_currency?currency=ETH&kind=option', undefined, 3000),
     ]);
     const btcJson = await btcRes.json();
     const ethJson = await ethRes.json();

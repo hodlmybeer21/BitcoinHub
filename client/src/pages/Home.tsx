@@ -208,7 +208,7 @@ const Home = () => {
             </motion.div>
 
             <motion.p variants={fadeInUp} className="text-sm text-muted-foreground">
-              <span className="text-foreground font-medium">47,000+ learners</span> learning through simulation, not speculation.
+              Learn by simulating — not by reading price charts.
             </motion.p>
           </motion.div>
         </div>
@@ -552,7 +552,7 @@ const Home = () => {
                         Subscribe Free <ArrowRight className="ml-2 w-5 h-5" />
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground text-center">47,000+ subscribers. Unsubscribe any time. No spam, ever.</p>
+                    <p className="text-xs text-muted-foreground text-center">Free weekly insights. Unsubscribe any time. No spam, ever.</p>
                   </form>
                 )}
               </CardContent>
