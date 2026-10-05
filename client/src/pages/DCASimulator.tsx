@@ -400,13 +400,25 @@ export default function DCASimulator() {
                       <ShareChartButton
                         className="flex-shrink-0 mt-0.5"
                         title="Share your DCA projection on X"
-                        text={
-                          `My BTC DCA plan:\n` +
-                          `$${inputs.amount}/month × ${inputs.months} months → ${formatBTC(data.btcAccumulated)} BTC\n` +
-                          `Current value: ${formatCurrency(data.currentValue)}\n` +
-                          `Total invested: ${formatCurrency(data.totalInvested)}\n\n` +
-                          `Build your own → bitcoinhub.goodbotai.tech/dca-simulator`
-                        }
+                        text={(() => {
+                          // Same pre-existing bug shape as /risk (PR #6):
+                          // ShareChartButton text IIFE referenced an `inputs`
+                          // object that doesn't exist — the actual variables
+                          // are `monthlyAmount` (state) and `monthsInvested`
+                          // (from data). Wrapped in try/catch + static fallback
+                          // so a future typo here doesn't take down the whole
+                          // /dca-simulator page.
+                          try {
+                            const months = data?.monthsInvested ?? 0;
+                            return `My BTC DCA plan:\n` +
+                              `$${monthlyAmount}/month × ${months} months → ${formatBTC(data.btcAccumulated)} BTC\n` +
+                              `Current value: ${formatCurrency(data.currentValue)}\n` +
+                              `Total invested: ${formatCurrency(data.totalInvested)}\n\n` +
+                              `Build your own → bitcoinhub.goodbotai.tech/dca-simulator`;
+                          } catch {
+                            return `My BTC DCA plan — see it on BitcoinHub\n\nbitcoinhub.goodbotai.tech/dca-simulator`;
+                          }
+                        })()}
                       />
                     </div>
                   </CardHeader>
