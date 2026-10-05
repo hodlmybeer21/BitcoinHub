@@ -5007,13 +5007,20 @@ function computeLiveIndicatorsInline(closes: number[]) {
 }
 
 async function handleETFFlows(_req: VercelRequest, res: VercelResponse) {
+  // Honest empty state. The previous version of this message advertised a
+  // $29/mo CoinGlass Pro API key, which is a credibility hit for a free-tier
+  // product — every visitor landing on /analytics would see an upsell card.
+  // The project's free-data policy (see /sources and /api/sources) is "no
+  // paid feeds" — so the right thing is to say so directly. When a free
+  // ETF-flow source surfaces (e.g. a future free public API), wire it here
+  // and the widget will start rendering real data automatically.
   return ok(res, {
     available: false,
     source: 'none',
     asOf: new Date().toISOString(),
     flows: [],
     summary: { totalInflowUSD: 0, totalOutflowUSD: 0, netFlowUSD: 0, daysCovered: 0 },
-    message: 'Live BTC spot ETF flow data is not currently available. Free public sources (SoSoValue, farside.co, blockchaincenter) are Cloudflare-blocked; CoinGecko has no ETF endpoint. To enable live flows, wire a CoinGlass Pro API key as COINGLASS_API_KEY (~$29/mo).',
+    message: 'ETF flow data is not currently sourced — BitcoinHub only uses free public APIs, and the public ETF-flow sources (SoSoValue, farside.co, blockchaincenter) are Cloudflare-blocked from this server. We do not pay for data; if a free source surfaces in the future, it will be wired here and this card will start rendering real flows automatically.',
   });
 }
 
