@@ -69,7 +69,13 @@ verify with a curl before relying on it.
 
 | Commit | What |
 |---|---|
-| `f11f07a` | **fix(trust)**: drop hard-coded "47,000+ learners/subscribers" copy (no data source), fix `/api/options-flow` 500 (handler referenced `validateShape` + `OptionsFlowSchema` from `shared/safe-api.ts` but never imported them; tightened Deribit fetch from 8s → 3s so a slow upstream doesn't blow the 10s Vercel gateway budget), surface whale-alert `data.timestamp` in empty state. PR open: https://github.com/hodlmybeer21/BitcoinHub/pull/1 |
+| `63c198b` | **fix(dca-simulator)**: restore /dca-simulator page (ShareChartButton IIFE referenced undefined `inputs` variable). Same pre-existing bug shape as PR #6 (share-to-X feature in commit c480907). Also wrapped route in ErrorBoundary for defense in depth. PR #7. |
+| `83d3df5` | **fix(etf-flows)**: drop the $29/mo CoinGlass upsell on /analytics. Free-tier product, no paid-feed advertising. PR #8. |
+| `8e00b57` | **fix(risk)**: restore /risk page (ShareChartButton IIFE referenced `risk` which doesn't exist on this page). Pre-existing bug from share-to-X feature in c480907; same shape as the DCA bug fixed in PR #7. PR #6. |
+| `96222ad` | **fix(auth)**: honest UI for /login and /register while auth is disabled; "data on this device" hints on Workbench + MPT. PR #5. |
+| `5d358ab` | **feat(learn)**: make '13 games' claim verifiable — fetch live count from /api/learning/paths. PR #3. |
+| `38de717` | **fix(risk)**: restore 4-Year chart visual richness — halving markers, band lines, gradient fill. PR #2. |
+| `8536de9` | **fix(trust)**: drop unsubstantiated 47K claims, fix /api/options-flow 500, surface whale-alert timestamp. PR #1. |
 | `bb31a6f` | **fix(risk)**: restore to e08d4d0 working state (binary-search abandoned). The 4 single-prop fixes (Bar+Cell, gradient fill, dual YAxis, XAxis interval) didn't fix the "Invariant failed" — the actual culprit is a combination of all the internals together. Restored the e08d4d0 minimal LineChart. The visual richness (per-band bar colors, halving markers, band lines, gradient fill) is lost — the chart now renders as a single orange line. Future work: restore the visual richness incrementally with the inner ErrorBoundary catching any throw. |
 | `58af0e9` | **fix(risk)**: remove XAxis interval prop (next suspect in 'Invariant failed' binary search). The 4th single-prop fix — didn't fix it. The binary-search approach of removing individual props one at a time isn't converging. |
 | `d1a048c` | **fix(risk)**: remove dual YAxis (next suspect in 'Invariant failed' binary search). The 3rd single-prop fix — didn't fix it. |
