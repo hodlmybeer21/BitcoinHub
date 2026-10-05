@@ -110,13 +110,10 @@ function UnavailableState({ message }: { message: string }) {
       <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/20">
         <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
         <div className="text-xs text-amber-200/90 leading-relaxed">
-          <p className="font-medium mb-1">Live ETF flow data unavailable</p>
+          <p className="font-medium mb-1">ETF flow data not currently sourced</p>
           <p className="text-amber-200/70">{message}</p>
         </div>
       </div>
-      <p className="text-[10px] text-muted-foreground/60">
-        Enable: add <code className="px-1 py-0.5 bg-muted rounded text-[10px]">COINGLASS_API_KEY</code> to env vars
-      </p>
     </div>
   );
 }
