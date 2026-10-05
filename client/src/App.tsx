@@ -52,7 +52,11 @@ function Router() {
         <Route path="/web-resources" component={WebResources} />
         <Route path="/legislation" component={Legislation} />
         <Route path="/admin" component={Admin} />
-        <Route path="/dca-simulator" component={DCASimulator} />
+        <Route path="/dca-simulator" component={() => (
+          <ErrorBoundary label="DCA Simulator">
+            <DCASimulator />
+          </ErrorBoundary>
+        )} />
         <Route path="/cycle" component={Cycle} />
         <Route path="/cycle/compare">
           <ErrorBoundary label="Cycle compare">
