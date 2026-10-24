@@ -28,6 +28,7 @@ import React from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
+import { compactUsd } from '@shared/format-usd';
 
 // ── Shared shell ────────────────────────────────────────────────────────────
 
@@ -502,6 +503,19 @@ export function LiquidationZonesTile() {
       <IndicatorTile label="Liquidation zones" loading href="/risk" />
     );
   }
+  // Audit B6/D9: never show sample strikes as if live. If Deribit is unreachable the
+  // API says source 'unavailable' (or an old deploy says 'proxy'); hide the bars.
+  if (!data || data.source === 'unavailable' || data.source === 'proxy') {
+    return (
+      <IndicatorTile
+        label="OI-based liquidation zones"
+        value="—"
+        sub="Deribit data unavailable right now"
+        tone="neutral"
+        href="/risk"
+      />
+    );
+  }
 
   // Normalize bar widths to max OI in window
   const allOI = [...above, ...below].map((s) => s.openInterest ?? 0);
@@ -518,7 +532,7 @@ export function LiquidationZonesTile() {
         </Link>
       </div>
       <p className="text-[10px] text-white/[0.4] mb-1">
-        Deribit top strikes — estimated liquidation magnets
+        Deribit top strikes (all expiries, USD OI) — estimated liquidation magnets
       </p>
       <div className="flex-1 space-y-0.5 overflow-hidden">
         {above.length === 0 && below.length === 0 ? (
@@ -550,7 +564,7 @@ export function LiquidationZonesTile() {
       </div>
       {totalOI > 0 && (
         <p className="text-[10px] text-white/[0.4] font-mono mt-1 pt-1 border-t border-white/[0.06]">
-          Total BTC OI: ${(totalOI / 1e9).toFixed(2)}B
+          Total BTC options OI: {compactUsd(totalOI)}
         </p>
       )}
     </div>
@@ -586,7 +600,7 @@ function StrikeBar({
         </div>
       </div>
       <span className="text-white/[0.45] w-12 shrink-0 text-right">
-        {oi != null ? `${(oi / 1000).toFixed(0)}k` : '—'}
+        {oi != null ? compactUsd(oi) : '—'}
       </span>
     </div>
   );

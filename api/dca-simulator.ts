@@ -209,22 +209,58 @@ export const BTC_MONTHLY_PRICES: Record<string, number> = {
   "2025-03": 87000.0,
 };
 
-// Get current BTC price (using latest available data point)
-function getCurrentBTCPrice(): number {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  
-  // Try to find current month first
-  const currentKey = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
-  if (BTC_MONTHLY_PRICES[currentKey]) {
-    return BTC_MONTHLY_PRICES[currentKey];
-  }
-  
-  // Otherwise use most recent data
-  const sortedKeys = Object.keys(BTC_MONTHLY_PRICES).sort();
-  const lastKey = sortedKeys[sortedKeys.length - 1];
-  return BTC_MONTHLY_PRICES[lastKey];
+// ── Live extension (audit D5) ────────────────────────────────────────────────
+// The hardcoded table above ends 2025-03. Months after that are filled with
+// monthly AVERAGE closes computed from Yahoo daily BTC-USD (same semantics as the
+// table), and "now" uses the live spot price. Nothing here invents a number: if a
+// source fails, the month is skipped or the fallback is labelled in the response.
+
+const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; BitcoinHub/1.0)' };
+
+/** Average daily close per YYYY-MM (UTC) from Yahoo-style arrays. Pure, exported for tests. */
+export function monthlyAveragesFromDaily(timestampsSec: number[], closes: (number | null)[]): Record<string, number> {
+  const sums: Record<string, { s: number; n: number }> = {};
+  timestampsSec.forEach((t, i) => {
+    const c = closes[i];
+    if (typeof c !== 'number' || !Number.isFinite(c) || c <= 0) return;
+    const k = new Date(t * 1000).toISOString().slice(0, 7);
+    (sums[k] ??= { s: 0, n: 0 }).s += c;
+    sums[k].n += 1;
+  });
+  const out: Record<string, number> = {};
+  for (const [k, { s, n }] of Object.entries(sums)) out[k] = Math.round((s / n) * 100) / 100;
+  return out;
+}
+
+/** Table + live months; table values win where both exist. Pure, exported for tests. */
+export function mergeMonthly(table: Record<string, number>, live: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = { ...table };
+  for (const [k, v] of Object.entries(live)) if (!(k in out)) out[k] = v;
+  return out;
+}
+
+async function fetchLiveMonthlyAverages(fromISO: string): Promise<Record<string, number>> {
+  try {
+    const p1 = Math.floor(new Date(fromISO + 'T00:00:00Z').getTime() / 1000);
+    const p2 = Math.floor(Date.now() / 1000);
+    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?period1=${p1}&period2=${p2}&interval=1d`, { headers: UA, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return {};
+    const j: any = await r.json();
+    const res = j?.chart?.result?.[0];
+    return monthlyAveragesFromDaily(res?.timestamp ?? [], res?.indicators?.quote?.[0]?.close ?? []);
+  } catch { return {}; }
+}
+
+async function fetchLiveSpot(): Promise<{ price: number; source: string } | null> {
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { headers: UA, signal: AbortSignal.timeout(6000) });
+    if (r.ok) { const j: any = await r.json(); const v = Number(j?.bitcoin?.usd); if (v > 0) return { price: v, source: 'CoinGecko' }; }
+  } catch { /* fall through */ }
+  try {
+    const r = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot', { headers: UA, signal: AbortSignal.timeout(6000) });
+    if (r.ok) { const j: any = await r.json(); const v = Number(j?.data?.amount); if (v > 0) return { price: v, source: 'Coinbase' }; }
+  } catch { /* fall through */ }
+  return null;
 }
 
 interface DCAResult {
@@ -236,6 +272,8 @@ interface DCAResult {
   satsAccumulated: number;
   priceAtStart: number;
   priceNow: number;
+  priceNowSource: string;
+  pricesThrough: string;
   monthsInvested: number;
   dataPoints: Array<{
     date: string;
@@ -244,14 +282,20 @@ interface DCAResult {
   }>;
 }
 
-export async function calculateDCA(
+/** Pure DCA math over a monthly price map. Exported for tests. */
+export function calculateDCA(
   monthlyAmount: number,
-  startYear: number
-): Promise<DCAResult> {
-  const currentBTCPrice = getCurrentBTCPrice();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  startYear: number,
+  prices: Record<string, number> = BTC_MONTHLY_PRICES,
+  spot: { price: number; source: string } | null = null,
+  now: Date = new Date()
+): DCAResult {
+  const keys = Object.keys(prices).sort();
+  const lastKey = keys[keys.length - 1];
+  const currentBTCPrice = spot?.price ?? prices[lastKey];
+  const priceNowSource = spot ? `${spot.source} spot (live)` : `monthly average ${lastKey} (live price unavailable)`;
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth() + 1;
 
   let totalInvested = 0;
   let btcAccumulated = 0;
@@ -259,38 +303,27 @@ export async function calculateDCA(
   let priceAtStart = 0;
   let monthsInvested = 0;
 
-  // Iterate through each month from start year to now
   for (let year = startYear; year <= currentYear; year++) {
-    const startMonth = year === startYear ? 1 : 1;
     const endMonth = year === currentYear ? currentMonth : 12;
-
-    for (let month = startMonth; month <= endMonth; month++) {
+    for (let month = 1; month <= endMonth; month++) {
       const monthKey = `${year}-${String(month).padStart(2, "0")}`;
-      const price = BTC_MONTHLY_PRICES[monthKey];
-
-      if (price) {
-        if (year === startYear && month === startMonth) {
-          priceAtStart = price;
-        }
-
-        const btcBought = monthlyAmount / price;
-        btcAccumulated += btcBought;
-        totalInvested += monthlyAmount;
-        monthsInvested++;
-
-        dataPoints.push({
-          date: monthKey,
-          btcHeld: parseFloat(btcAccumulated.toFixed(8)),
-          usdValue: parseFloat((btcAccumulated * currentBTCPrice).toFixed(2)),
-        });
-      }
+      const price = prices[monthKey];
+      if (!price) continue;
+      if (priceAtStart === 0) priceAtStart = price;
+      btcAccumulated += monthlyAmount / price;
+      totalInvested += monthlyAmount;
+      monthsInvested++;
+      dataPoints.push({
+        date: monthKey,
+        btcHeld: parseFloat(btcAccumulated.toFixed(8)),
+        usdValue: parseFloat((btcAccumulated * currentBTCPrice).toFixed(2)),
+      });
     }
   }
 
   const currentValue = btcAccumulated * currentBTCPrice;
   const totalReturn = currentValue - totalInvested;
   const returnPercent = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
-  const satsAccumulated = Math.floor(btcAccumulated * 100000000);
 
   return {
     totalInvested: Math.round(totalInvested * 100) / 100,
@@ -298,9 +331,11 @@ export async function calculateDCA(
     currentValue: Math.round(currentValue * 100) / 100,
     totalReturn: Math.round(totalReturn * 100) / 100,
     returnPercent: Math.round(returnPercent * 100) / 100,
-    satsAccumulated,
+    satsAccumulated: Math.floor(btcAccumulated * 100000000),
     priceAtStart: Math.round(priceAtStart * 100) / 100,
     priceNow: Math.round(currentBTCPrice * 100) / 100,
+    priceNowSource,
+    pricesThrough: dataPoints.length ? dataPoints[dataPoints.length - 1].date : lastKey,
     monthsInvested,
     dataPoints,
   };
@@ -318,11 +353,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (monthly < 10 || monthly > 1000) {
       return err(res, 400, 'Monthly amount must be between $10 and $1000');
     }
-    if (startYear < 2012 || startYear > 2025) {
-      return err(res, 400, 'Start year must be between 2012 and 2025');
+    const thisYear = new Date().getUTCFullYear();
+    if (startYear < 2012 || startYear > thisYear) {
+      return err(res, 400, `Start year must be between 2012 and ${thisYear}`);
     }
 
-    const result = await calculateDCA(monthly, startYear);
+    const [live, spot] = await Promise.all([fetchLiveMonthlyAverages('2025-04-01'), fetchLiveSpot()]);
+    const result = calculateDCA(monthly, startYear, mergeMonthly(BTC_MONTHLY_PRICES, live), spot);
     return ok(res, result);
   } catch (e: any) {
     console.error('DCA simulator error:', e);

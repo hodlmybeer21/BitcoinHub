@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { safeFetch, OptionsFlowSchema } from "@shared/safe-api";
+import { compactUsd } from "@shared/format-usd";
 
 interface OptionContract {
   instrumentName: string;
@@ -66,23 +67,22 @@ export default function OptionsFlowWidget() {
     );
   }
 
-  if (!data) {
+  // Audit B6/D9: no sample data shown as live.
+  if (!data || data.source === 'unavailable' || data.source === 'proxy') {
     return (
       <Card className="bg-card/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold text-muted-foreground">OPTIONS FLOW</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">Unable to load options data</p>
+          <p className="text-sm text-muted-foreground text-center py-4">Deribit options data unavailable right now</p>
         </CardContent>
       </Card>
     );
   }
 
-  const formatOI = (oi: number): string => {
-    if (oi >= 1000) return `${(oi / 1000).toFixed(1)}K`;
-    return oi.toFixed(0);
-  };
+  // Values are USD notional (Deribit v2 OI in coins × underlying price).
+  const formatOI = (oi: number): string => compactUsd(oi);
 
   const sentimentColor = {
     bullish: 'text-green-500 bg-green-500/10',
@@ -158,7 +158,7 @@ export default function OptionsFlowWidget() {
             </div>
           </div>
           <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
-            <div className="text-xs text-muted-foreground mb-1">BTC Net Delta</div>
+            <div className="text-xs text-muted-foreground mb-1">BTC Call − Put OI</div>
             <div className="text-sm font-mono text-blue-500">
               {data.btc?.netDelta !== undefined ? formatOI(data.btc.netDelta) : '—'}
             </div>

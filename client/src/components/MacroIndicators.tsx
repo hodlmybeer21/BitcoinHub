@@ -166,7 +166,7 @@ export default function MacroIndicators() {
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Fed Balance</span>
             <span className="font-mono font-medium">
-              ${(netLiqIndicator.value / 1000).toFixed(2)}T
+              ${(netLiqIndicator.value / 1e6).toFixed(2)}T{/* WALCL is in millions */}
             </span>
           </div>
         )}

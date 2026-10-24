@@ -56,8 +56,8 @@ export const FRED_SERIES: FredSeriesDef[] = [
   {
     id: 'M2SL', name: 'M2 Money Supply',
     category: 'liquidity', unit: 'B USD',
-    description: 'M2 money supply — weekly (FRED). Tyler’s headline liquidity tracker: M2 YoY is the cleanest macro signal for BTC.',
-    frequency: 'weekly', transform: 'none',
+    description: 'M2 money supply — monthly, seasonally adjusted, billions of USD (FRED). Tyler’s headline liquidity tracker: M2 YoY is the cleanest macro signal for BTC.',
+    frequency: 'monthly', transform: 'none',
   },
 
   // ─── Rates & yield curve ───────────────────────────────────────────
