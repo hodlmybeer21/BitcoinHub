@@ -30,7 +30,6 @@ import {
   Activity,
   Repeat,
   Wrench,
-  Wallet,
 } from 'lucide-react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import FearGreedWidget from '@/components/FearGreedWidget';
@@ -67,7 +66,7 @@ export default function Dashboard() {
               Live Bitcoin Analytics
             </h1>
             <p className="text-sm text-white/[0.55] mt-1 max-w-2xl">
-              The signals that mattered in the prev cycle — visible at a
+              The signals that mattered in the previous cycle — visible at a
               glance. For deeper analysis, open a specialized dashboard
               below.
             </p>
@@ -149,15 +148,9 @@ export default function Dashboard() {
               />
               <DeepTabCard
                 href="/workbench"
-                title="Workbench"
+                title="Workbench (Labs)"
                 desc="Build, backtest, share, and fork custom indicators"
                 Icon={Wrench}
-              />
-              <DeepTabCard
-                href="/portfolio/mpt"
-                title="Portfolio optimizer"
-                desc="MPT allocation · stress tests · DCA migration"
-                Icon={Wallet}
               />
             </div>
           </section>

@@ -67,7 +67,7 @@ export default function Laws() {
               className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-4"
             >
               Networks, adoption, and time itself — <br className="hidden sm:block" />
-              <span className="text-primary">why Bitcoin keeps winning.</span>
+              <span className="text-primary">how Bitcoin's growth compares.</span>
             </motion.h1>
             <motion.p
               variants={fadeInUp}

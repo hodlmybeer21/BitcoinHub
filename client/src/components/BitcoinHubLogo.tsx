@@ -13,7 +13,7 @@ import React from "react";
  *
  * Variants:
  *   - "icon"        — orange circle + cycle wave only (favicon-friendly)
- *   - "wordmark"    — orange circle + ₿ BitcoinHub text
+ *   - "wordmark"    — orange circle + "BitcoinHub" text (one mark only; UX review #16)
  *   - "full"        — same as "wordmark", kept as an alias for clarity
  *
  * Size is interpreted as the icon width in Tailwind units (default `w-8 h-8`
@@ -97,7 +97,7 @@ export const BitcoinHubLogo: React.FC<BitcoinHubLogoProps> = ({
     <span className={`flex items-center ${className}`}>
       <CycleMark size={iconClass} />
       <span className="ml-2 text-xl font-bold text-foreground whitespace-nowrap">
-        <span className="text-primary">₿</span> BitcoinHub
+        BitcoinHub
       </span>
     </span>
   );

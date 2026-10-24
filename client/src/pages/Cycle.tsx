@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { windowStatus, windowPhrase } from "@/lib/cycleWindow";
 import { Button } from "@/components/ui/button";
+import { SubscribeCTA } from "@/components/SubscribeCTA";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -150,12 +151,12 @@ export default function Cycle() {
               </Badge>
             </motion.div>
             <motion.h1 variants={fadeInUp} className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground max-w-4xl">
-              The cycle has held through 4 halvings. <span className="text-[#F7931A]">It's holding now.</span>
+              The cycle has held through 4 halvings. <span className="text-[#F7931A]">If the pattern holds, here's where we are.</span>
             </motion.h1>
             <motion.p variants={fadeInUp} className="mt-6 text-lg text-muted-foreground max-w-3xl">
-              Bitcoin tops in Q4 of post-halving years and bottoms in Q4 of midterm years. The pattern
-              has survived ETFs, MicroStrategy, and trillions in corporate buying. The Q4 2026
-              textbook bottom window is {win ? `${windowPhrase(win)}.` : "Aug–Oct 2026."}
+              Historically, Bitcoin has topped in Q4 of post-halving years and bottomed in Q4 of midterm
+              years, a pattern that has held through ETFs, MicroStrategy, and trillions in corporate
+              buying. Past cycles don't guarantee the next one. If the pattern holds, the Q4 2026 bottom window is {win ? `${windowPhrase(win)}.` : "Aug–Oct 2026."}
             </motion.p>
             <motion.div variants={fadeInUp} className="mt-8 flex flex-wrap gap-3">
               <Link href="/dca-simulator">
@@ -265,7 +266,7 @@ export default function Cycle() {
                 <div className="text-xs text-muted-foreground mt-1">
                   {!win || win.phase === "before" ? "weeks to Q4 window" : win.phase === "open" ? `Q4 window · opened Aug 1, 2026` : "Q4 window ended Oct 31, 2026"}
                 </div>
-                <div className="text-xs text-muted-foreground mt-2">Aug–Oct optimal entry</div>
+                <div className="text-xs text-muted-foreground mt-2">Aug–Oct: where past bottoms fell</div>
               </CardContent>
             </Card>
             <Card>
@@ -314,6 +315,8 @@ export default function Cycle() {
               )}
             </CardContent>
           </Card>
+          {/* The one Substack CTA on /cycle (UX review #26). The Pulse above is editorial and unchanged. */}
+          <SubscribeCTA />
         </div>
       </section>
 

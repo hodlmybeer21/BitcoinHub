@@ -60,6 +60,9 @@ const GAME_ICONS: Record<string, string> = {
   'dollar-dilemma': '💸',
 };
 
+// UX review #19: lead with four sober, history-first lessons; the rest stay available but folded away.
+export const FEATURED_IDS = ['fourth-turning-quiz', 'bretton-woods-collapse-quiz', 'great-inflation-quiz', 'triffin-dilemma-quiz'];
+
 const CATEGORY_DESCRIPTIONS: Record<string, { title: string; desc: string; icon: any }> = {
   simulation: { title: 'Interactive Simulations', desc: 'Play through economic scenarios and watch the math unfold in real time.', icon: TrendingUp },
   adventure: { title: 'Story Adventures', desc: 'Escape rooms, treasure hunts, and quests that teach through narrative.', icon: Zap },
@@ -134,6 +137,7 @@ export function LearningPaths({ completedGames, onGameComplete }: LearningPathsP
   }, {} as Record<string, LearningPath[]>);
 
   const categories = Object.keys(byCategory);
+  const featured = FEATURED_IDS.map(id => allPaths.find(p => p.id === id)).filter((p): p is LearningPath => !!p);
 
   // ─── GAME VIEW ──────────────────────────────────────────────
   if (activeView === 'game' && selectedPath?.isGame) {
@@ -295,6 +299,23 @@ export function LearningPaths({ completedGames, onGameComplete }: LearningPathsP
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {featured.length > 0 && (
+        <section className="space-y-4" data-testid="learn-featured">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">Start here: four short lessons in monetary history</h2>
+            <p className="text-sm text-muted-foreground">The Fourth Turning, Bretton Woods, the 1970s inflation and the Triffin dilemma.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {featured.map(renderPathCard)}
+          </div>
+        </section>
+      )}
+
+      <details className="group rounded-lg border border-muted/20 bg-card/30 p-4" data-testid="learn-more">
+        <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+          More simulations and games ({allPaths.length - featured.length})
+        </summary>
+        <div className="pt-6">
       {/* Tabs by category */}
       <Tabs defaultValue={categories[0]} className="w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -343,6 +364,8 @@ export function LearningPaths({ completedGames, onGameComplete }: LearningPathsP
           );
         })}
       </Tabs>
+        </div>
+      </details>
     </div>
   );
 }
