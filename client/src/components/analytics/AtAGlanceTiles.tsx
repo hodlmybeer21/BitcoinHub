@@ -14,6 +14,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { IndicatorTile } from './PulseStubs';
+import { yoyPct, momPct, bpChange, monthsAgoISO, daysAgoISO } from '@shared/fred-math';
 
 // ── Shared sparkline (kept local to avoid coupling to PulseStubs internals) ─
 
@@ -164,37 +165,41 @@ interface FredPoint { date: string; value: number; }
 interface FredResp { seriesId: string; definition: { unit: string }; points: FredPoint[]; }
 
 export function M2SupplyTile() {
+  // /api/fred/data ignores `limit` and downsamples from 1900, so ask for an explicit
+  // start date instead (audit D1). 27 months covers YoY plus a 2-year sparkline.
+  const start = monthsAgoISO(27);
   const { data, isLoading } = useQuery<FredResp>({
-    queryKey: ['/api/fred/data', 'series_id=M2SL', 'limit=26'],
+    queryKey: ['/api/fred/data', 'series_id=M2SL', `start=${start}`],
     queryFn: async () => {
-      const r = await fetch('/api/fred/data?series_id=M2SL&limit=26');
+      const r = await fetch(`/api/fred/data?series_id=M2SL&start=${start}`);
       if (!r.ok) throw new Error('m2 fetch failed');
       return r.json();
     },
     refetchInterval: 60 * 60 * 1000,
     staleTime: 60 * 60 * 1000,
   });
-  const points = (data?.points ?? [])
-    .map((p) => p.value)
-    .filter((v) => Number.isFinite(v));
+  const points = (data?.points ?? []).filter((p) => Number.isFinite(p.value));
 
-  // FRED M2 is in MILLIONS of USD. Convert to $T for display.
-  const lastM = points[points.length - 1];
-  const prevM = points[points.length - 2];
-  const lastT = lastM != null ? lastM / 1e6 : null;
-  const momPct = lastM != null && prevM != null && prevM > 0 ? ((lastM - prevM) / prevM) * 100 : null;
-  const spark = points.slice(-26);
+  // FRED M2SL is in BILLIONS of USD (monthly). Billions / 1e3 = trillions.
+  const last = points[points.length - 1];
+  const lastT = last ? last.value / 1e3 : null;
+  const yoy = yoyPct(points);
+  const mom = momPct(points);
+  const spark = points.slice(-26).map((p) => p.value);
   const value = lastT != null ? `$${lastT.toFixed(2)}T` : undefined;
-  const sub = momPct != null ? `${momPct >= 0 ? '+' : ''}${momPct.toFixed(1)}% MoM` : undefined;
+  const fmt = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+  const parts = [yoy != null ? `${fmt(yoy)} YoY` : null, mom != null ? `${fmt(mom)} MoM` : null].filter(Boolean);
+  const sub = parts.length ? parts.join(' · ') : undefined;
+  const asOf = last ? new Date(last.date + 'T00:00:00Z').toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : null;
 
   return (
     <IndicatorTile
       label="M2 Money Supply"
       value={value}
       sub={sub}
-      tone={momPct != null && momPct > 0 ? 'good' : 'warn'}
+      tone={yoy == null ? 'neutral' : yoy > 0 ? 'good' : 'warn'}
       loading={isLoading && !data}
-      hint="FRED M2SL · weekly · +1.2% MoM ≈ BTC tailwind"
+      hint={`FRED M2SL · monthly${asOf ? ` · as of ${asOf}` : ''}`}
     >
       <Sparkline values={spark} color="#22c55e" />
     </IndicatorTile>
@@ -204,10 +209,13 @@ export function M2SupplyTile() {
 // ── 3. 10Y Treasury (TNX) ─────────────────────────────────────────────────
 
 export function TnxTile() {
+  // Explicit start date (the endpoint ignores `limit`); deltas are by calendar date,
+  // not by array index, so 7d/30d mean days, not downsampled points (audit D4).
+  const start = daysAgoISO(70);
   const { data, isLoading } = useQuery<FredResp>({
-    queryKey: ['/api/fred/data', 'series_id=DGS10', 'limit=60'],
+    queryKey: ['/api/fred/data', 'series_id=DGS10', `start=${start}`],
     queryFn: async () => {
-      const r = await fetch('/api/fred/data?series_id=DGS10&limit=60');
+      const r = await fetch(`/api/fred/data?series_id=DGS10&start=${start}`);
       if (!r.ok) throw new Error('dgs10 fetch failed');
       return r.json();
     },
@@ -218,10 +226,8 @@ export function TnxTile() {
   const values = points.map((p) => p.value);
 
   const last = values[values.length - 1];
-  const d30 = values[values.length - 30] ?? values[0];
-  const d7 = values[values.length - 7] ?? values[0];
-  const deltaBps30 = last != null && d30 != null ? Math.round((last - d30) * 100) : null;
-  const deltaBps7 = last != null && d7 != null ? Math.round((last - d7) * 100) : null;
+  const deltaBps30 = bpChange(points, 30);
+  const deltaBps7 = bpChange(points, 7);
 
   const spark = values.slice(-30);
   const value = last != null ? `${last.toFixed(2)}%` : undefined;

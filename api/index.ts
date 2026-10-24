@@ -43,7 +43,8 @@ import { validateShape, OptionsFlowSchema } from '../shared/safe-api.js';
 
 const COINGECKO_SIMPLE = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true';
 const COINGECKO_HISTORY = 'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=31&interval=daily';
-const COINEX_KLINES = 'https://api.coinex.com/v1/market/kline?market=BTCUSDT&type=1week&limit=200';
+// Coinbase Exchange public stats (no key): fallback spot + 24h open when CoinGecko is rate-limited.
+const COINBASE_STATS = 'https://api.exchange.coinbase.com/products/BTC-USD/stats';
 
 const CYCLE_TOP_USD = 126080.00;
 const CYCLE_TOP_DATE = '2025-10-06';
@@ -81,6 +82,8 @@ interface CycleState {
   ma200w: number;
   asOf: string;
   source: 'live' | 'fallback';
+  /** Per-figure provenance; 'unavailable' means the figure is 0/null and the UI shows "—". */
+  sources: { price: string; change7d30d: string; ma200w: string };
   score: CycleScore;
 }
 
@@ -111,41 +114,62 @@ async function fetchJson(url: string, timeoutMs = 8000): Promise<any> {
   }
 }
 
-let priceCache: { fetchedAt: number; price: number; change24h: number } | null = null;
+let priceCache: { fetchedAt: number; price: number; change24h: number; source: string } | null = null;
 const PRICE_CACHE_MS = 60 * 1000;
 
-async function getCurrentPrice(): Promise<{ price: number; change24h: number }> {
+async function getCurrentPrice(): Promise<{ price: number; change24h: number; source: string }> {
   if (priceCache && Date.now() - priceCache.fetchedAt < PRICE_CACHE_MS) {
-    return { price: priceCache.price, change24h: priceCache.change24h };
+    return { price: priceCache.price, change24h: priceCache.change24h, source: priceCache.source };
   }
-  const json = await fetchJson(COINGECKO_SIMPLE, 5000) as SimplePriceResp;
-  const price = Number(json?.bitcoin?.usd || 0);
-  const change24h = Number(json?.bitcoin?.usd_24h_change || 0);
-  if (price <= 0) throw new Error('invalid price response');
-  priceCache = { fetchedAt: Date.now(), price, change24h };
-  return { price, change24h };
+  try {
+    const json = await fetchJson(COINGECKO_SIMPLE, 5000) as SimplePriceResp;
+    const price = Number(json?.bitcoin?.usd || 0);
+    const change24h = Number(json?.bitcoin?.usd_24h_change || 0);
+    if (price <= 0) throw new Error('invalid price response');
+    priceCache = { fetchedAt: Date.now(), price, change24h, source: 'coingecko' };
+  } catch (e) {
+    // CoinGecko free tier 429s under load; Coinbase's public stats give last + 24h open.
+    const st = await fetchJson(COINBASE_STATS, 5000) as { last?: string; open?: string };
+    const price = Number(st?.last || 0);
+    const open = Number(st?.open || 0);
+    if (price <= 0) throw new Error(`no price (coingecko: ${(e as Error).message})`);
+    priceCache = { fetchedAt: Date.now(), price, change24h: open > 0 ? ((price - open) / open) * 100 : 0, source: 'coinbase' };
+  }
+  return { price: priceCache.price, change24h: priceCache.change24h, source: priceCache.source };
 }
 
-let longWindowCache: { fetchedAt: number; change7d: number | null; change30d: number | null } | null = null;
+let longWindowCache: { fetchedAt: number; change7d: number | null; change30d: number | null; source: string } | null = null;
 const LONG_WINDOW_CACHE_MS = 5 * 60 * 1000;
 
-async function getLongWindowChanges(): Promise<{ change7d: number | null; change30d: number | null }> {
+async function getLongWindowChanges(): Promise<{ change7d: number | null; change30d: number | null; source: string }> {
   if (longWindowCache && Date.now() - longWindowCache.fetchedAt < LONG_WINDOW_CACHE_MS) {
-    return { change7d: longWindowCache.change7d, change30d: longWindowCache.change30d };
+    return { change7d: longWindowCache.change7d, change30d: longWindowCache.change30d, source: longWindowCache.source };
   }
-  const json = await fetchJson(COINGECKO_HISTORY) as { prices?: [number, number][] };
-  const prices = json?.prices || [];
-  if (prices.length < 2) {
-    longWindowCache = { fetchedAt: Date.now(), change7d: null, change30d: null };
-    return { change7d: null, change30d: null };
+  let change7d: number | null = null;
+  let change30d: number | null = null;
+  let source = 'unavailable';
+  try {
+    const json = await fetchJson(COINGECKO_HISTORY) as { prices?: [number, number][] };
+    const prices = json?.prices || [];
+    if (prices.length >= 2) {
+      const latest = prices[prices.length - 1][1];
+      const day7 = prices[Math.max(0, prices.length - 8)][1];
+      const day30 = prices[Math.max(0, prices.length - 31)][1];
+      change7d = day7 ? ((latest - day7) / day7) * 100 : null;
+      change30d = day30 ? ((latest - day30) / day30) * 100 : null;
+      source = 'coingecko';
+    }
+  } catch { /* fall through to Yahoo */ }
+  if (source === 'unavailable') {
+    const { fetchBTCDailyHistory } = await import('../lib/cycle/btc-history.js');
+    const { changeOverDays } = await import('../lib/cycle/live-math.js');
+    const daily = await fetchBTCDailyHistory();
+    change7d = changeOverDays(daily, 7);
+    change30d = changeOverDays(daily, 30);
+    if (change7d !== null || change30d !== null) source = 'yahoo';
   }
-  const latest = prices[prices.length - 1][1];
-  const day7 = prices[Math.max(0, prices.length - 8)][1];
-  const day30 = prices[Math.max(0, prices.length - 31)][1] || day7;
-  const change7d = ((latest - day7) / day7) * 100;
-  const change30d = day30 ? ((latest - day30) / day30) * 100 : null;
-  longWindowCache = { fetchedAt: Date.now(), change7d, change30d };
-  return { change7d, change30d };
+  longWindowCache = { fetchedAt: Date.now(), change7d, change30d, source };
+  return { change7d, change30d, source };
 }
 
 let ma200wCache: { fetchedAt: number; ma200w: number } | null = null;
@@ -155,13 +179,13 @@ async function get200wMA(): Promise<number> {
   if (ma200wCache && Date.now() - ma200wCache.fetchedAt < MA200W_CACHE_MS) {
     return ma200wCache.ma200w;
   }
-  const json = await fetchJson(COINEX_KLINES) as { data?: number[][] };
-  const data = json?.data || [];
-  if (data.length < 200) throw new Error(`only ${data.length} weeks of data`);
-  // kline format per CoinEx: [ts, open, high, low, close, vol, ...]
-  const closes = data.map(row => Number(row[4]));
-  const last200 = closes.slice(-200);
-  const ma = last200.reduce((s, c) => s + c, 0) / last200.length;
+  // Computed from the Yahoo BTC-USD daily series the site already uses for /api/btc/monthly
+  // (the old CoinEx v1 weekly-kline endpoint returns 503). Completed weeks only, Sunday close.
+  const { fetchBTCDailyHistory } = await import('../lib/cycle/btc-history.js');
+  const { weeklyCloses, sma } = await import('../lib/cycle/live-math.js');
+  const weeks = weeklyCloses(await fetchBTCDailyHistory());
+  const ma = sma(weeks, 200);
+  if (ma === null) throw new Error(`only ${weeks.length} weeks of data`);
   ma200wCache = { fetchedAt: Date.now(), ma200w: ma };
   return ma;
 }
@@ -176,47 +200,40 @@ function computeWeeksToWindow(): number {
 async function getCycleState(): Promise<CycleState> {
   const asOf = new Date().toISOString();
   const score = await getCycleScore();
-  try {
-    const [{ price, change24h }, longWindow, ma200w] = await Promise.all([
-      getCurrentPrice(),
-      getLongWindowChanges(),
-      get200wMA(),
-    ]);
-    const drawdown = ((CYCLE_TOP_USD - price) / CYCLE_TOP_USD) * 100;
-    return {
-      price,
-      change24h,
-      change7d: longWindow.change7d,
-      change30d: longWindow.change30d,
-      drawdownPctFromTop: Math.max(0, drawdown),
-      weeksToWindow: computeWeeksToWindow(),
-      cycleTop: { price: CYCLE_TOP_USD, date: CYCLE_TOP_DATE },
-      cycleLowTarget: { min: CYCLE_LOW_TARGET_MIN_USD, max: CYCLE_LOW_TARGET_MAX_USD },
-      windowOpen: WINDOW_OPEN_ISO,
-      ma200w,
-      asOf,
-      source: 'live',
-      score,
-    };
-  } catch (err) {
-    console.warn('[cycle] live fetch failed, returning fallback payload:', (err as Error).message);
-    const ma200w = await get200wMA().catch(() => ma200wCache?.ma200w ?? 0);
-    return {
-      price: 0,
-      change24h: 0,
-      change7d: null,
-      change30d: null,
-      drawdownPctFromTop: 0,
-      weeksToWindow: computeWeeksToWindow(),
-      cycleTop: { price: CYCLE_TOP_USD, date: CYCLE_TOP_DATE },
-      cycleLowTarget: { min: CYCLE_LOW_TARGET_MIN_USD, max: CYCLE_LOW_TARGET_MAX_USD },
-      windowOpen: WINDOW_OPEN_ISO,
-      ma200w,
-      asOf,
-      source: 'fallback',
-      score,
-    };
+  // allSettled: one dead upstream must not blank the others (audit B5).
+  const [priceR, longR, maR] = await Promise.allSettled([
+    getCurrentPrice(),
+    getLongWindowChanges(),
+    get200wMA(),
+  ]);
+  for (const [name, r] of [['price', priceR], ['7d/30d', longR], ['200wma', maR]] as const) {
+    if (r.status === 'rejected') console.warn(`[cycle] ${name} unavailable:`, (r.reason as Error)?.message);
   }
+  const price = priceR.status === 'fulfilled' ? priceR.value.price : 0;
+  const change24h = priceR.status === 'fulfilled' ? priceR.value.change24h : 0;
+  const long = longR.status === 'fulfilled' ? longR.value : { change7d: null, change30d: null, source: 'unavailable' };
+  const ma200w = maR.status === 'fulfilled' ? maR.value : (ma200wCache?.ma200w ?? 0);
+  const drawdown = price > 0 ? ((CYCLE_TOP_USD - price) / CYCLE_TOP_USD) * 100 : 0;
+  return {
+    price,
+    change24h,
+    change7d: long.change7d,
+    change30d: long.change30d,
+    drawdownPctFromTop: Math.max(0, drawdown),
+    weeksToWindow: computeWeeksToWindow(),
+    cycleTop: { price: CYCLE_TOP_USD, date: CYCLE_TOP_DATE },
+    cycleLowTarget: { min: CYCLE_LOW_TARGET_MIN_USD, max: CYCLE_LOW_TARGET_MAX_USD },
+    windowOpen: WINDOW_OPEN_ISO,
+    ma200w,
+    asOf,
+    source: price > 0 ? 'live' : 'fallback',
+    sources: {
+      price: priceR.status === 'fulfilled' ? priceR.value.source : 'unavailable',
+      change7d30d: long.source,
+      ma200w: ma200w > 0 ? 'yahoo-weekly' : 'unavailable',
+    },
+    score,
+  };
 }
 // --- end inlined ---
 
@@ -933,89 +950,34 @@ async function getFundingRates() {
 // Deribit blocks serverless with Cloudflare — use fallback data
 
 async function handleOptionsFlow(_: VercelRequest, res: VercelResponse) {
-  // Try Deribit first with a tight 3s budget per request — Vercel's
-  // serverless lambda has a 10s gateway cap, and Deribit is often slow
-  // (or 403'd by Cloudflare) from the edge. If either call doesn't return
-  // a usable `result` array in 3s, fall through to the proxy data marked
-  // `source: 'proxy'` so the page renders something useful.
+  // Deribit public API v2 (audit B6). If it fails, say so: no hardcoded sample numbers.
   try {
+    const { DERIBIT_V2_BOOK, parseOptions, aggregate, topStrikes } = await import('../lib/options/deribit.js');
     const [btcRes, ethRes] = await Promise.all([
-      apiFetch('https://www.deribit.com/api/v6/public/get_book_summary_by_currency?currency=BTC&kind=option', undefined, 3000),
-      apiFetch('https://www.deribit.com/api/v6/public/get_book_summary_by_currency?currency=ETH&kind=option', undefined, 3000),
+      apiFetch(DERIBIT_V2_BOOK('BTC'), undefined, 5000),
+      apiFetch(DERIBIT_V2_BOOK('ETH'), undefined, 5000).catch(() => null),
     ]);
-    const btcJson = await btcRes.json();
-    const ethJson = await ethRes.json();
-    if (btcJson.result && Array.isArray(btcJson.result)) {
-      const agg = aggregateOptions(btcJson.result);
-      const topStrikes = btcJson.result
-        .sort((a: any, b: any) => (b.open_interest || 0) - (a.open_interest || 0))
-        .slice(0, 8)
-        .map((o: any) => ({
-          symbol: o.underlying?.replace('BTC-', '') || '',
-          strike: o.strike || 0,
-          type: o.underlying?.includes('put') ? 'put' : 'call',
-          openInterest: o.open_interest || 0,
-          volume: o.volume || 0,
-          iv: o.implied_volatility || 0,
-          markPrice: o.mark_price || 0,
-        }));
-      const payload = { btc: agg, eth: aggregateOptions(ethJson.result || []), topStrikes, lastUpdated: new Date().toISOString() };
-      validateShape(payload, OptionsFlowSchema, '/api/options-flow');
-      return ok(res, payload);
-    }
-    throw new Error('Invalid Deribit response');
-  } catch (_) {
-    // Fallback: realistic proxy data based on current market conditions
+    const btcJson: any = await btcRes.json();
+    if (!Array.isArray(btcJson?.result) || btcJson.result.length === 0) throw new Error('Invalid Deribit response');
+    let ethJson: any = null;
+    try { ethJson = ethRes && ethRes.ok ? await ethRes.json() : null; } catch (_) {}
+    const btcOpts = parseOptions(btcJson.result);
+    const ethOpts = Array.isArray(ethJson?.result) ? parseOptions(ethJson.result) : [];
     const payload = {
-      btc: {
-        putCallRatio: 0.68,
-        totalOI: 2840000000,
-        totalVolume: 1250000000,
-        putCallVolumeRatio: 0.82,
-        netDelta: 847000000,
-        sentiment: 'bullish',
-      },
-      eth: {
-        putCallRatio: 0.74,
-        totalOI: 1240000000,
-        totalVolume: 680000000,
-        putCallVolumeRatio: 0.91,
-        netDelta: 312000000,
-        sentiment: 'bullish',
-      },
-      topStrikes: [
-        { symbol: 'BTC-27MAR', strike: 70000, type: 'put', openInterest: 456000000, volume: 234000000, iv: 0.52, markPrice: 2800 },
-        { symbol: 'BTC-27MAR', strike: 75000, type: 'call', openInterest: 389000000, volume: 198000000, iv: 0.48, markPrice: 3100 },
-        { symbol: 'BTC-24APR', strike: 80000, type: 'call', openInterest: 312000000, volume: 156000000, iv: 0.55, markPrice: 4200 },
-        { symbol: 'BTC-24APR', strike: 65000, type: 'put', openInterest: 278000000, volume: 134000000, iv: 0.61, markPrice: 1900 },
-        { symbol: 'BTC-24APR', strike: 90000, type: 'call', openInterest: 234000000, volume: 98000000, iv: 0.72, markPrice: 1800 },
-        { symbol: 'ETH-27MAR', strike: 1800, type: 'put', openInterest: 189000000, volume: 89000000, iv: 0.58, markPrice: 45 },
-        { symbol: 'ETH-27MAR', strike: 2000, type: 'call', openInterest: 156000000, volume: 78000000, iv: 0.54, markPrice: 62 },
-        { symbol: 'ETH-24APR', strike: 2200, type: 'call', openInterest: 123000000, volume: 67000000, iv: 0.63, markPrice: 89 },
-      ],
+      btc: aggregate(btcOpts),
+      eth: ethOpts.length ? aggregate(ethOpts) : undefined,
+      topStrikes: topStrikes(btcOpts, 10),
+      units: 'USD notional (open interest in coins × underlying price)',
       lastUpdated: new Date().toISOString(),
-      source: 'proxy',
+      source: 'deribit-v2',
     };
     validateShape(payload, OptionsFlowSchema, '/api/options-flow');
-    ok(res, payload);
+    res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=600');
+    return res.json(payload);
+  } catch (_) {
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+    return res.status(200).json({ btc: {}, eth: null, topStrikes: [], lastUpdated: new Date().toISOString(), source: 'unavailable' });
   }
-}
-
-function aggregateOptions(options: any[]) {
-  const puts = options.filter((o: any) => o.underlying?.includes('put'));
-  const calls = options.filter((o: any) => o.underlying?.includes('call'));
-  const putOI = puts.reduce((s: number, o: any) => s + (o.open_interest || 0), 0);
-  const callOI = calls.reduce((s: number, o: any) => s + (o.open_interest || 0), 0);
-  const putVol = puts.reduce((s: number, o: any) => s + (o.volume || 0), 0);
-  const callVol = calls.reduce((s: number, o: any) => s + (o.volume || 0), 0);
-  return {
-    putCallRatio: callOI > 0 ? putOI / callOI : 0,
-    totalOI: putOI + callOI,
-    totalVolume: putVol + callVol,
-    putCallVolumeRatio: callVol > 0 ? putVol / callVol : 0,
-    netDelta: callOI - putOI,
-    sentiment: callOI > putOI ? 'bullish' : callOI < putOI ? 'bearish' : 'neutral',
-  };
 }
 
 // ─── Liquidity ────────────────────────────────────────────────────────────────
@@ -1046,22 +1008,18 @@ async function getLiquidityData() {
     fedBalance = fbRaw || 0;
   } catch (_) {}
 
-  // M2 year-over-year growth (need 12 months apart)
+  // M2 year-over-year growth: same month a year earlier, matched by date (audit D2).
   let m2Growth = 0;
+  let m2AsOf: string | null = null;
   try {
-    const r = await apiFetch('https://fred.stlouisfed.org/graph/fredgraph.csv?id=M2SL&npp=14');
-    if (r.ok) {
-      const text = await r.text();
-      const lines = text.trim().split('\n').slice(2); // skip header,date,value
-      const valid = lines.map(l => l.split(',')).filter(p => p.length >= 2 && p[1] !== '.').map(p => parseFloat(p[1])).filter(v => !isNaN(v));
-      if (valid.length >= 2) {
-        m2Growth = parseFloat(((valid[0] - valid[1]) / valid[1] * 100).toFixed(2));
-      }
-    }
+    const { fetchFredCsv, yoyPct, monthsAgoISO } = await import('../lib/macro/fred-csv.js');
+    const pts = await fetchFredCsv('M2SL', monthsAgoISO(15));
+    const y = yoyPct(pts);
+    if (y !== null) { m2Growth = parseFloat(y.toFixed(2)); m2AsOf = pts[pts.length - 1].date; }
   } catch (_) {}
 
   // Derive macro signal
-  const hasRealData = m2 > 0 && fedBalance > 0;
+  const hasRealData = m2 > 0 && fedBalance > 0 && m2AsOf !== null;
   let overallSignal = 'unavailable';
   let signalExplanation = '';
   if (hasRealData) {
@@ -1081,10 +1039,11 @@ async function getLiquidityData() {
       m2,
     },
     indicators: {
-      m2: { value: m2, label: 'M2 Money Supply', unit: 'USD Billions', change: hasRealData ? m2Growth : null },
-      rrp: { value: rrp, label: 'Overnight RRP', unit: 'USD Billions', change: null },
-      tga: { value: tga, label: 'Treasury Gen. Acct', unit: 'USD Billions', change: null },
-      fedBalance: { value: fedBalance, label: 'Fed Balance Sheet', unit: 'USD Billions', change: null },
+      // Units per FRED: M2SL and RRPONTSYD are billions; TREAST and WALCL are millions (audit D2).
+      m2: { value: m2, label: 'M2 Money Supply', unit: 'USD Billions', change: hasRealData ? m2Growth : null, asOf: m2AsOf, seriesId: 'M2SL' },
+      rrp: { value: rrp, label: 'Overnight RRP', unit: 'USD Billions', change: null, seriesId: 'RRPONTSYD' },
+      tga: { value: tga, label: 'Fed Treasury Holdings', unit: 'USD Millions', change: null, seriesId: 'TREAST' },
+      fedBalance: { value: fedBalance, label: 'Fed Balance Sheet', unit: 'USD Millions', change: null, seriesId: 'WALCL' },
     },
     derivedMetrics: {
       moneySupplyGrowth: hasRealData ? m2Growth : null,
@@ -1300,17 +1259,29 @@ async function handleTreasuryFiscal(_: VercelRequest, res: VercelResponse) {
 // ─── Financial Inflation (sectors) ────────────────────────────────────────────
 
 async function handleFinancialInflation(_: VercelRequest, res: VercelResponse) {
-  ok(res, {
-    overall: { rate: 3.2, change: -0.1, lastUpdated: '2026-03-01', comparisonPeriod: 'Year-over-Year' },
-    sectors: [
-      { name: 'Food & Beverages', rate: 3.8, change: 0.2, seriesId: 'CUSR0000SAF' },
-      { name: 'Shelter', rate: 5.4, change: -0.3, seriesId: 'CUSR0000SAH1' },
-      { name: 'Energy', rate: -0.4, change: -1.2, seriesId: 'CUSR0000SAE' },
-      { name: 'Medical Care', rate: 3.1, change: 0.1, seriesId: 'CUSR0000SAM' },
-      { name: 'Transportation', rate: 2.8, change: 0.4, seriesId: 'CUSR0000SAT' },
-      { name: 'Education', rate: 4.2, change: 0.0, seriesId: 'CUSR0000SAE1' },
-    ],
-    source: 'Bureau of Labor Statistics (FRED)',
+  // Headline CPI from FRED (audit D3). The old hardcoded sector table (with a mislabeled
+  // energy series id) is gone; sectors come from FRED too and are omitted if a series fails.
+  const SECTORS = [
+    { name: 'Food', seriesId: 'CPIUFDSL' },
+    { name: 'Shelter', seriesId: 'CUSR0000SAH1' },
+    { name: 'Energy', seriesId: 'CPIENGSL' },
+    { name: 'Medical Care', seriesId: 'CPIMEDSL' },
+    { name: 'Transportation', seriesId: 'CPITRNSL' },
+  ];
+  const [headline, ...sectorResults] = await Promise.allSettled([
+    inflationYoY('CPIAUCSL'),
+    ...SECTORS.map(s => inflationYoY(s.seriesId)),
+  ]);
+  if (headline.status !== 'fulfilled') return err(res, 503, 'CPI unavailable from FRED right now');
+  const sectors = SECTORS.flatMap((s, i) => {
+    const r = sectorResults[i];
+    return r.status === 'fulfilled' ? [{ name: s.name, rate: r.value.value, change: r.value.change ?? 0, seriesId: s.seriesId }] : [];
+  });
+  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+  res.json({
+    overall: { rate: headline.value.value, change: headline.value.change ?? 0, lastUpdated: headline.value.lastUpdated, comparisonPeriod: 'Year-over-Year' },
+    sectors,
+    source: 'Bureau of Labor Statistics via FRED (CPIAUCSL)',
   });
 }
 
@@ -1403,15 +1374,49 @@ async function handleTreasury(_: VercelRequest, res: VercelResponse) {
 
 // ─── Inflation ─────────────────────────────────────────────────────────────────
 
+// Live inflation from FRED (keyless CSV), audit D3. Each figure carries its own as-of date;
+// a series that fails to load is null, never a hardcoded number.
+const INFLATION_SERIES = {
+  cpi: { id: 'CPIAUCSL', label: 'CPI YoY' },
+  core: { id: 'CPILFESL', label: 'Core CPI YoY' },
+  pce: { id: 'PCEPI', label: 'PCE YoY' },
+  ppi: { id: 'PPIFID', label: 'PPI (final demand) YoY' },
+} as const;
+
+async function inflationYoY(seriesId: string) {
+  const { fetchFredCsv, yoyPct, monthsAgoISO } = await import('../lib/macro/fred-csv.js');
+  const pts = await fetchFredCsv(seriesId, monthsAgoISO(15));
+  const last = pts[pts.length - 1];
+  const prev = pts[pts.length - 2];
+  const now = yoyPct(pts);
+  const before = prev ? yoyPct(pts, prev) : null;
+  if (now === null || !last) throw new Error(`${seriesId}: not enough data for YoY`);
+  return {
+    value: Number(now.toFixed(1)),
+    change: before !== null ? Number((now - before).toFixed(1)) : null, // pp vs prior month's YoY
+    lastUpdated: last.date,
+    seriesId,
+  };
+}
+
 async function handleInflation(_: VercelRequest, res: VercelResponse) {
-  ok(res, {
-    cpi: { value: 3.2, label: 'CPI YoY', change: -0.1, lastUpdated: '2026-03-31' },
-    ppi: { value: 2.8, label: 'PPI YoY', change: -0.2, lastUpdated: '2026-03-31' },
-    pce: { value: 2.7, label: 'PCE YoY', change: -0.1, lastUpdated: '2026-02-28' },
-    core: { value: 3.4, label: 'Core CPI', change: 0.0, lastUpdated: '2026-03-31' },
-    breakeven: ((4.35 - 2.0) || 2.35).toFixed(2),
-    lastUpdated: new Date().toISOString(),
+  const keys = Object.keys(INFLATION_SERIES) as (keyof typeof INFLATION_SERIES)[];
+  const results = await Promise.allSettled(keys.map(k => inflationYoY(INFLATION_SERIES[k].id)));
+  const out: Record<string, unknown> = {};
+  keys.forEach((k, i) => {
+    const r = results[i];
+    out[k] = r.status === 'fulfilled'
+      ? { ...r.value, label: INFLATION_SERIES[k].label }
+      : { value: null, change: null, lastUpdated: null, label: INFLATION_SERIES[k].label, seriesId: INFLATION_SERIES[k].id, error: 'unavailable' };
   });
+  let breakeven: string | null = null;
+  try {
+    const { fetchFredCsv } = await import('../lib/macro/fred-csv.js');
+    const pts = await fetchFredCsv('T10YIE', new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+    if (pts.length) breakeven = pts[pts.length - 1].value.toFixed(2);
+  } catch (_) {}
+  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+  res.json({ ...out, breakeven, source: 'FRED (St. Louis Fed)', lastUpdated: new Date().toISOString() });
 }
 
 // Inlined editorial overlay — MUST stay in sync with client/src/lib/legislation-data.ts.

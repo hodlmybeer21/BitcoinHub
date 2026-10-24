@@ -75,6 +75,8 @@ interface DCAResult {
   satsAccumulated: number;
   priceAtStart: number;
   priceNow: number;
+  priceNowSource?: string;
+  pricesThrough?: string;
   monthsInvested: number;
   dataPoints: Array<{
     date: string;
@@ -446,11 +448,14 @@ export default function DCASimulator() {
                       </div>
                       <div className="bg-muted/30 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground">BTC at Start</p>
-                        <p className="text-lg font-semibold">${formatCurrency(data.priceAtStart)}</p>
+                        <p className="text-lg font-semibold">{formatCurrency(data.priceAtStart)}</p>
                       </div>
                       <div className="bg-muted/30 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground">BTC Now</p>
-                        <p className="text-lg font-semibold">${formatCurrency(data.priceNow)}</p>
+                        <p className="text-lg font-semibold" data-testid="dca-price-now">{formatCurrency(data.priceNow)}</p>
+                        {data.priceNowSource && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{data.priceNowSource}</p>
+                        )}
                       </div>
                     </div>
 

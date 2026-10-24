@@ -16,6 +16,7 @@ import { motion } from "framer-motion";
 import { TrendingDown, Clock, Target, AlertTriangle, ArrowRight, Play, Loader2, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { windowStatus, windowPhrase } from "@/lib/cycleWindow";
 import { Button } from "@/components/ui/button";
 
 const fadeInUp = {
@@ -62,10 +63,10 @@ const CYCLE_MILESTONES = [
     note: "Historical -75% to -80% from the $126,080 peak. Window: Aug–Oct 2026.",
   },
   {
-    date: "Q4 2027",
+    date: "Q4 2029",
     event: "Next cycle top",
     price: "TBD",
-    note: "If the cycle holds, post-halving blow-off top in late 2027 / early 2028.",
+    note: "If the pattern holds. Tops came in Q4 of post-halving years (2013, 2017, 2021, 2025); the next halving is expected in 2028 (every 210,000 blocks), so the post-halving year is 2029.",
   },
 ];
 
@@ -132,6 +133,7 @@ export default function Cycle() {
   });
 
   const live = cycleState?.source === "live";
+  const win = cycleState ? windowStatus(cycleState.windowOpen) : null;
   const priceFmt = (n: number) =>
     n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const pctFmt = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
@@ -152,8 +154,8 @@ export default function Cycle() {
             </motion.h1>
             <motion.p variants={fadeInUp} className="mt-6 text-lg text-muted-foreground max-w-3xl">
               Bitcoin tops in Q4 of post-halving years and bottoms in Q4 of midterm years. The pattern
-              has survived ETFs, MicroStrategy, and trillions in corporate buying. Q4 2026 is the next
-              textbook bottom window — {cycleState ? `${cycleState.weeksToWindow} weeks away.` : "approaching."}
+              has survived ETFs, MicroStrategy, and trillions in corporate buying. The Q4 2026
+              textbook bottom window is {win ? `${windowPhrase(win)}.` : "Aug–Oct 2026."}
             </motion.p>
             <motion.div variants={fadeInUp} className="mt-8 flex flex-wrap gap-3">
               <Link href="/dca-simulator">
@@ -257,10 +259,12 @@ export default function Cycle() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold font-mono text-amber-400">
-                  {cycleState ? cycleState.weeksToWindow : "—"}
+                <div className="text-3xl font-bold font-mono text-amber-400" data-testid="window-status">
+                  {!win ? "—" : win.phase === "before" ? win.weeks : win.phase === "open" ? "Open" : "Closed"}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">weeks to Q4 window</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {!win || win.phase === "before" ? "weeks to Q4 window" : win.phase === "open" ? `Q4 window · opened Aug 1, 2026` : "Q4 window ended Oct 31, 2026"}
+                </div>
                 <div className="text-xs text-muted-foreground mt-2">Aug–Oct optimal entry</div>
               </CardContent>
             </Card>
@@ -380,7 +384,7 @@ export default function Cycle() {
               ? priceFmt(cycleState.price)
               : "—";
             const currentNote = isCurrent && cycleState && cycleState.price > 0
-              ? `Live. ${cycleState.drawdownPctFromTop.toFixed(1)}% below the $${cycleState.cycleTop.price.toLocaleString()} top. ${cycleState.weeksToWindow} weeks to the Q4 window.`
+              ? `Live. ${cycleState.drawdownPctFromTop.toFixed(1)}% below the $${cycleState.cycleTop.price.toLocaleString()} top. Q4 window ${win ? windowPhrase(win) : ""}.`
               : m.note;
             return (
               <Card key={i} className={isCurrent ? "border-[#F7931A]/40 bg-[#F7931A]/[0.03]" : ""}>
@@ -513,8 +517,7 @@ export default function Cycle() {
             <Target className="h-10 w-10 text-[#F7931A] mx-auto mb-4" />
             <h2 className="text-2xl sm:text-3xl font-bold mb-3">Make this personal</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
-              See what $50/month from any start year would have built. Then see what $50/month from
-              the next 15 weeks could build.
+              See what $50/month from any start year would have built, priced to today's live BTC.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Link href="/dca-simulator">
