@@ -12,7 +12,7 @@ import Learn from "@/pages/Learn";
 import { Redirect } from "wouter";
 import WebResources from "@/pages/WebResources";
 import Legislation from "@/pages/Legislation";
-import Admin from "@/pages/Admin";
+import DataStories from "@/pages/DataStories";
 import DCASimulator from "@/pages/DCASimulator";
 import Cycle from "@/pages/Cycle";
 import CycleCompare from "@/pages/CycleCompare";
@@ -53,7 +53,8 @@ function Router() {
         <Route path="/news">{() => <Redirect to="/cycle" />}</Route>
         <Route path="/web-resources" component={WebResources} />
         <Route path="/legislation" component={Legislation} />
-        <Route path="/admin" component={Admin} />
+        {/* /admin removed (UX review #44): dead client-only shell; falls through to NotFound. */}
+        <Route path="/data-stories" component={DataStories} />
         <Route path="/dca-simulator" component={() => (
           <ErrorBoundary label="DCA Simulator">
             <DCASimulator />

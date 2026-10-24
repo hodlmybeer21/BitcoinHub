@@ -28,6 +28,7 @@ export default function RouteMeta() {
       <meta property="og:url" content={m.canonical} />
       <meta name="twitter:title" content={m.title} />
       <meta name="twitter:description" content={m.description} />
+      {m.noindex && <meta name="robots" content="noindex" />}
     </Helmet>
   );
 }

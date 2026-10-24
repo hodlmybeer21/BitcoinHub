@@ -1,87 +1,31 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
-import {
-  TrendingUp,
-  ArrowRight,
-  BookOpen,
-  ChevronDown,
-  BarChart3,
-  Scale,
-  Coins,
-  CheckCircle2,
-  Mail,
-  ExternalLink,
-  Gamepad2,
-  Shield,
-  Target,
-  Zap,
-  User,
-  Bot,
-  Sparkles,
-  Heart,
-  ChevronRight
-} from 'lucide-react';
+import { ArrowRight, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { formatCurrency } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
 import { buildValueStats, type SourceRef } from "@/lib/valueTrackerStats";
 import SubstackSignup from "@/components/SubstackSignup";
 import { NEWSLETTER_NAME, NEWSLETTER_TAGLINE } from "@/lib/newsletter";
 import { CycleNow } from '@/components/CycleNow';
 
-interface MarketData {
-  price: number;
-  change24h: number;
-  marketCap: number;
-  volume24h: number;
-}
-
-const BitcoinIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
-  <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" r="16" fill="#F7931A"/>
-    <circle cx="16" cy="16" r="12" fill="none" stroke="white" strokeWidth="1.5"/>
-    <text x="16" y="21" textAnchor="middle" fontSize="14" fontWeight="bold" fill="white" fontFamily="serif">₿</text>
-  </svg>
-);
+// Front door (UX review #1–#13): one message, the Cycle Now card in the hero, the
+// "what a dollar buys" cards, three laws, a short founder line, and exactly one
+// Substack embed. Games, the Human+AI section, audience pills and the second
+// footer are gone from here; the site footer in Layout carries the disclaimer.
 
 const fadeInUp = {
-  initial: { opacity: 0, y: 24 },
+  initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+  transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
 };
-
-const staggerContainer = {
-  animate: { transition: { staggerChildren: 0.08 } }
-};
-
-const HeroBackground = () => (
-  <div className="absolute inset-0 overflow-hidden">
-    <div className="absolute inset-0 bg-[linear-gradient(rgba(247,147,26,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(247,147,26,0.04)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black,transparent)]" />
-    <motion.div
-      className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-[#F7931A]/8 blur-3xl"
-      animate={{ x: [0, 40, 0], y: [0, 20, 0] }}
-      transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-    />
-    <motion.div
-      className="absolute -bottom-40 -right-40 w-[400px] h-[400px] rounded-full bg-[#F7931A]/5 blur-3xl"
-      animate={{ x: [0, -30, 0], y: [0, -40, 0] }}
-      transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-    />
-  </div>
-);
 
 const ValueStat = ({ label, usd, gold, note, sources }: { label: string; usd: string; gold: string; note?: string; sources?: readonly SourceRef[] }) => (
   <div className="flex flex-col items-center px-4 py-3 bg-card/40 rounded-xl border border-muted/10">
-    <span className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</span>
-    <div className="flex items-baseline gap-3">
+    <span className="text-xs text-muted-foreground uppercase tracking-wider mb-1 text-center">{label}</span>
+    <div className="flex items-baseline gap-3 flex-wrap justify-center">
       <span className="text-amber-500 font-bold text-lg font-mono">{usd}</span>
-      {gold && <span className="text-green-500 text-sm font-mono">{gold}</span>}
+      {/* Neutral colour: a gold-terms change is context, not a win or loss (review #5). */}
+      {gold && <span className="text-muted-foreground text-sm font-mono">{gold}</span>}
     </div>
     {note && <span className="text-[10px] text-muted-foreground mt-0.5 text-center">{note}</span>}
     {sources && sources.length > 0 && (
@@ -98,150 +42,70 @@ const ValueStat = ({ label, usd, gold, note, sources }: { label: string; usd: st
   </div>
 );
 
+const LAWS = [
+  { id: 'metcalfe', name: "Metcalfe's Law", tagline: "Network value grows with users squared. How Bitcoin's curve compares with the internet's." },
+  { id: 'lindy', name: 'The Lindy Effect', tagline: 'The longer something survives, the longer it tends to last. Bitcoin is 17 years in.' },
+  { id: 's2f', name: 'Stock-to-Flow', tagline: 'The scarcity model fit 2013→2021 and broke 2022→2024. We chart both, honestly.' },
+];
+
+const scrollToSignup = () => {
+  document.getElementById('newsletter')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
 const Home = () => {
-
-  const { data: marketData } = useQuery<MarketData>({
-    queryKey: ['/api/bitcoin/market-data'],
-    refetchInterval: 60000,
-  });
-
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, []);
-
-  const btcPrice = marketData?.price ?? 0;
-  const priceChange = marketData?.change24h ?? 0;
-
   return (
-    <div className="min-h-screen bg-background">
-
-      {/* ─── HERO ─── */}
-      <section className="relative min-h-[92vh] flex items-center justify-center overflow-hidden">
-        <HeroBackground />
-        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
-          <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-8">
-
-            {btcPrice > 0 && (
-              <motion.div variants={fadeInUp} className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-card/80 border border-muted/20 backdrop-blur-sm">
-                <div className="flex items-center gap-2">
-                  <BitcoinIcon className="w-5 h-5" />
-                  <span className="font-mono font-bold text-foreground">${formatCurrency(btcPrice).replace('$', '')}</span>
-                </div>
-                <div className={`flex items-center gap-1 text-sm ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {priceChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingUp className="w-4 h-4 transform rotate-180" />}
-                  <span>{priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%</span>
-                </div>
-                <Badge variant="outline" className="text-xs bg-green-500/10 text-green-400 border-green-500/30">LIVE</Badge>
-              </motion.div>
-            )}
-
-            <motion.h1 variants={fadeInUp} className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground leading-[1.1] max-w-4xl mx-auto tracking-tight">
-              The Bitcoin Education Platform{' '}
-              <span className="text-primary">Built by a Human + AI Team</span>
-            </motion.h1>
-
-            {/* Satoshi §1 quote — the thesis BitcoinHub is built around */}
-            <motion.blockquote
-              variants={fadeInUp}
-              className="max-w-3xl mx-auto border-l-2 border-primary/60 pl-4 pr-2 italic text-muted-foreground"
-            >
-              <p className="text-base sm:text-lg leading-relaxed">
-                &ldquo;A purely peer-to-peer version of electronic cash would allow online payments
-                to be sent directly from one party to another without going through a financial
-                institution.&rdquo;
-              </p>
-              <footer className="text-[11px] text-muted-foreground/70 mt-2 not-italic">
-                — Satoshi Nakamoto,{' '}
-                <a
-                  href="https://bitcoin.org/bitcoin.txt"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-foreground/80"
-                >
-                  <em>Bitcoin: A Peer-to-Peer Electronic Cash System</em>
-                </a>{' '}
-                (2008), §1
-              </footer>
-            </motion.blockquote>
-
-            <motion.p variants={fadeInUp} className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Most Bitcoin sites speculate on price. We teach you how money actually works —
-              through 13 interactive games, real purchasing power data, and a founding story
-              that proves this isn't just another crypto blog.
-            </motion.p>
-
-            <motion.div variants={fadeInUp} className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm">
-              <Link href="/thesis">
-                <span className="inline-flex items-center gap-1 text-primary hover:text-primary/80 cursor-pointer font-medium">
-                  Read the full Satoshi paper <ArrowRight className="w-4 h-4" />
-                </span>
-              </Link>
-              <span className="text-muted-foreground/40">·</span>
-              <Link href="/sources">
-                <span className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer">
-                  See every data source <ArrowRight className="w-4 h-4" />
-                </span>
-              </Link>
-            </motion.div>
-
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2 sm:gap-3">
-              <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
-                Millennials worried about inflation
-              </span>
-              <span className="text-muted-foreground hidden sm:inline" aria-hidden="true">•</span>
-              <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
-                Retiring Boomers who lived through the system
-              </span>
-              <span className="text-muted-foreground hidden sm:inline" aria-hidden="true">•</span>
-              <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
-                Anyone protecting a family's purchasing power
-              </span>
-            </motion.div>
-
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-              <Link href="/learn">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 h-12 text-base">
-                  Start Learning Free <ArrowRight className="ml-2 w-5 h-5" />
+    <div className="bg-background">
+      {/* ─── HERO: one message + Cycle Now (review #1, #4) ─── */}
+      <section className="relative overflow-hidden" data-testid="home-hero">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(247,147,26,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(247,147,26,0.035)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(ellipse_80%_70%_at_50%_30%,black,transparent)]" aria-hidden="true" />
+        <div className="relative max-w-4xl mx-auto px-0 sm:px-4 pt-6 sm:pt-12 pb-10">
+          <motion.div {...fadeInUp} className="text-center space-y-4">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground leading-[1.08] tracking-tight">
+              Where are we in the <span className="text-primary">Bitcoin cycle?</span>
+            </h1>
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Calm, sourced answers, updated daily. One clear read on the 4-year cycle, with every
+              number linked to where it came from.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+              <Link href="/cycle">
+                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-7 h-12 text-base" data-testid="hero-see-cycle">
+                  See the cycle <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <Link href="/analytics">
-                <Button variant="outline" size="lg" className="font-semibold px-8 h-12 text-base border-muted/30 hover:border-primary/50">
-                  See Live Analytics <BarChart3 className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-            </motion.div>
+              <Button
+                size="lg"
+                variant="outline"
+                className="font-semibold px-7 h-12 text-base border-muted/30 hover:border-primary/50"
+                onClick={scrollToSignup}
+                data-testid="hero-get-chart"
+              >
+                <Mail className="mr-2 w-5 h-5" /> Get the free daily chart
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Educational, not financial advice ·{' '}
+              <Link href="/sources" className="underline hover:text-foreground">See every data source</Link>
+            </p>
+          </motion.div>
 
-            <motion.p variants={fadeInUp} className="text-sm text-muted-foreground">
-              Learn by simulating — not by reading price charts.
-            </motion.p>
+          <motion.div {...fadeInUp} transition={{ ...fadeInUp.transition, delay: 0.1 }} className="mt-8 text-left">
+            <CycleNow />
           </motion.div>
         </div>
-        <motion.div className="absolute bottom-8 left-1/2 -translate-x-1/2" animate={{ y: [0, 8, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>
-          <ChevronDown className="w-7 h-7 text-muted-foreground/50" />
-        </motion.div>
       </section>
 
-      {/* ─── CYCLE NOW — "Where are we in the Bitcoin cycle?" hero widget ─── */}
-      {/* Per Tyler's 2026-09-17 review: the first above-the-fold data hook for
-          new visitors. Day X of the 4-year halving cycle, current risk band,
-          BTC price change since halving. The single artifact the daily X
-          auto-post compounds on. */}
-      <section className="bg-background py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <CycleNow />
-        </div>
-      </section>
-
-      {/* ─── VALUE TRACKER STATS BAR ─── */}
-      <section className="bg-card/60 border-y border-muted/10 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ─── WHAT A DOLLAR BUYS (review #5) ─── */}
+      <section className="bg-card/60 border-y border-muted/10 py-10 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-5">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">The Numbers Don't Lie</p>
-            <p className="text-sm text-muted-foreground">
-              Price changes through 2025 from public data (World Bank, BLS, Census/FRED, StatMuse). Gold and items are annual averages; Bitcoin is Dec 31 closes. Explore more in{' '}
+            <h2 className="text-2xl font-bold text-foreground mb-1">What a dollar buys, 1970–2025</h2>
+            <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
+              Price changes through 2025 from public data (World Bank, BLS, Census/FRED, StatMuse). Gold and items are
+              annual averages; Bitcoin is Dec 31 closes. More in{' '}
               <a href="https://tracker.goodbotai.tech" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 Value Tracker
-              </a>
+              </a>.
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -252,406 +116,72 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ─── WHY THIS EXISTS ─── */}
-      <section className="py-24 bg-background">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial="initial" whileInView="animate" viewport={{ once: true, margin: "-80px" }} variants={staggerContainer}>
-            <motion.div variants={fadeInUp} className="text-center mb-16">
-              <Badge variant="outline" className="mb-4 border-primary/30 text-primary bg-primary/5">Why This Exists</Badge>
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Built by Someone Living It</h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Tyler isn't a VC or a "crypto influencer." He works a regular job and built this
-                because he couldn't find Bitcoin education that actually taught him how money works.
-              </p>
-            </motion.div>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              <motion.div variants={fadeInUp} className="md:col-span-2">
-                <Card className="bg-card border-muted/20 p-8 h-full">
-                  <div className="flex items-start gap-4 mb-6">
-                    <div className="w-14 h-14 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                      <User className="w-7 h-7 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-foreground mb-1">Tyler, Founder</h3>
-                      <p className="text-sm text-muted-foreground">@HODLMyBeer21 · Human + AI builder</p>
-                    </div>
-                  </div>
-                  <div className="space-y-4 text-muted-foreground leading-relaxed">
-                    <p>
-                      "I've watched the financial system from an everyday job, and the real 
-                      inventory that matters is <em>purchasing power</em>. 
-                      I wanted to understand why my dollar buys less every year, and every 
-                      Bitcoin site just showed me a price chart."
-                    </p>
-                    <p>
-                      "I hired GoodBot — my AI research agent — to find the education I couldn't find. 
-                      It built 13 interactive games. It pulled real purchasing power data. 
-                      It connected things I'd never seen connected before."
-                    </p>
-                    <p className="text-foreground font-medium">
-                      "This platform is what I was looking for. If you're worried about what 
-                      your money will be worth in the future, you're in the right place."
-                    </p>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <Card className="bg-card border-muted/20 p-6 h-full flex flex-col">
-                  <div className="w-12 h-12 rounded-lg bg-red-500/10 flex items-center justify-center mb-4">
-                    <TrendingUp className="w-6 h-6 text-red-400" />
-                  </div>
-                  <CardTitle className="text-lg mb-3">The Problem We Solved</CardTitle>
-                  <ul className="space-y-3 text-sm text-muted-foreground flex-1">
-                    <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✕</span> Crypto sites are for traders, not learners</li>
-                    <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✕</span> YouTube is clickbait + price speculation</li>
-                    <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✕</span> Books are outdated before they publish</li>
-                    <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✕</span> No one explains monetary history visually</li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span className="text-foreground font-medium">BitcoinHub does all of this</span>
-                    </li>
-                  </ul>
-                </Card>
-              </motion.div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── BUILT DIFFERENTLY ─── */}
-      <section className="py-24 bg-card/40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial="initial" whileInView="animate" viewport={{ once: true, margin: "-80px" }} variants={staggerContainer}>
-            <motion.div variants={fadeInUp} className="text-center mb-16">
-              <Badge variant="outline" className="mb-4 border-primary/30 text-primary bg-primary/5">Built Differently</Badge>
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Human + AI: The Team Behind This</h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                No other Bitcoin education platform is built this way. Tyler brings the real-world 
-                experience and domain knowledge. GoodBot brings the research depth, data analysis, 
-                and tireless building. Together, it's something new.
-              </p>
-            </motion.div>
-
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <motion.div variants={fadeInUp}>
-                <Card className="bg-card border-muted/20 p-8 h-full hover:border-primary/30 transition-colors">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-14 h-14 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
-                      <User className="w-7 h-7 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-foreground">Tyler</h3>
-                      <p className="text-sm text-muted-foreground">The Human · Domain Expert</p>
-                    </div>
-                  </div>
-                  <ul className="space-y-3 text-sm text-muted-foreground">
-                    {[
-                      "Real-world experience watching how money actually works",
-                      "Lives with the same purchasing power concerns as everyone else",
-                      "Research direction: what matters to real people",
-                      "Quality control: is this actually useful?"
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <Card className="bg-card border-muted/20 p-8 h-full hover:border-primary/30 transition-colors">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-14 h-14 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
-                      <Bot className="w-7 h-7 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-foreground">GoodBot</h3>
-                      <p className="text-sm text-muted-foreground">The AI Agent · Research Engine</p>
-                    </div>
-                  </div>
-                  <ul className="space-y-3 text-sm text-muted-foreground">
-                    {[
-                      "Researches purchasing power data across decades",
-                      "Designed all 13 interactive learning games",
-                      "Built the Value Tracker data visualization",
-                      "Connects monetary history to current events",
-                      "Never sleeps — updates data and content continuously"
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              </motion.div>
-            </div>
-
-            <motion.div variants={fadeInUp} className="mt-10 text-center">
-              <div className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary/5 border border-primary/15">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-sm text-muted-foreground">This is the future of education: human judgment + AI scale</span>
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── FEATURES: GAMES + ANALYTICS ─── */}
-      <section className="py-24 bg-background">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial="initial" whileInView="animate" viewport={{ once: true, margin: "-80px" }} variants={staggerContainer}>
-            <motion.div variants={fadeInUp} className="text-center mb-16">
-              <Badge variant="outline" className="mb-4 border-primary/30 text-primary bg-primary/5">Interactive Learning</Badge>
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">13 Games That Make Money Make Sense</h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Most Bitcoin education tells you facts. We let you simulate consequences — 
-                so you build real intuition for how money, inflation, and Bitcoin work.
-              </p>
-            </motion.div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[
-                { icon: Gamepad2, title: "Inflation Simulator", desc: "Print money in a virtual economy and watch purchasing power evaporate in real time.", tag: "Most Popular" },
-                { icon: Scale, title: "Gold vs Bitcoin", desc: "Compare gold and Bitcoin's supply curves across 100 years. See why fixed supply changes everything.", tag: "New" },
-                { icon: TrendingUp, title: "DCA Backtester", desc: "Dollar-cost average into Bitcoin at any point in history. See how strategy beats timing.", tag: null },
-                { icon: Coins, title: "21 Million Race", desc: "Race against the Bitcoin mining schedule. Feel how the supply cap is enforced mathematically.", tag: null },
-                { icon: BarChart3, title: "Whale Watcher", desc: "Track large Bitcoin wallet movements and understand what whale activity means for price.", tag: "Analytics" },
-                { icon: Heart, title: "Family Finance Planner", desc: "Model your family's purchasing power across 10, 20, 30 years under different scenarios.", tag: "For Families" }
-              ].map((game, i) => (
-                <motion.div key={i} variants={fadeInUp}>
-                  <Card className="bg-card border-muted/20 p-6 h-full hover:shadow-lg hover:border-primary/25 transition-all group cursor-pointer">
-                    <CardHeader className="p-0 mb-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                          <game.icon className="w-5 h-5 text-primary" />
-                        </div>
-                        {game.tag && <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">{game.tag}</Badge>}
-                      </div>
-                      <CardTitle className="text-base">{game.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <p className="text-sm text-muted-foreground mb-4">{game.desc}</p>
-                      <Link href="/learn">
-                        <Button variant="ghost" size="sm" className="p-0 h-auto text-primary hover:text-primary/80 text-sm font-medium">
-                          Play it free <ChevronRight className="w-4 h-4 ml-0.5" />
-                        </Button>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-
-            <motion.div variants={fadeInUp} className="text-center mt-10">
-              <Link href="/learn">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
-                  See All 13 Games <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── THROUGH THE LAWS ─── */}
-      <section className="py-20 bg-card/40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial="initial" whileInView="animate" viewport={{ once: true, margin: "-80px" }} variants={staggerContainer}>
-            <motion.div variants={fadeInUp} className="text-center mb-12">
-              <Badge variant="outline" className="mb-4 border-primary/30 text-primary bg-primary/5">
-                <BookOpen className="w-3 h-3 mr-1.5 inline-block" />
-                Through the Laws
-              </Badge>
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-                Networks, adoption curves, and time itself
-              </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                People say Bitcoin is "the internet of money." We took that literally. Eight classical
-                laws — Metcalfe, Bass Diffusion, Lindy, Reed's, Power Law, Stock-to-Flow,
-                Nakamoto's, and Perez's revolutions — charted against live on-chain data.
-              </p>
-            </motion.div>
-
-            <div className="grid md:grid-cols-3 gap-4 mb-10">
-              {[
-                { id: 'metcalfe', emoji: '🔗', name: "Metcalfe's Law", tagline: 'Value grows with users². The internet proved it; BTC tracks the same curve.', color: 'amber' },
-                { id: 'bass',     emoji: '📈', name: 'Bass / S-Curve',  tagline: 'Innovators → majority → laggards. BTC adoption maps onto the web\'s, year for year.', color: 'purple' },
-                { id: 'lindy',    emoji: '🪸', name: 'The Lindy Effect', tagline: '17 years alive, ~480 "deaths" — and still climbing. Death is fertilizer.', color: 'emerald' },
-                { id: 'reed',     emoji: '🕸️', name: "Reed's Law",      tagline: 'Lightning enables 2ⁿ possible subgroups. Group-formation grows exponentially.', color: 'fuchsia' },
-                { id: 'power',    emoji: '⚖️', name: 'Power Law',       tagline: 'Top 1K addresses hold ~35%. Top 4 pools mine ~75%. Same shape, different scale.', color: 'cyan' },
-                { id: 's2f',      emoji: '🏆', name: 'Stock-to-Flow',   tagline: 'Scarcity = value. PlanB nailed 2013→2021, broke 2022→2024. We chart both honestly.', color: 'orange' },
-                { id: 'nakamoto', emoji: '⛏️', name: "Nakamoto's Law",  tagline: 'Hashrate doubles ~every 2 years — security budget compounds like Moore\'s Law.', color: 'cyan' },
-                { id: 'perez',    emoji: '🌀', name: 'Perez Revolutions', tagline: '5 historical tech revolutions, ~50-year cycles. BTC fits as a potential 6th.', color: 'violet' },
-              ].map((law) => (
-                <motion.div key={law.id} variants={fadeInUp}>
-                  <Link href={`/laws#${law.id}`}>
-                    <Card className="bg-card border-muted/20 hover:border-primary/40 transition-all p-6 h-full cursor-pointer group">
-                      <div className="text-4xl mb-3">{law.emoji}</div>
-                      <h3 className="text-lg font-semibold text-foreground mb-2">{law.name}</h3>
-                      <p className="text-sm text-muted-foreground leading-snug">{law.tagline}</p>
-                      <div className="flex items-center gap-1 text-sm text-primary mt-4 group-hover:gap-2 transition-all">
-                        <span>See the chart</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </Card>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-
-            <motion.div variants={fadeInUp} className="text-center">
-              <Link href="/laws">
-                <Button size="lg" variant="outline" className="font-semibold px-8 border-muted/30 hover:border-primary/50">
-                  Open all 8 laws <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── NEWSLETTER ─── */}
-      <section className="py-24 bg-card/40" id="newsletter">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial="initial" whileInView="animate" viewport={{ once: true }} variants={staggerContainer}>
-            <Card className="bg-gradient-to-br from-primary/[0.08] via-card to-card border-primary/15 p-8 md:p-12">
-              <CardHeader className="text-center p-0 mb-8">
-                <div className="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center mx-auto mb-4">
-                  <Mail className="w-7 h-7 text-primary" />
-                </div>
-                <CardTitle className="text-2xl md:text-3xl text-foreground">Get {NEWSLETTER_NAME} by email</CardTitle>
-                <CardDescription className="text-base mt-2 text-muted-foreground">
-                  {NEWSLETTER_TAGLINE}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <SubstackSignup />
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── FINAL CTA ─── */}
-      <section className="py-20 bg-background">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div initial="initial" whileInView="animate" viewport={{ once: true }} variants={staggerContainer}>
-            <motion.div variants={fadeInUp} className="mb-8">
-              <div className="inline-flex items-center gap-2 mb-4">
-                <User className="w-5 h-5 text-primary" />
-                <span className="text-muted-foreground text-sm">+</span>
-                <Bot className="w-5 h-5 text-primary" />
-              </div>
-              <BitcoinIcon className="w-20 h-20 mx-auto opacity-15" />
-            </motion.div>
-            <motion.h2 variants={fadeInUp} className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-              Ready to Understand What Money Actually Is?
-            </motion.h2>
-            <motion.p variants={fadeInUp} className="text-muted-foreground mb-8 max-w-xl mx-auto">
-              You don't need to be a finance expert. You just need to want to protect 
-              your family's purchasing power. Start with one game. See what clicks.
-            </motion.p>
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/learn">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8">
-                  Start With a Free Game <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-              <Link href="/analytics">
-                <Button variant="outline" size="lg" className="font-semibold px-8">
-                  Browse Live Analytics
-                </Button>
-              </Link>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── FOOTER ─── */}
-      <footer className="bg-card/80 border-t border-muted/10 py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-            <div className="sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-2 mb-4">
-                <BitcoinIcon className="w-6 h-6" />
-                <span className="font-bold text-foreground text-lg">BitcoinHub</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                The Bitcoin education platform built by a real human + AI team. 
-                Learn how money works — not how to trade it.
-              </p>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <User className="w-3 h-3" />
-                <span>Tyler</span>
-                <span className="mx-1">+</span>
-                <Bot className="w-3 h-3" />
-                <span>GoodBot</span>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-foreground mb-3 text-sm">Learn</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/learn" className="hover:text-primary transition-colors">All 13 Games</Link></li>
-                <li><Link href="/learn" className="hover:text-primary transition-colors">Learning Paths</Link></li>
-                <li><Link href="/cycle" className="hover:text-primary transition-colors">4-Year Cycle Thesis</Link></li>
-                <li><Link href="/analytics" className="hover:text-primary transition-colors">BTC Analytics</Link></li>
-                <li><Link href="/legislation" className="hover:text-primary transition-colors">Policy Tracker</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-foreground mb-3 text-sm">GoodBot Ecosystem</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <a href="https://goodbotai.tech" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
-                    GoodBotAI <ExternalLink className="w-3 h-3 opacity-50" />
-                  </a>
-                </li>
-                <li>
-                  <a href="https://tracker.goodbotai.tech" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
-                    Value Tracker <ExternalLink className="w-3 h-3 opacity-50" />
-                  </a>
-                </li>
-                <li>
-                  <a href="https://bitcoinhub.goodbotai.tech" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
-                    BitcoinHub <ExternalLink className="w-3 h-3 opacity-50" />
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-foreground mb-3 text-sm">Newsletter</h4>
-              <p className="text-sm text-muted-foreground mb-3">Weekly purchasing power insights. Free.</p>
-              <Link href="#newsletter">
-                <Button variant="outline" size="sm" className="w-full">
-                  <Mail className="w-4 h-4 mr-2" /> Subscribe Free
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          <div className="pt-6 border-t border-muted/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              © 2026 BitcoinHub. Built by Tyler + GoodBot. Educational content only — not financial advice.
+      {/* ─── THROUGH THE LAWS, trimmed to three (review #10) ─── */}
+      <section className="py-14">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">How Bitcoin's growth compares</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Classic network and adoption laws, charted against live data, including where they break.
             </p>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><User className="w-3 h-3" /><span>Human</span></span>
-              <span className="mx-1">+</span>
-              <span className="flex items-center gap-1"><Bot className="w-3 h-3" /><span>AI</span></span>
-              <span className="mx-1">=</span>
-              <span className="text-primary font-medium">Something new</span>
-            </div>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            {LAWS.map((law) => (
+              <Link key={law.id} href={`/laws#${law.id}`}>
+                <Card className="bg-card border-muted/20 hover:border-primary/40 transition-all p-6 h-full cursor-pointer group">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">{law.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-snug">{law.tagline}</p>
+                  <div className="flex items-center gap-1 text-sm text-primary mt-4 group-hover:gap-2 transition-all">
+                    <span>See the chart</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+          <div className="text-center mt-6">
+            <Link href="/laws" className="text-sm text-primary hover:underline">All eight laws →</Link>
           </div>
         </div>
-      </footer>
+      </section>
 
+      {/* ─── WHO + WHY TRUST IT (review #6, #8, #2) ─── */}
+      <section className="py-10 border-t border-muted/10">
+        <div className="max-w-3xl mx-auto text-center space-y-3">
+          <p className="text-muted-foreground leading-relaxed">
+            Tyler isn't a VC or a "crypto influencer." He works a regular job and built this because he couldn't
+            find Bitcoin education that actually taught him how money works.{' '}
+            <a href="https://x.com/hodlmybeer21" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">@HODLMyBeer21</a>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Researched with AI, edited by a human. Every number sourced.{' '}
+            <Link href="/about" className="underline hover:text-foreground">How it's made</Link>
+          </p>
+          <blockquote className="pt-3 text-sm italic text-muted-foreground/80">
+            &ldquo;A purely peer-to-peer version of electronic cash would allow online payments to be sent directly
+            from one party to another without going through a financial institution.&rdquo;
+            <footer className="mt-1 text-[11px] not-italic">
+              Satoshi Nakamoto, 2008 ·{' '}
+              <Link href="/thesis" className="underline hover:text-foreground">Read the thesis</Link>
+            </footer>
+          </blockquote>
+        </div>
+      </section>
+
+      {/* ─── THE ONE SUBSTACK CTA ON THIS PAGE (review #11, #12) ─── */}
+      <section className="py-14 scroll-mt-20" id="newsletter">
+        <div className="max-w-2xl mx-auto">
+          <Card className="bg-gradient-to-br from-primary/[0.08] via-card to-card border-primary/15 p-6 md:p-10">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground">Get tomorrow's chart in your inbox</h2>
+              <p className="text-base mt-2 text-muted-foreground">
+                {NEWSLETTER_NAME}: {NEWSLETTER_TAGLINE} Free.
+              </p>
+            </div>
+            <SubstackSignup height={170} />
+          </Card>
+        </div>
+      </section>
     </div>
   );
 };

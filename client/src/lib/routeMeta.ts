@@ -5,6 +5,9 @@ const SUFFIX = " — BitcoinHub";
 
 export interface RouteMeta { title: string; description: string }
 
+// Pages kept reachable but taken off the front door (UX review: retire / Labs). Asked not to be indexed.
+export const NOINDEX_PATHS = ["/games", "/web-resources", "/login", "/register", "/forgot-password", "/portfolio", "/portfolio/mpt"];
+
 const DEFAULT: RouteMeta = {
   title: "BitcoinHub — Where are we in the Bitcoin cycle?",
   description:
@@ -40,12 +43,13 @@ const ROUTES: Record<string, RouteMeta> = {
   "/sources": { title: "Data Sources" + SUFFIX, description: "Every number on BitcoinHub traces to a public endpoint. Here is each source and what it powers." },
   "/risk": { title: "Bitcoin Risk Indicators" + SUFFIX, description: "A 0–1 Bitcoin cycle-position score combining Mayer Multiple z-score, RSI(14), halving-cycle position and 200-week MA distance." },
   "/macro": { title: "Macro Dashboard" + SUFFIX, description: "Federal Reserve, Treasury, BLS and Chicago Fed data via FRED: liquidity, rates, inflation, employment and financial conditions." },
+  "/data-stories": { title: "Data Stories" + SUFFIX, description: "Bitcoin and the dollar in charts: what a dollar buys over time, DCA backtests and classic network laws, each with its sources." },
   "/laws": { title: "Bitcoin Through the Laws" + SUFFIX, description: "Network effects, adoption curves, and the Lindy Effect applied to Bitcoin." },
 };
 
-export function metaForPath(pathname: string): RouteMeta & { canonical: string } {
+export function metaForPath(pathname: string): RouteMeta & { canonical: string; noindex: boolean } {
   const clean = (pathname.split(/[?#]/)[0] || "/").replace(/\/+$/, "") || "/";
   let meta = ROUTES[clean];
   if (!meta && clean.startsWith("/workbench/backtests/")) meta = { title: "Backtest" + SUFFIX, description: "A Bitcoin strategy backtest from the BitcoinHub workbench." };
-  return { ...(meta ?? DEFAULT), canonical: SITE_ORIGIN + (clean === "/" ? "" : clean) };
+  return { ...(meta ?? DEFAULT), canonical: SITE_ORIGIN + (clean === "/" ? "" : clean), noindex: NOINDEX_PATHS.includes(clean) };
 }

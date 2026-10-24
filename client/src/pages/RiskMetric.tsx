@@ -423,7 +423,7 @@ export default function RiskMetric() {
                   {thresholds.data.currentThreshold.toFixed(2)}
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  This cycle's sell threshold (Ben Cowen)
+                  This cycle's historical top-zone threshold (Ben Cowen's method). Not a signal to buy or sell.
                 </div>
                 {/* Progress bar showing currentRisk / threshold */}
                 <div className="mt-3 h-2 rounded-full overflow-hidden bg-muted/30 relative">
@@ -1026,7 +1026,7 @@ export default function RiskMetric() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { id: 'risk_metric_snapshot',   label: 'Risk Metric',       desc: 'Current 0–1 cycle-position score' },
-              { id: 'risk_bmsb_lower',        label: 'BMSB Lower',        desc: '20-week SMA (buy zone)' },
+              { id: 'risk_bmsb_lower',        label: 'BMSB Lower',        desc: '20-week SMA (lower band)' },
               { id: 'risk_bmsb_upper',        label: 'BMSB Upper',        desc: '21-week EMA' },
               { id: 'risk_pi_cycle_ratio',    label: 'Pi Cycle Ratio',    desc: '111d MA / (350d MA × 2)' },
               { id: 'risk_cycle_position_pct', label: 'Cycle Position',   desc: 'Days through current halving cycle' },

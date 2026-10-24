@@ -401,7 +401,10 @@ export default function DCASimulator() {
                   <div className="h-1 bg-gradient-to-r from-[#F7931A] to-[#FFB347]" />
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-lg">Your Results</CardTitle>
+                      <div>
+                        <CardTitle className="text-lg">Your Results</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5" data-testid="dca-nfa">Hypothetical backtest on past prices; not advice.</p>
+                      </div>
                       <ShareChartButton
                         className="flex-shrink-0 mt-0.5"
                         title="Share your DCA projection on X"

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
-export function DonationButton() {
+export function DonationButton({ asLink = false }: { asLink?: boolean } = {}) {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
@@ -28,11 +28,17 @@ export function DonationButton() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
+        {asLink ? (
+          <button type="button" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="footer-donate">
+            Support (BTC)
+          </button>
+        ) : (
         <Button variant="outline" size="sm" className="flex items-center gap-2 text-orange-600 border-orange-200 hover:bg-orange-50">
           <Bitcoin className="h-4 w-4" />
           <span className="hidden sm:inline">Support BitcoinHub</span>
           <span className="sm:hidden">Donate</span>
         </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

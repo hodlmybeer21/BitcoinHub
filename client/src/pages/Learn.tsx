@@ -115,8 +115,8 @@ export default function Learn() {
                   <GraduationCap className="h-7 w-7 text-[#F7931A]" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-foreground">Learning Center</h1>
-                  <p className="text-muted-foreground text-sm mt-0.5">Interactive Bitcoin education — learn by doing, not reading.</p>
+                  <h1 className="text-3xl font-bold text-foreground">Learn</h1>
+                  <p className="text-muted-foreground text-sm mt-0.5">How money got here: short, sourced lessons in monetary history. Background for the <a href="/thesis" className="underline hover:text-foreground">thesis</a>.</p>
                 </div>
               </div>
             </div>
