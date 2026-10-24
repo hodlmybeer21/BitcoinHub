@@ -31,6 +31,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
 import { buildValueStats, type SourceRef } from "@/lib/valueTrackerStats";
+import SubstackSignup from "@/components/SubstackSignup";
+import { NEWSLETTER_NAME, NEWSLETTER_TAGLINE } from "@/lib/newsletter";
 import { CycleNow } from '@/components/CycleNow';
 
 interface MarketData {
@@ -97,8 +99,6 @@ const ValueStat = ({ label, usd, gold, note, sources }: { label: string; usd: st
 );
 
 const Home = () => {
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
 
   const { data: marketData } = useQuery<MarketData>({
     queryKey: ['/api/bitcoin/market-data'],
@@ -108,14 +108,6 @@ const Home = () => {
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail('');
-    }
-  };
 
   const btcPrice = marketData?.price ?? 0;
   const priceChange = marketData?.change24h ?? 0;
@@ -532,37 +524,13 @@ const Home = () => {
                 <div className="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center mx-auto mb-4">
                   <Mail className="w-7 h-7 text-primary" />
                 </div>
-                <CardTitle className="text-2xl md:text-3xl text-foreground">Get the Weekly Purchasing Power Report</CardTitle>
+                <CardTitle className="text-2xl md:text-3xl text-foreground">Get {NEWSLETTER_NAME} by email</CardTitle>
                 <CardDescription className="text-base mt-2 text-muted-foreground">
-                  Every week: one key data insight, one concept that clicks, one thing 
-                  worth thinking about. No hype. No price calls. Just understanding.
+                  {NEWSLETTER_TAGLINE}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                {subscribed ? (
-                  <div className="text-center py-6">
-                    <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-foreground mb-2">You're in. Welcome.</h3>
-                    <p className="text-muted-foreground text-sm">Check your email to confirm your subscription.</p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubscribe} className="space-y-3">
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <Input
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="flex-1 h-12 bg-background/60 border-muted/20 focus:border-primary text-base"
-                      />
-                      <Button type="submit" className="h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8">
-                        Subscribe Free <ArrowRight className="ml-2 w-5 h-5" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center">Free weekly insights. Unsubscribe any time. No spam, ever.</p>
-                  </form>
-                )}
+                <SubstackSignup />
               </CardContent>
             </Card>
           </motion.div>

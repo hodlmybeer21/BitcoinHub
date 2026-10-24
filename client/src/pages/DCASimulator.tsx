@@ -57,6 +57,8 @@ import {
   Loader2,
   BarChart3,
 } from "lucide-react";
+import SubstackSignup from '@/components/SubstackSignup';
+import { NEWSLETTER_NAME, NEWSLETTER_TAGLINE } from '@/lib/newsletter';
 import {
   Table,
   TableBody,
@@ -130,6 +132,7 @@ export default function DCASimulator() {
   const [monthlyAmount, setMonthlyAmount] = useState(50);
   const [startYear, setStartYear] = useState(2020);
   const [copied, setCopied] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
   const [mptPlan, setMptPlanRaw, mptPlanLoaded] = useSyncedStorage<MPTDcaPlan | null>('mpt_dca_plan', null, DCA_PLAN_STORAGE_KEY);
 
   // Hydrate MPT plan on mount + pre-fill DCA inputs from it (MPT Phase 2 B3 bridge).
@@ -631,21 +634,22 @@ export default function DCASimulator() {
                     <div>
                       <h4 className="font-semibold text-foreground">Stay Informed</h4>
                       <p className="text-sm text-muted-foreground">
-                        Get Bitcoin insights and DCA tips delivered to your inbox
+                        Get {NEWSLETTER_NAME} by email: {NEWSLETTER_TAGLINE}
                       </p>
                     </div>
                   </div>
                   <div className="flex gap-2 w-full md:w-auto">
-                    <Input
-                      type="email"
-                      placeholder="your@email.com"
-                      className="bg-background border-muted/30"
-                    />
-                    <Button className="bg-[#F7931A] hover:bg-[#E67500] text-white">
-                      Subscribe
+                    <Button
+                      className="bg-[#F7931A] hover:bg-[#E67500] text-white"
+                      onClick={() => setShowSignup((v) => !v)}
+                      aria-expanded={showSignup}
+                      data-testid="dca-newsletter-toggle"
+                    >
+                      {showSignup ? 'Hide signup' : 'Subscribe'}
                     </Button>
                   </div>
                 </div>
+                {showSignup && <SubstackSignup className="mt-4" />}
               </CardContent>
             </Card>
           </motion.div>
