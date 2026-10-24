@@ -248,6 +248,11 @@ const Navbar = () => {
                     Legislation
                   </span>
                 </Link>
+                <Link href="/newsletter">
+                  <span className={`${isActiveLink('/newsletter') ? 'text-foreground border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'} px-3 py-2 text-sm font-medium cursor-pointer`} data-testid="nav-newsletter-desktop">
+                    Newsletter
+                  </span>
+                </Link>
               </div>
             </div>
             
