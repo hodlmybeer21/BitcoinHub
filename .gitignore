@@ -11,3 +11,7 @@ vite.config.ts.*
 .env.local
 .env.*.local
 .env.production.local
+
+# Browser cookie jars — never commit (audit B4)
+cookies.txt
+*.cookies.txt
