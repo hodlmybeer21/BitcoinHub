@@ -258,9 +258,8 @@ const Home = () => {
               <Badge variant="outline" className="mb-4 border-primary/30 text-primary bg-primary/5">Why This Exists</Badge>
               <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Built by Someone Living It</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Tyler isn't a VC or a "crypto influencer." He's an inventory manager in Concord, New Hampshire —
-                married, two kids. He built this because he couldn't find Bitcoin
-                education that actually taught him how money works.
+                Tyler isn't a VC or a "crypto influencer." He works a regular job and built this
+                because he couldn't find Bitcoin education that actually taught him how money works.
               </p>
             </motion.div>
 
@@ -273,13 +272,13 @@ const Home = () => {
                     </div>
                     <div>
                       <h3 className="text-xl font-semibold text-foreground mb-1">Tyler, Founder</h3>
-                      <p className="text-sm text-muted-foreground">Inventory Manager · Concord, NH · Dad of 2</p>
+                      <p className="text-sm text-muted-foreground">@HODLMyBeer21 · Human + AI builder</p>
                     </div>
                   </div>
                   <div className="space-y-4 text-muted-foreground leading-relaxed">
                     <p>
-                      "I've watched the financial system from the inside — managing inventory, 
-                      but the real inventory that matters is <em>purchasing power</em>. 
+                      "I've watched the financial system from an everyday job, and the real 
+                      inventory that matters is <em>purchasing power</em>. 
                       I wanted to understand why my dollar buys less every year, and every 
                       Bitcoin site just showed me a price chart."
                     </p>
@@ -289,8 +288,8 @@ const Home = () => {
                       It connected things I'd never seen connected before."
                     </p>
                     <p className="text-foreground font-medium">
-                      "This platform is what I was looking for. If you're worried about your 
-                      family's future, you're in the right place."
+                      "This platform is what I was looking for. If you're worried about what 
+                      your money will be worth in the future, you're in the right place."
                     </p>
                   </div>
                 </Card>
@@ -348,10 +347,9 @@ const Home = () => {
                   <ul className="space-y-3 text-sm text-muted-foreground">
                     {[
                       "Real-world experience watching how money actually works",
-                      "Family of 4 managing real purchasing power concerns",
-                      "Research direction: what matters to real families",
-                      "Quality control: is this actually useful?",
-                      "Built BrewAsset as another real project"
+                      "Lives with the same purchasing power concerns as everyone else",
+                      "Research direction: what matters to real people",
+                      "Quality control: is this actually useful?"
                     ].map((item, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
