@@ -3496,10 +3496,18 @@ All this data is updated live in the dashboard above. Try asking about specific 
     try {
       const { password, data } = req.body;
       
-      // Use environment variable for admin password, fallback to default (not recommended for production)
-      const adminPassword = process.env.ADMIN_PASSWORD || 'HodlMyBeer21Admin';
-      
-      if (password !== adminPassword) {
+      // Admin password comes only from the ADMIN_PASSWORD env var (server-side).
+      // No fallback: if it is unset, the endpoint is disabled.
+      const adminPassword = process.env.ADMIN_PASSWORD;
+      if (!adminPassword) {
+        return res.status(503).json({ error: 'Admin upload is disabled' });
+      }
+      const { timingSafeEqual } = await import('crypto');
+      const given = Buffer.from(typeof password === 'string' ? password : '');
+      const expected = Buffer.from(adminPassword);
+      const ok = given.length === expected.length && timingSafeEqual(given, expected);
+
+      if (!ok) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
