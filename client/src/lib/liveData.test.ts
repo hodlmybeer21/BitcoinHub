@@ -99,3 +99,11 @@ test('Q4-2026 window phrase: open on Oct 24, 2026 (audit D6)', () => {
   assert.equal(windowStatus('2026-08-01T00:00:00Z', new Date('2026-07-01T00:00:00Z')).phase, 'before');
   assert.equal(windowStatus('2026-08-01T00:00:00Z', new Date('2026-11-02T00:00:00Z')).phase, 'closed');
 });
+
+test('parseFredApiJson drops missing values and sorts by date', async () => {
+  const { parseFredApiJson } = await import('../../../lib/macro/fred-csv.ts');
+  const pts = parseFredApiJson({ observations: [
+    { date: '2026-09-01', value: '22390.1' }, { date: '2026-08-01', value: '.' }, { date: '2026-07-01', value: '22300.5' },
+  ] });
+  assert.deepEqual(pts, [{ date: '2026-07-01', value: 22300.5 }, { date: '2026-09-01', value: 22390.1 }]);
+});
