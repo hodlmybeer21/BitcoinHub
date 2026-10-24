@@ -24,7 +24,6 @@ interface BillData {
   priority: LegislationPriority;
   whyItMatters: string;
   whatsNext: string;
-  passageChance: number;
   currentStatus: string;
   lastActionDate: string;
   stage: BillStage;
@@ -39,7 +38,8 @@ interface LegislationData {
   bills: BillData[];
   lastUpdated: string;
   summary: string;
-  nextMajorEvent: string;
+  /** Most recent congress.gov action across tracked bills; null when live data is unavailable. */
+  latestAction: { billName: string; text: string; date: string } | null;
   source: 'congress.gov' | 'partial' | 'fallback';
   fetchedAt: string;
 }
@@ -122,11 +122,20 @@ const Legislation = () => {
                 <p className="text-sm text-foreground leading-relaxed">{data.summary}</p>
               </div>
               <div>
-                <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Next major event</h3>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-foreground">{data.nextMajorEvent}</span>
-                </div>
+                <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Latest action on a tracked bill</h3>
+                {data.latestAction ? (
+                  <div className="flex items-start gap-2" data-testid="legislation-latest-action">
+                    <Calendar className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    <span className="text-sm text-foreground leading-snug">
+                      <strong>{data.latestAction.billName}</strong> ({data.latestAction.date}): {data.latestAction.text}
+                      <span className="block text-xs text-muted-foreground mt-1">Source: congress.gov. No votes are forecast here.</span>
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground" data-testid="legislation-latest-action">
+                    Live congress.gov data is unavailable right now. Each bill below shows its last hand-checked status.
+                  </p>
+                )}
               </div>
             </div>
             <FreshnessIndicator fetchedAt={data.fetchedAt} source={data.source} />
@@ -178,13 +187,12 @@ const Legislation = () => {
                 api.congress.gov
               </a>
               {' '}
-              (free, no API key required beyond the signup). Pipeline stage is derived heuristically from
-              the latest action text — it's a best-effort visualization, not an authoritative status.
+              (free, with an API key). The pipeline stage is read from each bill's action history; it's a best-effort
+              summary, so check the congress.gov link on each bill for the authoritative record.
             </p>
             <p>
-              <strong className="text-foreground/90">Editorial overlay</strong>: The "Why this matters for BTC" notes are
-              Tyler's (BitcoinHub founder) read, updated periodically. The passage-chance estimates are Tyler's best
-              guesses based on co-sponsors, committee votes, and the political cycle — not predictions.
+              <strong className="text-foreground/90">Editorial overlay</strong>: The "Why this matters for BTC" and
+              "What to watch next" notes are BitcoinHub's read, not predictions. We don't publish odds of passage.
             </p>
             <p>
               <strong className="text-foreground/90">Caveats</strong>: congress.gov's action history only goes back so far;

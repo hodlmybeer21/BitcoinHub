@@ -202,18 +202,11 @@ export default function Sources() {
 
           <footer className="mt-12 pt-8 border-t border-muted/20 text-sm text-muted-foreground/80 space-y-3">
             <p>
-              BitcoinHub does not run Google Analytics, Meta Pixel, or any other third-party
-              tracker on this site. The only tracking is first-party (Vercel analytics) and
-              we are happy to discuss the methodology in our{' '}
-              <Link href="/about">
+              BitcoinHub runs no analytics, ad or tracking scripts. What the site does store, and
+              which third parties your browser talks to, is listed on the{' '}
+              <Link href="/privacy">
                 <span className="underline text-primary hover:text-primary/80 cursor-pointer">
-                  /about page
-                </span>
-              </Link>{' '}
-              or in our{' '}
-              <Link href="/about#privacy">
-                <span className="underline text-primary hover:text-primary/80 cursor-pointer">
-                  privacy section
+                  Privacy page
                 </span>
               </Link>
               .

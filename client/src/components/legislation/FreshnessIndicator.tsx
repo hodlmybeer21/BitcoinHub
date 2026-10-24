@@ -27,7 +27,7 @@ export default function FreshnessIndicator({ fetchedAt, source }: Props) {
   const isPartial = source === 'partial';
 
   const sourceLabel = isFallback
-    ? 'Editorial only — congress.gov key not configured'
+    ? 'Hand-checked status (congress.gov live data unavailable)'
     : isPartial
     ? 'Partial — congress.gov (some bills unavailable)'
     : 'Live · api.congress.gov';
@@ -52,7 +52,7 @@ export default function FreshnessIndicator({ fetchedAt, source }: Props) {
       {isFallback && (
         <div className="flex items-center gap-1.5 text-yellow-500">
           <AlertCircle className="w-3 h-3" />
-          <span>Set CONGRESS_API_KEY in Vercel env to enable live data</span>
+          <span>Statuses may be out of date; each bill links to congress.gov</span>
         </div>
       )}
     </div>
