@@ -8,28 +8,38 @@ import { useState } from "react";
 const WebResources = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Fetch live data from APIs
-  const { data: m2Data, isLoading: m2Loading } = useQuery({
-    queryKey: ['/api/web-resources/m2-chart', refreshKey],
-    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+  // Fetch live data from APIs. Audit B11/D8: the old /api/web-resources/m2-chart and
+  // /liquidation routes never existed (404), so the cards showed hardcoded 2025 numbers.
+  // Now: M2 from /api/liquidity (FRED), BTC + trade buckets from /api/btc/liquidations-recent
+  // (Deribit public). Missing data renders "—", never a stale constant.
+  const { data: m2Data, isLoading: m2Loading } = useQuery<any>({
+    queryKey: ['/api/liquidity', refreshKey],
+    refetchInterval: 60 * 60 * 1000,
   });
 
-  const { data: liquidationData, isLoading: liquidationLoading } = useQuery({
-    queryKey: ['/api/web-resources/liquidation', refreshKey],
+  const { data: liquidationData, isLoading: liquidationLoading } = useQuery<any>({
+    queryKey: ['/api/btc/liquidations-recent', refreshKey],
     refetchInterval: 2 * 60 * 1000, // Refresh every 2 minutes
   });
+  const m2Value: number | undefined = m2Data?.indicators?.m2?.value;
+  const m2Yoy: number | null | undefined = m2Data?.indicators?.m2?.change;
+  const btcIndex: number | undefined = liquidationData?.btcIndexPrice;
+  const busiest = Array.isArray(liquidationData?.buckets)
+    ? [...liquidationData.buckets].sort((a: any, b: any) => (b.notionalUsd ?? 0) - (a.notionalUsd ?? 0))[0]
+    : undefined;
+  const usd0 = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
-  const { data: piCycleData, isLoading: piCycleLoading } = useQuery({
+  const { data: piCycleData, isLoading: piCycleLoading } = useQuery<any>({
     queryKey: ['/api/web-resources/pi-cycle', refreshKey],
     refetchInterval: 60 * 60 * 1000, // Refresh every hour
   });
 
-  const { data: fearGreedData, isLoading: fearGreedLoading } = useQuery({
+  const { data: fearGreedData, isLoading: fearGreedLoading } = useQuery<any>({
     queryKey: ['/api/web-resources/fear-greed', refreshKey],
     refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
   });
 
-  const { data: bullMarketData, isLoading: bullMarketLoading } = useQuery({
+  const { data: bullMarketData, isLoading: bullMarketLoading } = useQuery<any>({
     queryKey: ['/api/indicators/bull-market-signals', refreshKey],
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
   });
@@ -92,21 +102,21 @@ const WebResources = () => {
               ) : (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current Correlation:</span>
-                    <span className="font-medium text-foreground">
-                      {m2Data?.correlation || 'Strong Positive'}
+                    <span className="text-muted-foreground">M2 (FRED M2SL):</span>
+                    <span className="font-medium text-foreground" data-testid="wr-m2">
+                      {typeof m2Value === 'number' && m2Value > 0 ? `$${(m2Value / 1e3).toFixed(2)}T` : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">BTC Price:</span>
-                    <span className="font-medium text-foreground">
-                      ${m2Data?.btcPrice?.toLocaleString() || '109,800'}
+                    <span className="font-medium text-foreground" data-testid="wr-btc">
+                      {typeof btcIndex === 'number' && btcIndex > 0 ? usd0(btcIndex) : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">M2 Growth YoY:</span>
-                    <span className="font-medium text-foreground">
-                      {m2Data?.m2Growth || '18.5'}%
+                    <span className="font-medium text-foreground" data-testid="wr-m2-yoy">
+                      {typeof m2Yoy === 'number' ? `${m2Yoy >= 0 ? '+' : ''}${m2Yoy.toFixed(1)}%` : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -117,7 +127,7 @@ const WebResources = () => {
               )}
             </div>
             <div className="text-xs text-center text-muted-foreground pt-2 border-t border-border">
-              Powered by BGEometrics.com • Updated continuously
+              Chart: BGEometrics.com • Figures: FRED M2SL, Deribit BTC index
             </div>
           </CardContent>
         </Card>
@@ -150,7 +160,7 @@ const WebResources = () => {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-foreground">Liquidation Analysis</h4>
                 <Badge variant="secondary" className="text-xs">
-                  {liquidationLoading ? 'Loading...' : liquidationData?.timeframe || '24 Hour'}
+                  {liquidationLoading ? 'Loading...' : liquidationData?.totalTrades ? `Last ${liquidationData.totalTrades} trades` : '—'}
                 </Badge>
               </div>
               {liquidationLoading ? (
@@ -160,28 +170,28 @@ const WebResources = () => {
               ) : (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Liquidity Threshold:</span>
+                    <span className="text-muted-foreground">BTC index (Deribit):</span>
                     <span className="font-medium text-foreground">
-                      {liquidationData?.liquidityThreshold || '0.85'}
+                      {typeof btcIndex === 'number' && btcIndex > 0 ? usd0(btcIndex) : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">High Risk Zone:</span>
-                    <span className="font-medium text-red-500">
-                      ${liquidationData?.highRiskZone?.min?.toLocaleString() || '104,000'} - ${liquidationData?.highRiskZone?.max?.toLocaleString() || '106,000'}
+                    <span className="text-muted-foreground">Recent options notional:</span>
+                    <span className="font-medium text-foreground">
+                      {typeof liquidationData?.totalNotionalUsd === 'number' ? usd0(liquidationData.totalNotionalUsd) : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Support Zone:</span>
-                    <span className="font-medium text-green-500">
-                      ${liquidationData?.supportZone?.min?.toLocaleString() || '108,000'} - ${liquidationData?.supportZone?.max?.toLocaleString() || '110,000'}
+                    <span className="text-muted-foreground">Most active strike zone:</span>
+                    <span className="font-medium text-foreground" data-testid="wr-busiest">
+                      {busiest ? `${busiest.label} vs spot` : '—'}
                     </span>
                   </div>
                 </div>
               )}
             </div>
             <div className="text-xs text-center text-muted-foreground pt-2 border-t border-border">
-              Data from Coinglass.com • Binance Perpetual Futures
+              Proxy from Deribit public options trades • Full heatmap on Coinglass
             </div>
           </CardContent>
         </Card>
@@ -226,25 +236,31 @@ const WebResources = () => {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">111DMA Position:</span>
                     <span className="font-medium text-foreground">
-                      {piCycleData?.crossStatus || 'Below'} 350DMA x 2
+                      {piCycleData?.crossStatus ?? '—'} 350DMA x 2
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cycle Status:</span>
                     <span className={`font-medium ${piCycleData?.cyclePhase === 'Bullish' ? 'text-green-500' : 'text-orange-500'}`}>
-                      {piCycleData?.cyclePhase || 'Bullish'} Phase
+                      {piCycleData?.cyclePhase ? `${piCycleData.cyclePhase} Phase` : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">111DMA Price:</span>
                     <span className="font-medium text-foreground">
-                      ${piCycleData?.price111DMA?.toLocaleString() || '89,500'}
+                      {typeof piCycleData?.price111DMA === 'number' ? `$${piCycleData.price111DMA.toLocaleString()}` : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">350DMA x 2:</span>
+                    <span className="font-medium text-foreground" data-testid="wr-350x2">
+                      {typeof piCycleData?.price350DMAx2 === 'number' ? `$${piCycleData.price350DMAx2.toLocaleString()}` : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Last Cross:</span>
                     <span className="font-medium text-foreground">
-                      {piCycleData?.lastCrossDate || '2021 Peak'}
+                      {piCycleData?.lastCrossDate ?? '—'}
                     </span>
                   </div>
                 </div>
@@ -295,35 +311,35 @@ const WebResources = () => {
                 <>
                   <div className="text-center mb-4">
                     <div className="text-6xl font-bold text-orange-500 mb-2">
-                      {fearGreedData?.currentValue || '52'}
+                      {fearGreedData?.currentValue ?? '—'}
                     </div>
                     <div className="text-lg font-medium text-foreground">
-                      {fearGreedData?.classification || 'Neutral'}
+                      {fearGreedData?.classification ?? '—'}
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Yesterday:</span>
                       <span className="font-medium text-foreground">
-                        {fearGreedData?.yesterday || '50'}
+                        {fearGreedData?.yesterday ?? '—'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Last Week:</span>
                       <span className="font-medium text-foreground">
-                        {fearGreedData?.lastWeek || '48'}
+                        {fearGreedData?.lastWeek ?? '—'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Yearly High:</span>
                       <span className="font-medium text-green-500">
-                        {fearGreedData?.yearlyHigh?.value || '88'} - Extreme Greed
+                        {fearGreedData?.yearlyHigh ? `${fearGreedData.yearlyHigh.value} (${fearGreedData.yearlyHigh.date})` : '—'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Yearly Low:</span>
                       <span className="font-medium text-red-500">
-                        {fearGreedData?.yearlyLow?.value || '18'} - Extreme Fear
+                        {fearGreedData?.yearlyLow ? `${fearGreedData.yearlyLow.value} (${fearGreedData.yearlyLow.date})` : '—'}
                       </span>
                     </div>
                   </div>
@@ -429,7 +445,7 @@ const WebResources = () => {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-foreground">Market Peak Analysis</h4>
                 <Badge variant="secondary" className="text-xs">
-                  {bullMarketLoading ? 'Loading...' : bullMarketData?.totalIndicators || '30+'} Indicators
+                  {bullMarketLoading ? 'Loading...' : bullMarketData?.totalIndicators ? `${bullMarketData.totalIndicators} Indicators` : 'Indicators'}
                 </Badge>
               </div>
               {bullMarketLoading ? (

@@ -104,7 +104,7 @@ function AuctionCard({ term, data }: { term: string; data?: AuctionTermLatest })
   const ind = indirectShare(r);
   const tail = tailBps(r);
   const btc = r.bid_to_cover_ratio;
-  const ago = daysAgo(r.record_date);
+  const ago = daysAgo(r.auction_date);
 
   const btcColor = btc === null ? '' : btc < 2.2 ? 'text-red-400' : btc < 2.4 ? 'text-amber-400' : 'text-emerald-400';
   const indColor = ind === null ? '' : ind < 60 ? 'text-red-400' : ind < 68 ? 'text-amber-400' : 'text-emerald-400';
@@ -115,7 +115,7 @@ function AuctionCard({ term, data }: { term: string; data?: AuctionTermLatest })
       <CardHeader className="pb-2 flex flex-row justify-between items-start">
         <div>
           <CardTitle className="text-xs font-medium text-muted-foreground tracking-wider">{term} Auction</CardTitle>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{r.record_date} ({ago}d ago)</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Auction {r.auction_date} ({ago}d ago)</p>
         </div>
         {data.flags.length > 0 && (
           <Badge variant="outline" className="bg-amber-900/30 text-amber-300 border-amber-800 text-[10px]">
@@ -150,7 +150,7 @@ function AuctionCard({ term, data }: { term: string; data?: AuctionTermLatest })
         </div>
         <div className="text-[10px] text-muted-foreground pt-1 border-t border-muted/20">
           High yield: <span className="font-mono">{r.high_yield !== null ? `${r.high_yield.toFixed(3)}%` : '—'}</span>
-          {r.offering_amt ? <> · Offering: <span className="font-mono">${(r.offering_amt / 1000).toFixed(0)}B</span></> : null}
+          {r.offering_amt ? <> · Offering: <span className="font-mono">${(r.offering_amt / 1e9).toFixed(0)}B</span></> : null}
         </div>
       </CardContent>
     </Card>

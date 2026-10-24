@@ -257,6 +257,26 @@ function err(res: VercelResponse, status: number, message: string) {
   res.status(status).json({ error: message });
 }
 
+// Audit B10: CoinGecko's free tier 429s under load. Keep the last good payload per
+// warm instance and serve it (flagged stale) instead of a 500, and let Vercel's CDN
+// cache successful responses longer.
+const LAST_GOOD = new Map<string, { data: any; at: string }>();
+async function withLastGood<T>(key: string, fn: () => Promise<T>): Promise<T & { stale?: boolean; staleSince?: string }> {
+  try {
+    const data = await fn();
+    LAST_GOOD.set(key, { data, at: new Date().toISOString() });
+    return data as any;
+  } catch (e) {
+    const hit = LAST_GOOD.get(key);
+    if (hit) return { ...hit.data, stale: true, staleSince: hit.at };
+    throw e;
+  }
+}
+function okCached(res: VercelResponse, data: unknown, sMaxAge = 300, swr = 3600) {
+  res.setHeader('Cache-Control', `s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`);
+  res.json(data);
+}
+
 // Detect upstream-failure conditions so handlers can return 503 (service
 // unavailable / retryable transient) instead of 500 (our bug). Covers
 // axios network errors + node-fetch AbortError / DNS failures + upstream
@@ -728,26 +748,11 @@ async function handleFearGreed(_: VercelRequest, res: VercelResponse) {
 }
 
 async function getFearGreedData() {
-  const res = await apiFetch('https://api.alternative.me/fng/?limit=2');
+  const res = await apiFetch('https://api.alternative.me/fng/?limit=365');
   if (!res.ok) throw new Error(`alternative.me ${res.status}`);
   const json = await res.json();
-  const current = json.data[0];
-  const yesterday = json.data[1] || current;
-  const v = parseInt(current.value);
-  let classification: string;
-  if (v <= 24) classification = 'Extreme Fear';
-  else if (v <= 49) classification = 'Fear';
-  else if (v <= 54) classification = 'Neutral';
-  else if (v <= 74) classification = 'Greed';
-  else classification = 'Extreme Greed';
-  return {
-    currentValue: v,
-    classification,
-    yesterday: parseInt(yesterday.value),
-    lastWeek: Math.max(30, Math.min(70, v + (Math.random() > 0.5 ? -8 : 8))),
-    yearlyHigh: { value: 88, date: '2024-11-20' },
-    yearlyLow: { value: 15, date: '2025-03-10' },
-  };
+  const { summarizeFng } = await import('../lib/sentiment/fng.js');
+  return { ...summarizeFng(json.data || []), source: 'alternative.me' };
 }
 
 // ─── Financial Markets (S&P 500, DXY, Gold, VIX) ───────────────────────────────
@@ -915,35 +920,54 @@ async function getWhaleAlerts() {
 // ─── Funding Rates (fallback when exchanges block serverless) ──────────────────
 
 async function handleFundingRates(_: VercelRequest, res: VercelResponse) {
+  // Audit B9: OKX public funding (server-side, no CORS), Deribit perpetual as backup.
+  // No static fallback numbers: if both fail, say so.
   try {
-    // Try Binance first (most reliable from serverless)
     const data = await getFundingRates();
-    ok(res, data);
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=1800');
+    res.json(data);
   } catch (e: any) {
-    // Fallback to recent cached values
-    ok(res, {
-      latestRate: 0.0001 * 100,   // 0.01% (typical BTC funding)
-      avg24h: 0.00012 * 100,
-      nextFundingTime: null,
-      fundingRate: 0.0001 * 100,
-      basisRate: 0,
-      source: 'fallback',
-    });
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+    res.status(503).json({ error: 'Funding rate unavailable from OKX and Deribit right now', source: 'unavailable' });
   }
 }
 
 async function getFundingRates() {
-  const res = await apiFetch('https://api.binance.com/api/v3/premiumIndex?symbol=BTCUSDT');
-  if (!res.ok) throw new Error(`Binance ${res.status}`);
-  const data = await res.json();
-  const fundingRate = parseFloat(data.lastFundingRate || '0') * 100;
-  return {
-    latestRate: fundingRate,
-    avg24h: fundingRate,
-    nextFundingTime: data.nextFundingTime ? new Date(data.nextFundingTime).toISOString() : null,
-    fundingRate,
-    basisRate: 0,
-  };
+  try {
+    const r = await apiFetch('https://www.okx.com/api/v5/public/funding-rate?instId=BTC-USDT-SWAP', undefined, 5000);
+    if (!r.ok) throw new Error(`OKX ${r.status}`);
+    const j: any = await r.json();
+    const d = j?.data?.[0];
+    const rate = Number(d?.fundingRate);
+    if (j?.code !== '0' || !Number.isFinite(rate)) throw new Error('OKX bad payload');
+    const pct = rate * 100;
+    return {
+      latestRate: pct,
+      fundingRate: pct,
+      nextFundingTime: d.fundingTime ? new Date(Number(d.fundingTime)).toISOString() : null,
+      interval: '8h',
+      exchange: 'OKX',
+      instrument: 'BTC-USDT-SWAP',
+      source: 'okx',
+      asOf: new Date().toISOString(),
+    };
+  } catch (_) {
+    const r = await apiFetch('https://www.deribit.com/api/v2/public/ticker?instrument_name=BTC-PERPETUAL', undefined, 5000);
+    if (!r.ok) throw new Error(`Deribit ${r.status}`);
+    const j: any = await r.json();
+    const f8 = Number(j?.result?.funding_8h);
+    if (!Number.isFinite(f8)) throw new Error('Deribit bad payload');
+    return {
+      latestRate: f8 * 100,
+      fundingRate: f8 * 100,
+      nextFundingTime: null,
+      interval: '8h',
+      exchange: 'Deribit',
+      instrument: 'BTC-PERPETUAL',
+      source: 'deribit',
+      asOf: j?.result?.timestamp ? new Date(j.result.timestamp).toISOString() : new Date().toISOString(),
+    };
+  }
 }
 
 // ─── Options Flow ─────────────────────────────────────────────────────────────
@@ -5027,6 +5051,7 @@ async function handleETFFlows(_req: VercelRequest, res: VercelResponse) {
 
 async function handleStablecoin(_req: VercelRequest, res: VercelResponse) {
   try {
+    const payload = await withLastGood('stablecoin', async () => {
     const r = await apiFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=stablecoins&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h');
     if (!r.ok) throw new Error(`coingecko ${r.status}`);
     const coins: any[] = await r.json();
@@ -5040,68 +5065,41 @@ async function handleStablecoin(_req: VercelRequest, res: VercelResponse) {
     })).filter((c: any) => c.marketCapUSD > 0);
     const totalMarketCapUSD = topCoins.reduce((s: number, c: any) => s + c.marketCapUSD, 0);
     const total24hVolumeUSD = coins.reduce((s: number, c: any) => s + (Number(c.total_volume) || 0), 0);
-    return ok(res, {
+    return {
       totalMarketCapUSD,
       total24hVolumeUSD,
       coinCount: topCoins.length,
       topCoins: topCoins.slice(0, 15),
       asOf: new Date().toISOString(),
       source: 'CoinGecko',
+    };
     });
+    return okCached(res, payload);
   } catch (e: any) {
     console.error('stablecoin error:', e);
-    return err(res, 500, e.message || 'Failed to fetch stablecoin data');
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=300');
+    return err(res, 503, 'Stablecoin data temporarily unavailable (CoinGecko rate limit)');
   }
 }
 
 async function handleFearGreedHistory(_req: VercelRequest, res: VercelResponse) {
   try {
-    const [fgRes, histRes, priceRes] = await Promise.allSettled([
-      apiFetch('https://api.alternative.me/fng/?limit=2'),
-      apiFetch('https://api.alternative.me/fng/?limit=90&format=json'),
+    const [histRes, priceRes] = await Promise.allSettled([
+      apiFetch('https://api.alternative.me/fng/?limit=365&format=json'),
       apiFetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'),
     ]);
-
-    const fallbackCurrent = {
-      currentValue: 50, classification: 'Neutral' as const,
-      yesterday: 50, lastWeek: 50,
-      yearlyHigh: { value: 88, date: '2024-11-20' },
-      yearlyLow: { value: 15, date: '2025-03-10' },
-    };
-
-    let current = fallbackCurrent;
-    if (fgRes.status === 'fulfilled' && fgRes.value.ok) {
-      const j = await fgRes.value.json();
-      const c = j.data?.[0]; const y = j.data?.[1] || c;
-      if (c) {
-        const v = parseInt(c.value);
-        let cls: any = 'Neutral';
-        if (v <= 24) cls = 'Extreme Fear';
-        else if (v <= 49) cls = 'Fear';
-        else if (v <= 54) cls = 'Neutral';
-        else if (v <= 74) cls = 'Greed';
-        else cls = 'Extreme Greed';
-        current = {
-          currentValue: v, classification: cls,
-          yesterday: y ? parseInt(y.value) : v,
-          lastWeek: Math.max(35, Math.min(65, v - 7)),
-          yearlyHigh: { value: 88, date: '2024-11-20' },
-          yearlyLow: { value: 15, date: '2025-03-10' },
-        };
-      }
-    }
+    if (histRes.status !== 'fulfilled' || !histRes.value.ok) throw new Error('alternative.me unavailable');
+    const rows: any[] = (await histRes.value.json()).data || [];
+    const { summarizeFng } = await import('../lib/sentiment/fng.js');
+    const current = summarizeFng(rows); // no invented fallbacks (was 50/50/50 + hardcoded yearly high/low)
 
     const history: Array<{ date: string; value: number; classification: string }> = [];
-    if (histRes.status === 'fulfilled' && histRes.value.ok) {
-      const j = await histRes.value.json();
-      const arr: any[] = j.data || [];
-      for (const row of arr.reverse()) {
-        history.push({
-          date: new Date(Number(row.timestamp) * 1000).toISOString().slice(0, 10),
-          value: Number(row.value),
-          classification: row.value_classification,
-        });
-      }
+    for (const row of rows.slice(0, 90).reverse()) {
+      history.push({
+        date: new Date(Number(row.timestamp) * 1000).toISOString().slice(0, 10),
+        value: Number(row.value),
+        classification: row.value_classification,
+      });
     }
 
     let btcPriceAtSignal: { price: number; asOf: string } | undefined;
@@ -5135,6 +5133,7 @@ async function handleDominanceHistory(req: VercelRequest, res: VercelResponse) {
     // a known simplification that gives a flat-but-correct line. For a true
     // historical dominance chart, a paid source (CoinMarketCap / CoinGlass)
     // is required.
+    const payload = await withLastGood(`dominance-${days}`, async () => {
     const [chartRes, globalRes] = await Promise.allSettled([
       apiFetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`),
       apiFetch('https://api.coingecko.com/api/v3/global'),
@@ -5146,34 +5145,39 @@ async function handleDominanceHistory(req: VercelRequest, res: VercelResponse) {
     const chart = await chartRes.value.json();
     const caps: [number, number][] = chart.market_caps || [];
 
-    let currentDominance = 56.2;
+    // No hardcoded fallback dominance: if /global fails, the field is null.
+    let currentDominance: number | null = null;
     if (globalRes.status === 'fulfilled' && globalRes.value.ok) {
       const g = await globalRes.value.json();
-      currentDominance = g.data?.market_cap_percentage?.btc ?? currentDominance;
+      const v = Number(g.data?.market_cap_percentage?.btc);
+      if (Number.isFinite(v)) currentDominance = v;
     }
 
     // BTC dominance as a constant for the period (CoinGecko free tier doesn't
     // expose total crypto market cap history). The BTC market cap trend below
     // is the real time-series signal — dominance is labelled as "current".
-    const history: Array<{ date: string; dominance: number; marketCapUSD: number }> = [];
+    const history: Array<{ date: string; dominance: number | null; marketCapUSD: number }> = [];
     for (let i = 0; i < caps.length; i++) {
       const ts = caps[i][0];
       const btcMcap = caps[i][1];
       history.push({
         date: new Date(ts).toISOString().slice(0, 10),
-        dominance: Number(currentDominance.toFixed(2)),
+        dominance: currentDominance === null ? null : Number(currentDominance.toFixed(2)),
         marketCapUSD: btcMcap,
       });
     }
-    return ok(res, {
+    return {
       history,
       asOf: new Date().toISOString(),
       source: 'CoinGecko market_chart + /global',
       note: 'Historical dominance approximated as current (CoinGecko free tier does not expose total crypto market cap history). BTC market cap trend is the true time-series.',
+    };
     });
+    return okCached(res, payload);
   } catch (e: any) {
     console.error('dominance/history error:', e);
-    return err(res, 500, e.message || 'Failed to fetch dominance history');
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=300');
+    return err(res, 503, 'Dominance data temporarily unavailable (CoinGecko rate limit)');
   }
 }
 
@@ -5188,14 +5192,17 @@ async function handlePiCycle(_req: VercelRequest, res: VercelResponse) {
     };
     const price111DMA = Math.round(calcMA(111));
     const price350DMA = Math.round(calcMA(350));
-    const trigger111x2 = Math.round(price111DMA * 2);
+    // Pi Cycle Top: the 111DMA crossing ABOVE 2 x 350DMA. The old code doubled the 111DMA
+    // instead, so it read "Above / Distribution" whenever 111DMA > half the 350DMA.
+    const price350DMAx2 = Math.round(calcMA(350) * 2);
     let crossStatus: 'Below' | 'Above' | 'Crossing' = 'Below';
-    if (trigger111x2 > price350DMA) crossStatus = 'Above';
-    else if (Math.abs(trigger111x2 - price350DMA) / price350DMA < 0.005) crossStatus = 'Crossing';
+    if (Math.abs(price111DMA - price350DMAx2) / price350DMAx2 < 0.005) crossStatus = 'Crossing';
+    else if (price111DMA > price350DMAx2) crossStatus = 'Above';
     const cyclePhase = crossStatus === 'Above' ? 'Distribution' : 'Bullish';
     return ok(res, {
       price111DMA,
       price350DMA,
+      price350DMAx2,
       crossStatus,
       cyclePhase,
       lastCrossDate: '2021-04-14',

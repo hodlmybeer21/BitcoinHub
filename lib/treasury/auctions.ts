@@ -9,7 +9,7 @@
 // and indirect_share for that term, plus a computed stress score (0–100).
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validateShape, TreasuryAuctionsSchema } from '../shared/safe-api.js';
+import { validateShape, TreasuryAuctionsSchema } from '../../shared/safe-api.js';
 
 const AUCTIONS_URL =
   'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query';
@@ -75,12 +75,14 @@ function asNum(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function parseRows(raw: any[]): AuctionRow[] {
+export function parseRows(raw: any[]): AuctionRow[] {
   return raw
     .map(r => ({
       record_date: r.record_date,
       auction_date: r.auction_date ?? r.record_date,
-      security_term: r.security_term,
+      // Reopenings are labelled e.g. "29-Year 10-Month"; group by the original term (audit B8).
+      security_term: r.original_security_term ?? r.security_term,
+      tips: r.inflation_index_security === 'Yes',
       bid_to_cover_ratio: asNum(r.bid_to_cover_ratio),
       offering_amt: asNum(r.offering_amt),
       accepted_amt: asNum(r.accepted_amt ?? r.total_accepted),
@@ -91,8 +93,10 @@ function parseRows(raw: any[]): AuctionRow[] {
       direct_bidder_accepted: asNum(r.direct_bidder_accepted),
       total_accepted: asNum(r.total_accepted),
     }))
-    .filter(r => TERMS.includes(r.security_term as Term))
-    .sort((a, b) => b.record_date.localeCompare(a.record_date));
+    // Nominal coupons only; skip announced-but-not-yet-held auctions (no bid-to-cover yet).
+    .filter(r => TERMS.includes(r.security_term as Term) && !r.tips && r.bid_to_cover_ratio !== null)
+    .map(({ tips, ...r }) => r)
+    .sort((a, b) => b.auction_date.localeCompare(a.auction_date));
 }
 
 function indirectShare(r: AuctionRow): number | null {
@@ -161,9 +165,9 @@ async function fetchTerm(term: Term): Promise<AuctionRow[]> {
   const startStr = start.toISOString().slice(0, 10);
 
   const params = new URLSearchParams({
-    'filter': `record_date:gte:${startStr},security_term:eq:${term}`,
+    'filter': `record_date:gte:${startStr},original_security_term:eq:${term}`,
     'page[size]': '200',
-    'sort': '-record_date',
+    'sort': '-auction_date',
   });
   const url = `${AUCTIONS_URL}?${params.toString()}`;
   const json = await fetchJson(url);
