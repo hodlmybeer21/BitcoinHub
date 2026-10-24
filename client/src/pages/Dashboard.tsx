@@ -82,7 +82,7 @@ export default function Dashboard() {
             </div>
             <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
               <p className="text-[9px] uppercase tracking-widest text-white/[0.3] mb-3">
-                ETF flows (5d)
+                BTC spot ETF flows
               </p>
               <ETFFlowsWidget />
             </div>

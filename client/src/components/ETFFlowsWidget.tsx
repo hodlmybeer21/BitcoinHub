@@ -3,14 +3,13 @@
  *
  * Backend (`/api/etf-flows`) currently returns an honest empty response with
  * a clear message that free public sources are Cloudflare-blocked. This
- * widget renders that state cleanly with a CTA to wire a CoinGlass Pro key.
+ * widget collapses that state to one line, with the reason behind a toggle.
  *
  * When a key is wired (`COINGLASS_API_KEY` env var), the backend will return
  * real daily flows and this widget will render them automatically — no UI
  * changes needed.
  */
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
 
 interface ETFFlowData {
@@ -46,29 +45,14 @@ export default function ETFFlowsWidget() {
     staleTime: 60 * 1000,
   });
 
-  return (
-    <Card className="bg-card/50">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center justify-between">
-          <span>BTC SPOT ETF FLOWS</span>
-          {data?.flows?.length ? (
-            <span className="text-xs text-muted-foreground/60">{data.flows.length}d</span>
-          ) : null}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
-            <div className="h-12 bg-muted/40 rounded animate-pulse" />
-            <div className="h-4 bg-muted/40 rounded animate-pulse w-2/3" />
-          </div>
-        ) : data?.available && data.flows.length > 0 ? (
-          <FlowsDisplay data={data} />
-        ) : (
-          <UnavailableState message={data?.message || 'Loading...'} />
-        )}
-      </CardContent>
-    </Card>
+  // Rendered inside the /analytics KPI tile, which supplies the title.
+  if (isLoading) {
+    return <div className="h-5 bg-muted/40 rounded animate-pulse w-2/3" />;
+  }
+  return data?.available && data.flows.length > 0 ? (
+    <FlowsDisplay data={data} />
+  ) : (
+    <UnavailableState message={data?.message || 'No response from /api/etf-flows.'} />
   );
 }
 
@@ -104,16 +88,16 @@ function FlowsDisplay({ data }: { data: ETFFlowData }) {
   );
 }
 
+// Collapsed to one line (UX review #29); the full reason is one click away.
 function UnavailableState({ message }: { message: string }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/20">
-        <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-        <div className="text-xs text-amber-200/90 leading-relaxed">
-          <p className="font-medium mb-1">ETF flow data not currently sourced</p>
-          <p className="text-amber-200/70">{message}</p>
-        </div>
-      </div>
-    </div>
+    <details className="group text-xs text-muted-foreground" data-testid="etf-flows-unavailable">
+      <summary className="cursor-pointer list-none flex items-center gap-1.5 [&::-webkit-details-marker]:hidden">
+        <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+        <span>Not available on free sources.</span>
+        <span className="text-primary group-open:hidden">Why?</span>
+      </summary>
+      <p className="mt-2 leading-relaxed text-muted-foreground/80">{message}</p>
+    </details>
   );
 }

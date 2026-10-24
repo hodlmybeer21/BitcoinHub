@@ -98,8 +98,8 @@ function Router() {
             <div className="max-w-md w-full text-center space-y-3">
               <h1 className="text-3xl font-bold">Forgot password</h1>
               <p className="text-muted-foreground">
-                Password reset is part of the auth system that's coming back next month.
-                In the meantime, the rest of BitcoinHub works fine — just dive into any page from the navigation.
+                BitcoinHub doesn't have accounts, so there's no password to reset. Everything on the site
+                works without signing in.
               </p>
               <a href="/" className="inline-block mt-4 text-primary underline">Back to home</a>
             </div>

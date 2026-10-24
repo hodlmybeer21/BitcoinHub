@@ -1462,7 +1462,9 @@ async function handleInflation(_: VercelRequest, res: VercelResponse) {
 // Server can't import from client bundle (Vercel bundles them separately).
 // When editing either side, mirror the change here.
 
-const LEGISLATION_EDITORIAL = [
+// Statuses verified against congress.gov / sec.gov on 2026-10-24 (UX review #38).
+// No passage-chance estimates: they were guesses presented as numbers.
+const LEGISLATION_EDITORIAL: Array<Record<string, any>> = [
   {
     slug: 'genius-act',
     billName: 'GENIUS Act (signed)',
@@ -1472,30 +1474,11 @@ const LEGISLATION_EDITORIAL = [
     category: 'stablecoin',
     priority: 'high',
     stage: 'signed',
-    currentStatus: 'Became Public Law 119-27 — signed July 2025',
+    currentStatus: 'Became Public Law 119-27 on July 18, 2025',
     whyItMatters:
-      "Indirect for BTC, but high signal for the broader crypto market. Established federal licensing for stablecoin issuers (USDC, USDT, PYUSD) with reserve + audit requirements — takes stablecoins out of the SEC's enforcement-by-letters gray zone. A clean US stablecoin framework removes a regulatory-overhang line item from every crypto company's risk register, and signals that Congress can legislate on digital assets without it becoming partisan warfare. Also: USDC and USDT are the on-ramp that 80%+ of BTC purchases use, so a healthier US stablecoin regime is indirectly bullish for BTC liquidity.",
+      "Indirect for BTC, but a strong signal for the wider crypto market. It sets up federal licensing for payment-stablecoin issuers, with reserve and audit requirements, and takes stablecoins out of the regulatory gray zone. Stablecoins are a major on-ramp for buying BTC, so a clearer US stablecoin regime matters for BTC liquidity.",
     whatsNext:
-      'Watch how the new federal regime reshapes USDC vs Tether competitive dynamics. Treasury guidance on reserve-asset composition is the next major milestone — likely Q4 2026.',
-    passageChance: 100,
-  },
-  {
-    slug: 'fit21',
-    billName: 'FIT21 Act (retired)',
-    billType: 'hr',
-    billNumber: '4763',
-    congress: '118',
-    category: 'regulation',
-    priority: 'high',
-    stage: 'dead',
-    currentStatus: 'Died at end of 118th Congress — succeeded by CLARITY in 119th',
-    whyItMatters:
-      "Passed House 311-104 in 2024 — a rare bipartisan vote that established CFTC-as-primary-regulator as the policy consensus for digital commodities including BTC. Died in the Senate. The 119th Congress chose to start fresh with CLARITY rather than pick up FIT21. The principles live on; the bill vehicle does not.",
-    whatsNext:
-      'Monitor only if CLARITY stalls — FIT21 could be revived as a compromise vehicle, but the current path is CLARITY forward.',
-    passageChance: 0,
-    sponsorNote: 'Rep. Patrick McHenry (R-NC) + Rep. Glenn Thompson (R-PA) + House Democrats',
-    retired: true,
+      'It is law. What remains is implementation: the rules Treasury and the banking regulators write under it.',
   },
   {
     slug: 'clarity-act',
@@ -1505,69 +1488,93 @@ const LEGISLATION_EDITORIAL = [
     congress: '119',
     category: 'regulation',
     priority: 'high',
-    stage: 'committee',
-    currentStatus: 'Cloture motion on motion to proceed presented in Senate (Aug 2026) — closest a crypto market-structure bill has been to a floor vote',
+    stage: 'passed_chamber',
+    currentStatus: 'Passed the House 294-134 (July 17, 2025). In the Senate, cloture on the motion to proceed failed 49-50 (Sept 15, 2026).',
     whyItMatters:
-      "Direct for BTC. Defines digital commodities in statute (what BTC needs), establishes CFTC primary jurisdiction (not SEC's), creates a clear registration path for exchanges and custodians. The August 2026 cloture motion means the bill is actively being debated on the Senate floor — the closest a digital commodities bill has been to a Senate vote. If it passes, US-registered exchanges and custodians get a clear path to handle BTC without the current SEC-by-enforcement regime that's hung over the industry since the 2017-2018 ICO era.",
+      "Direct for BTC. Defines digital commodities in statute (what BTC needs), gives the CFTC primary jurisdiction over them instead of the SEC, and creates a registration path for exchanges and custodians.",
     whatsNext:
-      'Senate floor vote likely Q4 2026. Watch for amendments on the SEC/CFTC advisory committee scope — broader scope = more protection from jurisdictional turf wars between the agencies.',
-    passageChance: 60,
-    sponsorNote: 'Rep. French Hill (R-AR) + bipartisan working group',
-  },
-  // ── Editorial-only (no congress.gov bill ID yet) ──
-  {
-    slug: 'sec-cftc-unified-rulebook',
-    billName: 'SEC/CFTC Unified Rulebook',
-    category: 'regulation',
-    priority: 'high',
-    stage: 'committee',
-    currentStatus: 'Joint framework expected after 2025 roundtables — Q4 2026 release window',
-    whyItMatters:
-      "The two regulators are finally publishing a unified framework after 2025's joint roundtables. This is the more granular, day-to-day version of what CLARITY would lock in — even without legislation, this changes how exchanges and custodians operate. Concrete asks: which tokens are securities vs commodities, custody requirements, disclosure standards.",
-    whatsNext:
-      'Joint draft expected Q4 2026. Watch for the industry comment period — exchanges and custodians will signal what they want preserved.',
-    passageChance: 70,
+      'It needs 60 votes to get past the Senate procedural vote that failed in September 2026; a motion to reconsider that vote was entered. The latest congress.gov action is shown above.',
+    sponsorNote: 'Rep. French Hill (R-AR)',
   },
   {
     slug: 'anti-cbdc-surveillance',
     billName: 'Anti-CBDC Surveillance State Act',
+    billType: 'hr',
+    billNumber: '1919',
+    congress: '119',
     category: 'regulation',
     priority: 'medium',
     stage: 'passed_chamber',
-    currentStatus: 'Passed House twice (118th + 119th) — Senate Commerce Committee vote likely Q4 2026',
+    currentStatus: 'Passed the House 219-210 (July 17, 2025)',
     whyItMatters:
-      "Direct for BTC's monetary thesis. Prohibits the Fed from issuing a retail CBDC (central bank digital currency). If passed, it removes a credible Fed alternative to BTC and locks in the 'digital dollar = BTC' framing for retail. Otherwise, a Fed-issued retail CBDC competes with BTC on payments rails and could draw liquidity.",
+      "Direct for BTC's monetary thesis. It would bar the Federal Reserve from issuing a retail central bank digital currency (CBDC), which would otherwise compete with BTC as a digital form of money.",
     whatsNext:
-      'Senate Commerce Committee markup. Watch for administration signals — a hostile White House stance on retail CBDCs (likely) helps this bill.',
-    passageChance: 40,
+      'It needs Senate action to move. The latest congress.gov action is shown above.',
+    sponsorNote: 'Rep. Tom Emmer (R-MN)',
+  },
+  {
+    slug: 'fit21',
+    billName: 'FIT21 Act (expired)',
+    billType: 'hr',
+    billNumber: '4763',
+    congress: '118',
+    category: 'regulation',
+    priority: 'low',
+    stage: 'dead',
+    currentStatus: 'Passed the House 279-136 (May 22, 2024); never got a Senate vote and expired with the 118th Congress',
+    whyItMatters:
+      "The first bipartisan House vote to make the CFTC the main regulator for digital commodities like BTC. CLARITY in the 119th Congress picked up the same approach.",
+    whatsNext:
+      'Nothing pending. Kept for context.',
+    retired: true,
   },
   {
     slug: 'sab121-repeal',
-    billName: 'SAB 121 Repeal Joint Resolution',
+    billName: 'SAB 121 repeal resolution (resolved)',
+    billType: 'hjres',
+    billNumber: '109',
+    congress: '118',
     category: 'regulation',
-    priority: 'medium',
-    stage: 'committee',
-    currentStatus: 'House passed repeal resolution (2024) — Senate Banking Committee has not scheduled a vote',
+    priority: 'low',
+    stage: 'vetoed',
+    currentStatus: 'Passed both chambers in May 2024, vetoed May 31, 2024; the House override failed July 11, 2024. The SEC then rescinded SAB 121 itself with SAB 122 (Jan 23, 2025).',
     whyItMatters:
-      "Indirect but high-leverage. SEC's SAB 121 forced banks to mark crypto custody as a liability on the balance sheet — which functionally prevented US banks from custodying BTC. Repealing it unlocks institutional custody infrastructure. Pension funds, RIAs, and the big banks could then offer BTC exposure without weird workarounds. Estimated impact: $1-3T of institutional capital that can't currently touch BTC.",
+      "SAB 121 made firms that custody crypto for customers carry it as a balance-sheet liability, which kept most US banks out of BTC custody. That barrier is gone now that SAB 121 is rescinded.",
     whatsNext:
-      'Senate Banking Committee vote. Banking lobby is actively opposed (huge fee revenue at stake). Watch for SEC leadership signals or administration pressure to break the logjam.',
-    passageChance: 30,
+      'Nothing pending. Resolved by the SEC rather than Congress.',
+    retired: true,
   },
 ];
 
-// Best-effort heuristic to derive pipeline stage from latestAction.text.
-// congress.gov doesn't expose a machine-readable status field.
-function deriveStageLocal(text: string | undefined): string {
-  if (!text) return 'introduced';
-  const t = text.toLowerCase();
-  if (t.includes('became public law') || t.includes('signed by president')) return 'signed';
-  if (t.includes('vetoed')) return 'vetoed';
-  if (t.includes('pocket veto') || t.includes('died') || t.includes('withdrawn')) return 'dead';
-  if (t.includes('conference')) return 'conference';
-  if (t.includes('passed senate') || t.includes('passed house')) return 'passed_chamber';
-  if (t.includes('reported') || t.includes('committee') || t.includes('markup')) return 'committee';
+// Pipeline stage from a bill's whole action history — mirrors deriveStageFromActions
+// in client/src/lib/legislation-data.ts (tested there). congress.gov has no
+// machine-readable status field, so this reads the action text.
+function congressForLocal(date: Date): number {
+  const y = date.getUTCFullYear();
+  const beforeJan3 = date.getUTCMonth() === 0 && date.getUTCDate() < 3;
+  return Math.floor(((beforeJan3 ? y - 1 : y) - 1789) / 2) + 1;
+}
+function stageFromActions(actionTexts: string[], billCongress: number, currentCongress: number): string {
+  const all = actionTexts.map((t) => (t || '').toLowerCase());
+  const any = (...needles: string[]) => all.some((t) => needles.some((n) => t.includes(n)));
+  if (any('became public law', 'signed by president')) return 'signed';
+  if (any('vetoed by president', 'failed of passage in house over veto', 'failed of passage in senate over veto')) return 'vetoed';
+  if (billCongress < currentCongress) return 'dead';
+  if (any('passed/agreed to in house', 'passed/agreed to in senate', 'passed house', 'passed senate')) return 'passed_chamber';
+  if (any('reported', 'referred to', 'committee', 'markup')) return 'committee';
   return 'introduced';
+}
+
+// Most recent dated action across the bills that have live congress.gov data.
+// Replaces the old hardcoded "next major event" (UX review #38): we only report
+// what congress.gov shows, never a forecast.
+function latestTrackedAction(bills: any[]): { billName: string; text: string; date: string } | null {
+  let best: { billName: string; text: string; date: string } | null = null;
+  for (const b of bills) {
+    if (!b.lastActionDate || !b.liveStatus) continue;
+    if (!best || b.lastActionDate > best.date) best = { billName: b.billName, text: b.currentStatus, date: b.lastActionDate };
+  }
+  return best;
 }
 
 // Tiny in-memory cache — survives warm starts, resets on cold start.
@@ -1587,7 +1594,8 @@ async function handleLegislation(_: VercelRequest, res: VercelResponse) {
     const bills = LEGISLATION_EDITORIAL.map(e => ({
       ...e,
       billSlug: e.billType && e.billNumber ? `${e.congress}-${e.billType}-${e.billNumber}` : e.slug,
-      currentStatus: e.currentStatus || 'CONGRESS_API_KEY not set — configure in Vercel env to enable live data',
+      currentStatus: e.currentStatus || 'Status unavailable',
+      liveStatus: false,
       lastActionDate: '',
       stage: e.stage || 'introduced',
       sponsor: e.sponsorNote || 'Unknown',
@@ -1598,8 +1606,8 @@ async function handleLegislation(_: VercelRequest, res: VercelResponse) {
     const data = {
       bills,
       lastUpdated: fetchedAt,
-      summary: 'Editorial overview — congress.gov API key not configured. Set CONGRESS_API_KEY in Vercel env to enable live bill data.',
-      nextMajorEvent: 'GENIUS Act Senate floor vote (Q2 2026)',
+      summary: 'Editorial overview. Live congress.gov data is not configured, so statuses below were last checked by hand and may be out of date.',
+      latestAction: null,
       source: 'fallback',
       fetchedAt,
     };
@@ -1632,20 +1640,28 @@ async function handleLegislation(_: VercelRequest, res: VercelResponse) {
       const bill = billResp?.bill;
       if (!bill) throw new Error('no bill in response');
 
-      const actionsUrl = `https://api.congress.gov/v3/bill/${e.congress}/${e.billType}/${e.billNumber}/actions?api_key=${apiKey}&limit=10&format=json`;
+      // Full history (one request) so the stage doesn't regress on procedural actions;
+      // only the 10 most recent are sent to the client.
+      const actionsUrl = `https://api.congress.gov/v3/bill/${e.congress}/${e.billType}/${e.billNumber}/actions?api_key=${apiKey}&limit=250&format=json`;
       const actionsResp = await fetchJson(actionsUrl, 8000);
-      const actions = (actionsResp?.actions || []).map((a: any) => ({
+      const allActions = (actionsResp?.actions || []).map((a: any) => ({
         date: a.actionDate || '',
         text: a.text || '',
       }));
+      const actions = allActions.slice(0, 10);
 
       const latest = bill.latestAction || {};
       return {
         ...e,
         billSlug: slug,
         currentStatus: latest.text || 'No action yet',
+        liveStatus: true,
         lastActionDate: latest.actionDate || '',
-        stage: deriveStageLocal(latest.text),
+        stage: stageFromActions(
+          [latest.text || '', ...allActions.map((a: any) => a.text)],
+          Number(e.congress),
+          congressForLocal(new Date()),
+        ),
         sponsor: e.sponsorNote || (bill.sponsors?.[0]?.fullName) || 'Unknown',
         originChamber: bill.originChamber || '',
         updateDate: bill.updateDate || '',
@@ -1668,6 +1684,7 @@ async function handleLegislation(_: VercelRequest, res: VercelResponse) {
       ...e,
       billSlug: slug,
       currentStatus: e.currentStatus || 'Live data temporarily unavailable',
+      liveStatus: false,
       lastActionDate: '',
       stage: e.stage || 'introduced',
       sponsor: e.sponsorNote || 'Unknown',
@@ -1687,11 +1704,11 @@ async function handleLegislation(_: VercelRequest, res: VercelResponse) {
     bills,
     lastUpdated: fetchedAt,
     summary: source === 'congress.gov'
-      ? 'Live bill data from api.congress.gov, merged with editorial commentary from BitcoinHub team.'
+      ? 'Bill status and actions come live from api.congress.gov. The notes on why each bill matters for Bitcoin are BitcoinHub editorial.'
       : source === 'partial'
-      ? 'Partial — congress.gov data temporarily unavailable for some bills. Editorial commentary still current.'
-      : 'Editorial overview — congress.gov temporarily unavailable.',
-    nextMajorEvent: 'GENIUS Act Senate floor vote (Q2 2026)',
+      ? 'congress.gov was unavailable for some bills; those show the last hand-checked status.'
+      : 'congress.gov is temporarily unavailable; statuses below were last checked by hand and may be out of date.',
+    latestAction: latestTrackedAction(bills),
     source,
     fetchedAt,
   };

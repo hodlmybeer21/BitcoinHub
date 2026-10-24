@@ -256,14 +256,24 @@ export function RiskOneLiner() {
             <span className="font-mono font-medium text-white">
               {data.currentStreak.days}d
             </span>{' '}
-            in current band. Last transition:{' '}
-            <span className="font-mono text-white/[0.8]">
-              {data.lastTransition.date}
-            </span>{' '}
-            <span className="text-white/[0.4]">
-              ({data.lastTransition.from} → {data.lastTransition.to})
-            </span>
-            .
+            in current band.
+            {data.lastTransition?.date ? (
+              <>
+                {' '}Last transition:{' '}
+                <span className="font-mono text-white/[0.8]">
+                  {data.lastTransition.date}
+                </span>
+                {data.lastTransition.from && data.lastTransition.to ? (
+                  <>
+                    {' '}
+                    <span className="text-white/[0.4]">
+                      ({data.lastTransition.from} → {data.lastTransition.to})
+                    </span>
+                  </>
+                ) : null}
+                .
+              </>
+            ) : null}
           </p>
           <Link
             href="/risk"

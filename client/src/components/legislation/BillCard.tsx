@@ -20,7 +20,6 @@ interface BillData {
   priority: string;
   whyItMatters: string;
   whatsNext: string;
-  passageChance: number;
   currentStatus: string;
   lastActionDate: string;
   stage: BillStage;
@@ -55,16 +54,23 @@ function priorityColor(priority: string): string {
   }
 }
 
-function passageColor(chance: number): string {
-  if (chance >= 70) return 'text-emerald-500';
-  if (chance >= 40) return 'text-yellow-500';
-  return 'text-red-500';
+function stageColor(stage: BillStage): string {
+  if (stage === 'signed') return 'text-emerald-500';
+  if (stage === 'dead' || stage === 'vetoed') return 'text-muted-foreground';
+  return 'text-foreground';
 }
+
+const CONGRESS_GOV_TYPE: Record<string, string> = {
+  s: 'senate-bill',
+  hr: 'house-bill',
+  sjres: 'senate-joint-resolution',
+  hjres: 'house-joint-resolution',
+};
 
 export default function BillCard({ bill }: Props) {
   const hasCongressId = !!bill.congress && !!bill.billType && !!bill.billNumber;
   const congressUrl = hasCongressId
-    ? `https://www.congress.gov/bill/${bill.congress}th-congress/${bill.billType === 's' ? 'senate-bill' : 'house-bill'}/${bill.billNumber}`
+    ? `https://www.congress.gov/bill/${bill.congress}th-congress/${CONGRESS_GOV_TYPE[bill.billType!] ?? 'house-bill'}/${bill.billNumber}`
     : null;
 
   return (
@@ -104,11 +110,11 @@ export default function BillCard({ bill }: Props) {
             </div>
           </div>
           <div className="text-right">
-            <div className={`text-3xl font-bold ${passageColor(bill.passageChance)}`}>
-              {bill.passageChance}%
+            <div className={`text-lg font-semibold ${stageColor(bill.stage)}`} data-testid={`bill-stage-${bill.slug}`}>
+              {STAGE_LABEL[bill.stage] ?? bill.stage}
             </div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Passage estimate
+              Status
             </div>
           </div>
         </div>
@@ -168,7 +174,7 @@ export default function BillCard({ bill }: Props) {
                 </a>
               </>
             ) : (
-              <span>Source: Tyler + GoodBot editorial</span>
+              <span>Source: BitcoinHub editorial</span>
             )}
           </div>
         </div>
