@@ -174,6 +174,12 @@ function loadSavedPortfolios(): SavedPortfolio[] {
 
 // --- Helpers ---
 
+/** Weight (0–1) as a percent string; "—" instead of NaN% (audit B12). */
+function safePct(w: number | null | undefined, signed = false): string {
+  if (typeof w !== 'number' || !Number.isFinite(w)) return '—';
+  return `${signed && w >= 0 ? '+' : ''}${(w * 100).toFixed(1)}%`;
+}
+
 const DEFAULT_PORTFOLIO = [
   { symbol: 'BTC', quantity: 0.5 },
   { symbol: 'IBIT', quantity: 100 },
@@ -965,16 +971,23 @@ export default function PortfolioMPT() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {result.rebalanceTrades.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground text-sm">
+                          No trades needed: your current weights are already at the target.
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {result.rebalanceTrades.map(t => (
                       <TableRow key={t.symbol}>
                         <TableCell className="font-mono font-semibold">{t.symbol}</TableCell>
-                        <TableCell className="text-right font-mono">{(t.currentWeight * 100).toFixed(1)}%</TableCell>
-                        <TableCell className="text-right font-mono">{(t.targetWeight * 100).toFixed(1)}%</TableCell>
+                        <TableCell className="text-right font-mono">{safePct(t.currentWeight)}</TableCell>
+                        <TableCell className="text-right font-mono">{safePct(t.targetWeight)}</TableCell>
                         <TableCell className={`text-right font-mono ${pctColor(t.deltaWeight)}`}>
-                          {t.deltaWeight >= 0 ? '+' : ''}{(t.deltaWeight * 100).toFixed(1)}%
+                          {safePct(t.deltaWeight, true)}
                         </TableCell>
                         <TableCell className={`text-right font-mono font-semibold ${pctColor(t.deltaValue)}`}>
-                          {t.deltaValue >= 0 ? '+' : ''}{formatCurrency(t.deltaValue)}
+                          {Number.isFinite(t.deltaValue) ? `${t.deltaValue >= 0 ? '+' : ''}${formatCurrency(t.deltaValue)}` : '—'}
                         </TableCell>
                       </TableRow>
                     ))}

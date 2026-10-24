@@ -4,40 +4,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface FundingRateData {
   symbol: string;
-  fundingRate: number;
+  exchange: string;
   fundingRatePercent: number;
-  nextFundingTime: string;
-  price: number;
+  nextFundingTime: string | null;
 }
 
+// Audit B9: the browser used to call api.bybit.com directly (blocked by CORS).
+// Now it reads our own /api/funding-rates (OKX, Deribit backup), server-side.
 export default function FundingRates() {
   const { data, isLoading } = useQuery<FundingRateData[]>({
-    queryKey: ['funding-rates'],
+    queryKey: ['/api/funding-rates'],
     queryFn: async () => {
-      try {
-        const res = await fetch('https://api.bybit.com/v5/market/funding/inner-index-price?category=linear&symbol=BTCUSD');
-        if (!res.ok) throw new Error('Failed');
-        const json = await res.json();
-        
-        if (json.ret_code === 0 && json.result?.list) {
-          const item = json.result.list[0];
-          const fundingRatePercent = parseFloat(item.funding_rate || '0') * 100;
-          
-          return [{
-            symbol: 'BTCUSD',
-            fundingRate: parseFloat(item.funding_rate || '0'),
-            fundingRatePercent,
-            nextFundingTime: item.next_funding_time || '',
-            price: parseFloat(item.index_price || '0'),
-          }];
-        }
-        return [];
-      } catch (e) {
-        console.error('Funding rate fetch failed:', e);
-        return [];
-      }
+      const res = await fetch('/api/funding-rates');
+      if (!res.ok) return [];
+      const j = await res.json();
+      if (typeof j?.fundingRate !== 'number' || !Number.isFinite(j.fundingRate)) return [];
+      return [{
+        symbol: j.instrument ?? 'BTC perp',
+        exchange: j.exchange ?? '',
+        fundingRatePercent: j.fundingRate,
+        nextFundingTime: j.nextFundingTime ?? null,
+      }];
     },
-    refetchInterval: 60000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   if (isLoading) {
@@ -56,8 +45,8 @@ export default function FundingRates() {
   }
 
   const getFundingColor = (rate: number): string => {
-    if (rate > 0.01) return 'text-red-500'; // High funding = bears paying bulls
-    if (rate < -0.01) return 'text-green-500'; // Negative = bulls paying bears
+    if (rate > 0.01) return 'text-red-500'; // high positive funding: longs paying shorts
+    if (rate < -0.01) return 'text-green-500'; // negative: shorts paying longs
     return 'text-yellow-500';
   };
 
@@ -76,9 +65,11 @@ export default function FundingRates() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Bybit Funding Rate */}
-          <div className="p-3 bg-card rounded-lg border">
-            <div className="text-xs text-muted-foreground mb-1">Bybit Funding Rate</div>
+          {/* BTC perp funding rate */}
+          <div className="p-3 bg-card rounded-lg border" data-testid="funding-rate">
+            <div className="text-xs text-muted-foreground mb-1">
+              {data && data.length > 0 ? `${data[0].exchange} BTC Funding Rate` : 'BTC Funding Rate'}
+            </div>
             {data && data.length > 0 ? (
               <>
                 <div className={`text-xl font-mono font-bold ${getFundingColor(data[0].fundingRatePercent)}`}>
@@ -99,11 +90,11 @@ export default function FundingRates() {
             <div className="space-y-1 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/30" />
-                <span className="text-muted-foreground">Positive = Bears pay bulls</span>
+                <span className="text-muted-foreground">Positive = longs pay shorts</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/30" />
-                <span className="text-muted-foreground">Negative = Bulls pay bears</span>
+                <span className="text-muted-foreground">Negative = shorts pay longs</span>
               </div>
             </div>
           </div>
@@ -113,14 +104,16 @@ export default function FundingRates() {
             <div className="text-xs text-muted-foreground mb-1">Market Bias</div>
             {data && data.length > 0 ? (
               <div className={`text-lg font-mono font-bold ${getFundingColor(data[0].fundingRatePercent)}`}>
-                {data[0].fundingRatePercent > 0.005 ? 'BEARISH' : 
-                 data[0].fundingRatePercent < -0.005 ? 'BULLISH' : 'NEUTRAL'}
+                {/* 0.01%/8h is the exchanges' standard baseline (interest-rate component), so only
+                    funding beyond it signals crowding; same thresholds as the colour scale. */}
+                {data[0].fundingRatePercent > 0.01 ? 'LONGS CROWDED' :
+                 data[0].fundingRatePercent < -0.01 ? 'SHORTS CROWDED' : 'NEUTRAL'}
               </div>
             ) : (
               <div className="text-lg font-mono text-muted-foreground">—</div>
             )}
             <div className="text-xs text-muted-foreground mt-1">
-              Based on funding rate direction
+              Positioning read from funding direction
             </div>
           </div>
         </div>
@@ -129,7 +122,7 @@ export default function FundingRates() {
         {data && data.length > 0 && (
           <div className="mt-4 pt-4 border-t">
             <p className="text-xs text-muted-foreground/60">
-              Funding rate updates every 8 hours at 00:00, 08:00, 16:00 UTC. Data from Bybit.
+              Funding settles every 8 hours (00:00, 08:00, 16:00 UTC). Data from {data[0].exchange} public API.
             </p>
           </div>
         )}

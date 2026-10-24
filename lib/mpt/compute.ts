@@ -52,10 +52,15 @@ interface FrontierPoint {
   sharpe: number;
 }
 
-interface RebalanceTrade {
+// Audit B12: the /portfolio/mpt client renders currentWeight/targetWeight/deltaWeight/
+// deltaValue; this module returned only {action, shares, notional}, so the table was NaN.
+export interface RebalanceTrade {
   symbol: string;
+  currentWeight: number;
+  targetWeight: number;
+  deltaWeight: number;
+  deltaValue: number;
   action: 'buy' | 'sell';
-  shares: number;
   notional: number;
 }
 
@@ -338,7 +343,7 @@ function monteCarloOptimize(
   return { maxSharpe, minVol, cloud: subsample, nearFrontierAt };
 }
 
-function computeRebalanceTrades(
+export function computeRebalanceTrades(
   symbols: string[],
   currentWeights: number[],
   targetWeights: number[],
@@ -346,12 +351,18 @@ function computeRebalanceTrades(
 ): RebalanceTrade[] {
   const out: RebalanceTrade[] = [];
   for (let i = 0; i < symbols.length; i++) {
-    const delta = (targetWeights[i] - currentWeights[i]) * totalValue;
+    const cur = Number.isFinite(currentWeights[i]) ? currentWeights[i] : 0;
+    const tgt = Number.isFinite(targetWeights[i]) ? targetWeights[i] : 0;
+    const deltaWeight = tgt - cur;
+    const delta = Number.isFinite(totalValue) ? deltaWeight * totalValue : 0;
     if (Math.abs(delta) < 1) continue;
     out.push({
       symbol: symbols[i],
+      currentWeight: cur,
+      targetWeight: tgt,
+      deltaWeight,
+      deltaValue: Math.round(delta * 100) / 100,
       action: delta > 0 ? 'buy' : 'sell',
-      shares: Math.round(Math.abs(delta) * 100) / 100,
       notional: Math.round(Math.abs(delta) * 100) / 100,
     });
   }

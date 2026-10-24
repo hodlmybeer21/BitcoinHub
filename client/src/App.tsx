@@ -21,7 +21,7 @@ import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
-import Portfolio from "@/pages/Portfolio";
+import PortfolioPaused from "@/pages/PortfolioPaused";
 import PortfolioMPT from "@/pages/PortfolioMPT";
 import Workbench from "@/pages/Workbench";
 import WorkbenchTemplates from "@/pages/WorkbenchTemplates";
@@ -38,10 +38,12 @@ import Laws from "@/pages/Laws";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import RouteMeta from "@/components/RouteMeta";
 
 function Router() {
   return (
     <Layout>
+      <RouteMeta />
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/learn" component={Learn} />
@@ -68,7 +70,7 @@ function Router() {
         <Route path="/terms" component={Terms} />
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
-        <Route path="/portfolio" component={Portfolio} />
+        <Route path="/portfolio" component={PortfolioPaused} />
         <Route path="/portfolio/mpt" component={PortfolioMPT} />
         <Route path="/workbench">
           <ErrorBoundary label="Workbench">
