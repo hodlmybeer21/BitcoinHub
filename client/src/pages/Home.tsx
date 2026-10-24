@@ -30,6 +30,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
+import { buildValueStats, type SourceRef } from "@/lib/valueTrackerStats";
 import { CycleNow } from '@/components/CycleNow';
 
 interface MarketData {
@@ -73,14 +74,25 @@ const HeroBackground = () => (
   </div>
 );
 
-const ValueStat = ({ label, usd, gold, note }: { label: string; usd: string; gold: string; note?: string }) => (
+const ValueStat = ({ label, usd, gold, note, sources }: { label: string; usd: string; gold: string; note?: string; sources?: readonly SourceRef[] }) => (
   <div className="flex flex-col items-center px-4 py-3 bg-card/40 rounded-xl border border-muted/10">
     <span className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</span>
     <div className="flex items-baseline gap-3">
       <span className="text-amber-500 font-bold text-lg font-mono">{usd}</span>
-      <span className="text-green-500 text-sm font-mono">{gold}</span>
+      {gold && <span className="text-green-500 text-sm font-mono">{gold}</span>}
     </div>
-    {note && <span className="text-[10px] text-muted-foreground mt-0.5">{note}</span>}
+    {note && <span className="text-[10px] text-muted-foreground mt-0.5 text-center">{note}</span>}
+    {sources && sources.length > 0 && (
+      <span className="text-[10px] text-muted-foreground/80 mt-0.5 text-center">
+        Source:{' '}
+        {sources.map((src, i) => (
+          <span key={src.url}>
+            {i > 0 && '; '}
+            <a href={src.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{src.label}</a>
+          </span>
+        ))}
+      </span>
+    )}
   </div>
 );
 
@@ -234,18 +246,16 @@ const Home = () => {
           <div className="text-center mb-5">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">The Numbers Don't Lie</p>
             <p className="text-sm text-muted-foreground">
-              Purchasing power data from{' '}
+              Price changes through 2025 from public data (World Bank, BLS, Census/FRED, StatMuse). Gold and items are annual averages; Bitcoin is Dec 31 closes. Explore more in{' '}
               <a href="https://tracker.goodbotai.tech" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 Value Tracker
-              </a>{' '}
-              — real historical data
+              </a>
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <ValueStat label="Median US Home (1995→)" usd="+223%" gold="-72%" note="Same home, different measuring stick" />
-            <ValueStat label="Bread (1970→)" usd="+1,200%" gold="-95%" note="What a dollar buys you" />
-            <ValueStat label="Gold vs USD" usd="+1,800%" gold="Baseline" note="Gold held its purchasing power" />
-            <ValueStat label="Bitcoin (vs USD)" usd="+∞" gold="+∞" note="From $0.0008 to $100K+" />
+            {buildValueStats().map(({ key, ...stat }) => (
+              <ValueStat key={key} {...stat} />
+            ))}
           </div>
         </div>
       </section>
