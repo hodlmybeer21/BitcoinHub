@@ -1423,6 +1423,12 @@ async function inflationYoY(seriesId: string) {
   };
 }
 
+/** Short, key-free reason for a failed FRED fetch (shown in API output so prod failures are diagnosable). */
+function fredErrorReason(e: any): string {
+  const msg = String(e?.name === 'TimeoutError' ? 'timeout' : e?.message ?? e).replace(/api_key=[^&\s]+/gi, 'api_key=***');
+  return msg.slice(0, 160);
+}
+
 async function handleInflation(_: VercelRequest, res: VercelResponse) {
   const keys = Object.keys(INFLATION_SERIES) as (keyof typeof INFLATION_SERIES)[];
   const results = await Promise.allSettled(keys.map(k => inflationYoY(INFLATION_SERIES[k].id)));
@@ -1431,7 +1437,7 @@ async function handleInflation(_: VercelRequest, res: VercelResponse) {
     const r = results[i];
     out[k] = r.status === 'fulfilled'
       ? { ...r.value, label: INFLATION_SERIES[k].label }
-      : { value: null, change: null, lastUpdated: null, label: INFLATION_SERIES[k].label, seriesId: INFLATION_SERIES[k].id, error: 'unavailable' };
+      : { value: null, change: null, lastUpdated: null, label: INFLATION_SERIES[k].label, seriesId: INFLATION_SERIES[k].id, error: 'unavailable', reason: fredErrorReason(r.reason) };
   });
   let breakeven: string | null = null;
   try {
