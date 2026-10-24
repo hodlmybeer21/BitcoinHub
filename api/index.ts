@@ -1035,12 +1035,15 @@ async function getLiquidityData() {
   // M2 year-over-year growth: same month a year earlier, matched by date (audit D2).
   let m2Growth = 0;
   let m2AsOf: string | null = null;
+  let m2Source: string | null = null;
+  let m2Error: string | null = null;
   try {
-    const { fetchFredCsv, yoyPct, monthsAgoISO } = await import('../lib/macro/fred-csv.js');
-    const pts = await fetchFredCsv('M2SL', monthsAgoISO(15));
+    const { fetchFredSeries, yoyPct, monthsAgoISO } = await import('../lib/macro/fred-csv.js');
+    const { points: pts, source } = await fetchFredSeries('M2SL', monthsAgoISO(15));
     const y = yoyPct(pts);
-    if (y !== null) { m2Growth = parseFloat(y.toFixed(2)); m2AsOf = pts[pts.length - 1].date; }
-  } catch (_) {}
+    if (y !== null) { m2Growth = parseFloat(y.toFixed(2)); m2AsOf = pts[pts.length - 1].date; m2Source = source; }
+    else m2Error = 'not enough M2 data for YoY';
+  } catch (e) { m2Error = fredErrorReason(e); console.error('liquidity M2 YoY:', m2Error); }
 
   // Derive macro signal
   const hasRealData = m2 > 0 && fedBalance > 0 && m2AsOf !== null;
@@ -1055,7 +1058,7 @@ async function getLiquidityData() {
   return {
     summary: {
       overallSignal: hasRealData ? overallSignal : 'unavailable',
-      signalExplanation: hasRealData ? signalExplanation : 'FRED data unavailable — set FRED_API_KEY for live data.',
+      signalExplanation: hasRealData ? signalExplanation : 'M2 data unavailable from FRED right now.',
       m2Growth: hasRealData ? m2Growth : null,
       fedBalanceSheet: fedBalance,
       reverseRepo: rrp,
@@ -1064,7 +1067,7 @@ async function getLiquidityData() {
     },
     indicators: {
       // Units per FRED: M2SL and RRPONTSYD are billions; TREAST and WALCL are millions (audit D2).
-      m2: { value: m2, label: 'M2 Money Supply', unit: 'USD Billions', change: hasRealData ? m2Growth : null, asOf: m2AsOf, seriesId: 'M2SL' },
+      m2: { value: m2, label: 'M2 Money Supply', unit: 'USD Billions', change: hasRealData ? m2Growth : null, asOf: m2AsOf, seriesId: 'M2SL', source: m2Source, ...(m2Error ? { error: m2Error } : {}) },
       rrp: { value: rrp, label: 'Overnight RRP', unit: 'USD Billions', change: null, seriesId: 'RRPONTSYD' },
       tga: { value: tga, label: 'Fed Treasury Holdings', unit: 'USD Millions', change: null, seriesId: 'TREAST' },
       fedBalance: { value: fedBalance, label: 'Fed Balance Sheet', unit: 'USD Millions', change: null, seriesId: 'WALCL' },
@@ -1296,7 +1299,10 @@ async function handleFinancialInflation(_: VercelRequest, res: VercelResponse) {
     inflationYoY('CPIAUCSL'),
     ...SECTORS.map(s => inflationYoY(s.seriesId)),
   ]);
-  if (headline.status !== 'fulfilled') return err(res, 503, 'CPI unavailable from FRED right now');
+  if (headline.status !== 'fulfilled') {
+    console.error('financial/inflation CPI:', fredErrorReason(headline.reason));
+    return err(res, 503, `CPI unavailable from FRED right now (${fredErrorReason(headline.reason)})`);
+  }
   const sectors = SECTORS.flatMap((s, i) => {
     const r = sectorResults[i];
     return r.status === 'fulfilled' ? [{ name: s.name, rate: r.value.value, change: r.value.change ?? 0, seriesId: s.seriesId }] : [];
@@ -1408,8 +1414,8 @@ const INFLATION_SERIES = {
 } as const;
 
 async function inflationYoY(seriesId: string) {
-  const { fetchFredCsv, yoyPct, monthsAgoISO } = await import('../lib/macro/fred-csv.js');
-  const pts = await fetchFredCsv(seriesId, monthsAgoISO(15));
+  const { fetchFredSeries, yoyPct, monthsAgoISO } = await import('../lib/macro/fred-csv.js');
+  const { points: pts, source } = await fetchFredSeries(seriesId, monthsAgoISO(15));
   const last = pts[pts.length - 1];
   const prev = pts[pts.length - 2];
   const now = yoyPct(pts);
@@ -1420,7 +1426,14 @@ async function inflationYoY(seriesId: string) {
     change: before !== null ? Number((now - before).toFixed(1)) : null, // pp vs prior month's YoY
     lastUpdated: last.date,
     seriesId,
+    source,
   };
+}
+
+/** Short, key-free reason for a failed FRED fetch (shown in API output so prod failures are diagnosable). */
+function fredErrorReason(e: any): string {
+  const msg = String(e?.name === 'TimeoutError' ? 'timeout' : e?.message ?? e).replace(/api_key=[^&\s]+/gi, 'api_key=***');
+  return msg.slice(0, 160);
 }
 
 async function handleInflation(_: VercelRequest, res: VercelResponse) {
@@ -1431,16 +1444,18 @@ async function handleInflation(_: VercelRequest, res: VercelResponse) {
     const r = results[i];
     out[k] = r.status === 'fulfilled'
       ? { ...r.value, label: INFLATION_SERIES[k].label }
-      : { value: null, change: null, lastUpdated: null, label: INFLATION_SERIES[k].label, seriesId: INFLATION_SERIES[k].id, error: 'unavailable' };
+      : { value: null, change: null, lastUpdated: null, label: INFLATION_SERIES[k].label, seriesId: INFLATION_SERIES[k].id, error: 'unavailable', reason: fredErrorReason(r.reason) };
+    if (r.status === 'rejected') console.error(`inflation ${INFLATION_SERIES[k].id}:`, fredErrorReason(r.reason));
   });
   let breakeven: string | null = null;
+  let breakevenAsOf: string | null = null;
   try {
     const { fetchFredCsv } = await import('../lib/macro/fred-csv.js');
     const pts = await fetchFredCsv('T10YIE', new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-    if (pts.length) breakeven = pts[pts.length - 1].value.toFixed(2);
-  } catch (_) {}
+    if (pts.length) { breakeven = pts[pts.length - 1].value.toFixed(2); breakevenAsOf = pts[pts.length - 1].date; }
+  } catch (e) { console.error('inflation T10YIE:', fredErrorReason(e)); }
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
-  res.json({ ...out, breakeven, source: 'FRED (St. Louis Fed)', lastUpdated: new Date().toISOString() });
+  res.json({ ...out, breakeven, breakevenAsOf, source: 'FRED (St. Louis Fed)', lastUpdated: new Date().toISOString() });
 }
 
 // Inlined editorial overlay — MUST stay in sync with client/src/lib/legislation-data.ts.
