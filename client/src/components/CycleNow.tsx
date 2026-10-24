@@ -13,7 +13,15 @@
  *
  * Sources:
  *   /api/risk/indicator?symbol=BTC&days=3650  → score + band
- *   /api/cycle/overlay?from=halving&to=top&cycles=c4  → day + changePct
+ *   /api/cycle/position  → live BTC price (Yahoo daily close, 5-min cache),
+ *                          days since halving 4, % change since halving
+ *   Fallback: Coinbase public spot (keyless) if /api/cycle/position fails.
+ *   If both fail, the card says the live price is unavailable instead of
+ *   showing an old number.
+ *
+ * NOTE: this used to read /api/cycle/overlay?from=halving&to=top, which is
+ * the halving→cycle-TOP leg (ends 2025-10-06 at $124,752.53). That is a
+ * historical segment, so the card was frozen at the ATH while labeled LIVE.
  *
  * Per Tyler's review (2026-09-17): this widget is the answer to
  * "where are we in the Bitcoin cycle?" — the one question every Bitcoin
@@ -45,6 +53,57 @@ const BAND_LABELS: Record<string, string> = {
   extreme_greed: 'Extreme Greed',
 };
 
+// Halving 4 anchor — mirrors HALVING4_DATE / HALVING4_PRICE in lib/cycle/position.ts.
+const HALVING4_DATE_MS = Date.parse('2024-04-20T00:00:00Z');
+const HALVING4_PRICE = 63817.3;
+
+type LivePrice = {
+  price: number;
+  changePct: number;
+  day: number;
+  asOf: string;
+  source: 'yahoo' | 'coinbase';
+};
+
+function daysSinceHalving(nowMs: number = Date.now()): number {
+  return Math.max(0, Math.floor((nowMs - HALVING4_DATE_MS) / 86400000));
+}
+
+async function fetchLivePrice(): Promise<LivePrice> {
+  // Primary: our own /api/cycle/position (Yahoo daily close, cached 5 min).
+  try {
+    const r = await fetch('/api/cycle/position');
+    if (r.ok) {
+      const d = await r.json();
+      const price = Number(d?.currentPrice);
+      if (Number.isFinite(price) && price > 0) {
+        return {
+          price,
+          changePct: Number(d.priceSinceHalvingPct ?? ((price - HALVING4_PRICE) / HALVING4_PRICE) * 100),
+          day: Number(d.daysSinceHalving4 ?? daysSinceHalving()),
+          asOf: String(d.asOf ?? new Date().toISOString().slice(0, 10)),
+          source: 'yahoo',
+        };
+      }
+    }
+  } catch {
+    /* fall through to Coinbase */
+  }
+  // Fallback: Coinbase public spot price (no key, CORS-enabled).
+  const r = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot');
+  if (!r.ok) throw new Error(`coinbase spot: ${r.status}`);
+  const d = await r.json();
+  const price = Number(d?.data?.amount);
+  if (!Number.isFinite(price) || price <= 0) throw new Error('coinbase spot: bad payload');
+  return {
+    price,
+    changePct: ((price - HALVING4_PRICE) / HALVING4_PRICE) * 100,
+    day: daysSinceHalving(),
+    asOf: new Date().toISOString().slice(0, 10),
+    source: 'coinbase',
+  };
+}
+
 const FALLBACK_COLORS = { bg: 'bg-slate-500/15', text: 'text-slate-300', border: 'border-slate-500/40', dot: 'bg-slate-400' };
 
 export function CycleNow() {
@@ -59,14 +118,12 @@ export function CycleNow() {
     staleTime: 60 * 1000,
   });
 
-  const { data: cycleData } = useQuery({
-    queryKey: ['/api/cycle/overlay', 'halving', 'top', 'c4'],
-    queryFn: async () => {
-      const r = await fetch('/api/cycle/overlay?from=halving&to=top&cycles=c4');
-      if (!r.ok) throw new Error(`cycle/overlay: ${r.status}`);
-      return r.json();
-    },
-    staleTime: 60 * 60 * 1000, // 1h
+  const { data: live, isError: liveError } = useQuery({
+    queryKey: ['/api/cycle/position', 'live-price'],
+    queryFn: fetchLivePrice,
+    refetchInterval: 5 * 60 * 1000, // 5 min
+    staleTime: 60 * 1000,
+    retry: 1,
   });
 
   if (riskLoading || !risk) {
@@ -86,18 +143,20 @@ export function CycleNow() {
     typeof risk.band === 'string'
       ? risk.band
       : (risk.band?.band ?? 'neutral');
-  const c4 = cycleData?.series?.[0];
-  const day: number = c4?.days ?? 880;
+  const day: number = live?.day ?? daysSinceHalving();
   const cycleProgress = Math.min(100, Math.max(0, Math.round((day / 1460) * 100)));
-  const priceChange: number = Number(c4?.changePct ?? 0);
-  const endPrice: number = Number(c4?.endPrice ?? 0);
+  const hasPrice = live != null && Number.isFinite(live.price);
+  const priceChange: number = hasPrice ? live!.changePct : 0;
+  const endPrice: number = hasPrice ? live!.price : 0;
 
   const colors = BAND_COLORS[band] || FALLBACK_COLORS;
   const bandLabel = BAND_LABELS[band] || band;
 
   // Share intent — pre-fills an X post with the cycle status + link
   const shareText = encodeURIComponent(
-    `Day ${day} of the Bitcoin cycle · Risk band: ${bandLabel} · BTC since halving: ${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(1)}%\n\nbitcoinhub.goodbotai.tech/risk`
+    `Day ${day} of the Bitcoin cycle · Risk band: ${bandLabel}` +
+      (hasPrice ? ` · BTC since halving: ${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(1)}%` : '') +
+      `\n\nbitcoinhub.goodbotai.tech/risk`
   );
   const tweetIntent = `https://x.com/intent/tweet?text=${shareText}`;
 
@@ -171,14 +230,23 @@ export function CycleNow() {
               <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
                 BTC since halving
               </div>
-              <div className={`text-xl font-bold font-mono ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(1)}%
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  ${endPrice.toLocaleString()}
-                </span>
-              </div>
+              {hasPrice ? (
+                <div className={`text-xl font-bold font-mono ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(1)}%
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    ${endPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ) : (
+                <div className="text-sm font-semibold text-amber-400">
+                  {liveError ? 'Live price unavailable right now' : 'Loading live price…'}
+                </div>
+              )}
               <div className="text-xs text-muted-foreground mt-1">
                 {day} days into the 1,460-day cycle
+                {hasPrice && (
+                  <> · vs ${HALVING4_PRICE.toLocaleString()} at halving · {live!.source === 'yahoo' ? 'Yahoo daily close' : 'Coinbase spot'} as of {live!.asOf}</>
+                )}
               </div>
             </div>
           </div>
